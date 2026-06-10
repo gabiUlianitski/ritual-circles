@@ -1,0 +1,26 @@
+# Render blueprint — FastAPI API connected to Supabase PostgreSQL
+# Deploy: Render Dashboard → New → Blueprint → connect repo
+# Set DATABASE_URL and ALLOWED_ORIGINS in the Render dashboard after sync.
+
+services:
+  - type: web
+    name: ritual-circles-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /docs
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: DATABASE_SSL
+        value: require
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false

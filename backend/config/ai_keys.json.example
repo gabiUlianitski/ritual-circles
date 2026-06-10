@@ -1,0 +1,15 @@
+{
+  "AI_ENABLED": true,
+  "HTTPX_VERIFY": true,
+  "AI_PROVIDER": "groq",
+  "GROQ_API_KEY": "",
+  "GROQ_MODEL": "llama-3.3-70b-versatile",
+  "GROQ_API_URL": "https://api.groq.com/openai/v1/chat/completions",
+  "OPENAI_API_KEY": "",
+  "OPENAI_MODEL": "gpt-4o-mini",
+  "OPENAI_API_URL": "https://api.openai.com/v1/chat/completions",
+  "TEMPERATURE": 0.2,
+  "MAX_TOKENS": 1200,
+  "TIMEOUT": 60000
+}
+

@@ -1,0 +1,207 @@
+import React from "react";
+import type { CircleListItem } from "../api/types";
+import { circleHobyTitle } from "./circleDisplay";
+import { formatCompactSchedule, formatCompactLocation, formatParticipantsLabel } from "./circleDiscover";
+
+export type DiscoverCircleCardProps = {
+  circle: CircleListItem;
+  onPress: () => void;
+  joinAction?: {
+    label: string;
+    busy?: boolean;
+    disabled?: boolean;
+    secondary?: boolean;
+    onJoin: () => void;
+  } | null;
+};
+
+export function DiscoverCircleCard(props: DiscoverCircleCardProps) {
+  const { circle } = props;
+  const title = circleHobyTitle(circle);
+  const location = formatCompactLocation(circle);
+  const time = formatCompactSchedule(circle);
+  const participants = formatParticipantsLabel(circle);
+
+  return (
+    <article className="discover-card discover-card-tappable" onClick={() => props.onPress()}>
+      <div className="discover-card-body">
+        <div className="discover-card-head">
+          <span className="discover-card-icon" aria-hidden>
+            {circle.hobyIcon || "🎯"}
+          </span>
+          <h3 className="discover-card-title">{title}</h3>
+        </div>
+        <ul className="discover-card-meta">
+          <li>
+            <span className="discover-card-meta-icon" aria-hidden>
+              🕐
+            </span>
+            {time}
+          </li>
+          <li className="discover-card-meta-location">
+            <span className="discover-card-meta-icon" aria-hidden>
+              📍
+            </span>
+            <span className="discover-card-meta-text">{location}</span>
+          </li>
+          <li className="discover-card-participants">
+            <span className="discover-card-meta-icon" aria-hidden>
+              👥
+            </span>
+            <span className="discover-card-participants-text">{participants}</span>
+          </li>
+        </ul>
+      </div>
+      {props.joinAction ? (
+        <button
+          type="button"
+          className={`discover-card-join${props.joinAction.secondary ? " discover-card-join-secondary" : " primary"}`}
+          disabled={props.joinAction.disabled || props.joinAction.busy}
+          onClick={(e) => {
+            e.stopPropagation();
+            props.joinAction?.onJoin();
+          }}
+        >
+          {props.joinAction.busy ? "Joining…" : props.joinAction.label}
+        </button>
+      ) : null}
+    </article>
+  );
+}
+
+export function DiscoverSection(props: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+  compact?: boolean;
+}) {
+  return (
+    <section className={`discover-section${props.compact ? " discover-section-compact" : ""}`}>
+      <div className="discover-section-heading">
+        <h2 className="discover-section-title">{props.title}</h2>
+        {props.subtitle ? <p className="discover-section-subtitle muted">{props.subtitle}</p> : null}
+      </div>
+      <div className="discover-section-body">{props.children}</div>
+    </section>
+  );
+}
+
+export function DiscoverFilterChips<T extends string>(props: {
+  label: string;
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="discover-filter-group">
+      <span className="discover-filter-label muted">{props.label}</span>
+      <div className="discover-chips row" role="group" aria-label={props.label}>
+        {props.options.map((opt) => (
+          <button
+            key={opt.value || "all"}
+            type="button"
+            className={`discover-chip${props.value === opt.value ? " discover-chip-active" : ""}`}
+            disabled={props.disabled}
+            aria-pressed={props.value === opt.value}
+            onClick={() => props.onChange(opt.value)}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function DiscoverFiltersCollapsible(props: {
+  expanded: boolean;
+  onToggle: () => void;
+  hasActiveFilters: boolean;
+  onClear: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="discover-filters-panel">
+      <button
+        type="button"
+        className="discover-filters-toggle"
+        aria-expanded={props.expanded}
+        onClick={props.onToggle}
+        disabled={props.disabled}
+      >
+        <span>Filters</span>
+        {props.hasActiveFilters ? <span className="discover-filters-dot" aria-label="Filters active" /> : null}
+        <span className="discover-filters-chevron" aria-hidden>
+          {props.expanded ? "▾" : "▸"}
+        </span>
+      </button>
+      {props.expanded ? (
+        <div className="discover-filters-body stack">
+          {props.children}
+          {props.hasActiveFilters ? (
+            <button type="button" className="discover-filters-clear" onClick={props.onClear}>
+              Clear filters
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function DiscoverInterestChips(props: {
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  categories: { id: string; label: string; icon: string }[];
+}) {
+  return (
+    <div className="discover-interest-scroll" role="group" aria-label="Browse by interest">
+      {props.categories.map((cat) => {
+        const active = props.value === cat.id;
+        return (
+          <button
+            key={cat.id}
+            type="button"
+            className={`discover-interest-chip${active ? " discover-interest-chip-active" : ""}`}
+            disabled={props.disabled}
+            aria-pressed={active}
+            onClick={() => props.onChange(active ? "" : cat.id)}
+          >
+            <span aria-hidden>{cat.icon}</span> {cat.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function DiscoverEmptyState(props: {
+  title: string;
+  message?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="discover-empty stack">
+      <div className="discover-empty-title">{props.title}</div>
+      {props.message ? <p className="discover-empty-message muted">{props.message}</p> : null}
+      {props.actionLabel && props.onAction ? (
+        <button type="button" className="primary discover-empty-action" onClick={props.onAction}>
+          {props.actionLabel}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+export function DiscoverSectionHint(props: { title: string; message?: string }) {
+  return (
+    <div className="discover-section-hint stack">
+      <div className="discover-section-hint-title">{props.title}</div>
+      {props.message ? <p className="discover-section-hint-message muted">{props.message}</p> : null}
+    </div>
+  );
+}

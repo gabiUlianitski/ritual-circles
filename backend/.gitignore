@@ -1,0 +1,7 @@
+.env
+.venv
+__pycache__/
+*.pyc
+config/ai_keys.json
+config/google_maps_keys.json
+

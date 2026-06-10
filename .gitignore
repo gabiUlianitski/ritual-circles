@@ -1,0 +1,30 @@
+# Dependencies
+web/node_modules/
+backend/.venv/
+
+# Build output (Vercel builds from source)
+web/dist/
+
+# Secrets & local env
+.env
+**/.env
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+
+# IDE / tooling
+.cursor/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local API keys (see backend/.gitignore)
+backend/config/ai_keys.json
+backend/config/google_maps_keys.json

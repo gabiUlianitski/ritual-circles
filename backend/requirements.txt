@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+pydantic
+asyncpg
+python-dotenv
+PyJWT
+passlib
+httpx
+pycountry
+pyspellchecker
