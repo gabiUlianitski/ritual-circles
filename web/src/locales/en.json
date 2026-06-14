@@ -6,7 +6,24 @@
   "common": {
     "save": "Save changes",
     "saving": "Saving…",
-    "back": "Back"
+    "back": "Back",
+    "loading": "Loading…"
+  },
+  "nav": {
+    "appTitle": "Ritual Circles",
+    "menu": "Menu",
+    "moreOptions": "More options",
+    "home": "Home",
+    "discoverCircles": "Discover Circles",
+    "profile": "Profile",
+    "notifications": "Notifications",
+    "notificationsUnread": "Notifications — new activity",
+    "notificationsNew": "You have new notifications",
+    "hobbies": "Hobbies",
+    "logout": "Log out"
+  },
+  "errors": {
+    "sessionExpired": "Your session ended. Please sign in again."
   },
   "login": {
     "title": "Sign in",
@@ -17,6 +34,19 @@
     "createAccount": "New here? Create account",
     "registerTitle": "Create account"
   },
+  "home": {
+    "greeting": "Hi 👋",
+    "greetingName": "Hi {{name}} 👋",
+    "weekOneHangout": "1 hangout coming up this week 🙂",
+    "weekManyHangouts": "{{count}} hangouts coming up this week 🙂",
+    "noHangouts": "No hangouts yet — when you're ready, explore circles",
+    "hangoutToday": "Your next hangout is today 🙂",
+    "hangoutTomorrow": "Your next hangout is tomorrow 🙂",
+    "hangoutInDays": "Your next hangout is in {{count}} days 🙂",
+    "emptyDayTitle": "Nothing planned for this day",
+    "findCircles": "Find circles for this day",
+    "createCircle": "Create a circle on this day"
+  },
   "profile": {
     "title": "Profile",
     "tabs": {
@@ -26,7 +56,6 @@
     },
     "personalIntro": "What your circle can see. Tap fields to edit, then save.",
     "sections": {
-      "preferences": "Preferences",
       "personalDetails": "Personal details",
       "work": "Work",
       "education": "Education",

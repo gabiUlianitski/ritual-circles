@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api, getAuthToken, setAuthToken } from "../api/client";
 import type { HomeResponse } from "../api/types";
 import { hasAnyNotifications } from "../notificationsFeed";
+import { AppLanguageSelect } from "./AppLanguageSelect";
 import { Notifications } from "./Notifications";
 import { FormError } from "./FormError";
 import { Login } from "./Login";
@@ -48,6 +50,7 @@ function IconBell() {
 }
 
 export function App() {
+  const { t } = useTranslation();
   const [home, setHome] = useState<HomeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -102,7 +105,7 @@ export function App() {
         setAuthToken(null);
         setHome(null);
         setStage("login");
-        setError("Your session ended. Please sign in again.");
+        setError(t("errors.sessionExpired"));
       } else {
         setError(msg);
       }
@@ -226,17 +229,18 @@ export function App() {
     <div className="app">
       <div className="row app-header-row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div className="h1" style={{ marginBottom: 0 }}>
-          Ritual Circles
+          {t("nav.appTitle")}
         </div>
-        {stage !== "login" ? (
-          <div className="header-toolbar">
+        <div className="header-toolbar">
+          {stage !== "login" ? (
+            <>
             <button
               type="button"
               className={`icon-btn${stage === "dashboard" ? " is-active" : ""}`}
-              aria-label="Home"
+              aria-label={t("nav.home")}
               aria-current={stage === "dashboard" ? "page" : undefined}
               disabled={loading}
-              title="Home"
+              title={t("nav.home")}
               onClick={() => navigate("dashboard")}
             >
               <IconHome />
@@ -244,10 +248,10 @@ export function App() {
             <button
               type="button"
               className={`icon-btn${stage === "circles" ? " is-active" : ""}`}
-              aria-label="Discover Circles"
+              aria-label={t("nav.discoverCircles")}
               aria-current={stage === "circles" ? "page" : undefined}
               disabled={loading}
-              title="Discover Circles"
+              title={t("nav.discoverCircles")}
               onClick={() => navigate("circles")}
             >
               <IconCircles />
@@ -255,10 +259,10 @@ export function App() {
             <button
               type="button"
               className={`icon-btn${stage === "profile" ? " is-active" : ""}`}
-              aria-label="Profile"
+              aria-label={t("nav.profile")}
               aria-current={stage === "profile" ? "page" : undefined}
               disabled={loading}
-              title="Profile"
+              title={t("nav.profile")}
               onClick={() => navigate("profile")}
             >
               <IconProfile />
@@ -266,15 +270,17 @@ export function App() {
             <button
               type="button"
               className={`icon-btn icon-btn-notif${stage === "notifications" ? " is-active" : ""}`}
-              aria-label={hasUnread ? "Notifications — new activity" : "Notifications"}
+              aria-label={hasUnread ? t("nav.notificationsUnread") : t("nav.notifications")}
               aria-current={stage === "notifications" ? "page" : undefined}
               disabled={loading}
-              title={hasUnread ? "You have new notifications" : "View notifications"}
+              title={hasUnread ? t("nav.notificationsNew") : t("nav.notifications")}
               onClick={() => openNotifications()}
             >
               <IconBell />
               {hasUnread ? <span className="notif-dot" aria-hidden /> : null}
             </button>
+            </>
+          ) : null}
             <div className="app-header-wrap" ref={menuRef}>
               <button
                 ref={menuButtonRef}
@@ -287,12 +293,15 @@ export function App() {
                 onClick={() => setMenuOpen((o) => !o)}
                 disabled={loading}
               >
-                Menu
+                {t("nav.menu")}
               </button>
               {menuOpen ? (
-                <div id="app-nav-menu" className="app-nav-dropdown stack" role="menu" aria-label="More options">
+                <div id="app-nav-menu" className="app-nav-dropdown stack" role="menu" aria-label={t("nav.moreOptions")}>
+                  <AppLanguageSelect variant="menu" disabled={loading} />
+                  {stage !== "login" ? (
+                    <>
                   <button type="button" className="app-nav-item" role="menuitem" onClick={() => navigateFromMenu("hobies")}>
-                    Hobies
+                    {t("nav.hobbies")}
                   </button>
                   <button
                     type="button"
@@ -304,13 +313,14 @@ export function App() {
                     }}
                     disabled={loading}
                   >
-                    Log out
+                    {t("nav.logout")}
                   </button>
+                    </>
+                  ) : null}
                 </div>
               ) : null}
             </div>
-          </div>
-        ) : null}
+        </div>
       </div>
 
       {error ? <FormError>{error}</FormError> : null}
@@ -368,7 +378,7 @@ export function App() {
           }}
         />
       ) : home === null ? (
-        <div className="card muted">Loading…</div>
+        <div className="card muted">{t("common.loading")}</div>
       ) : (
         <Dashboard
           home={home}

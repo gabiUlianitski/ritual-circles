@@ -1,7 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import type { UserMeResponse } from "../api/types";
-import { AppLanguageSelect } from "./AppLanguageSelect";
 import { ProfileAvailabilityPicker } from "./ProfileAvailabilityPicker";
 import { FormError } from "./FormError";
 import { formatLanguagesSummary, ProfileLanguagesPicker } from "./ProfileLanguagesPicker";
@@ -116,13 +115,6 @@ export function ProfilePersonalTab(props: {
       <p id="profile-personal-heading" className="profile-personal-fb-sub">
         {t("profile.personalIntro")}
       </p>
-
-      <ProfileFbSection title={t("profile.sections.preferences")}>
-        <ProfileFbRow icon={<IconLanguages />} last>
-          <div className="profile-fb-about-primary">{t("appLanguage.label")}</div>
-          <AppLanguageSelect disabled={props.working} />
-        </ProfileFbRow>
-      </ProfileFbSection>
 
       <ProfileFbSection title={t("profile.sections.personalDetails")}>
         <ProfileFbRow icon={<IconLocation />}>

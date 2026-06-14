@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { GoogleLogin } from "@react-oauth/google";
 import { api, setAuthToken } from "../api/client";
-import { AppLanguageSelect } from "./AppLanguageSelect";
 import { FormError } from "./FormError";
 
 const USER_NAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
@@ -237,9 +236,6 @@ export function Login(props: {
 
   return (
     <div className="card stack">
-      <div className="login-lang-row">
-        <AppLanguageSelect />
-      </div>
       <div className="h1">{mode === "login" ? t("login.title") : t("login.registerTitle")}</div>
       <div className="muted">
         {mode === "login" ? <>{t("login.subtitle")}</> : null}

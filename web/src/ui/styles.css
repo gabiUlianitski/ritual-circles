@@ -156,6 +156,28 @@ a { color: inherit; }
   justify-content: flex-start;
 }
 
+.app-nav-lang {
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-bottom: 1px solid var(--card-border);
+  margin-bottom: 4px;
+}
+
+.app-nav-lang-label {
+  font-size: 0.82rem;
+}
+
+.app-language-select--menu {
+  width: 100%;
+  max-width: none;
+}
+
+[dir="rtl"] .app-nav-dropdown button {
+  text-align: right;
+}
+
 .login-google-block {
   gap: 12px;
 }

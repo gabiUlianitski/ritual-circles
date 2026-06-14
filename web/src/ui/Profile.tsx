@@ -144,7 +144,7 @@ export function Profile(props: { onBack: () => void; onLogout: () => void }) {
       </div>
 
       {!me ? (
-        <div className="muted">Loading…</div>
+        <div className="muted">{t("common.loading")}</div>
       ) : (
         <>
           <div className="hoby-browse-toggle profile-tabs" role="tablist" aria-label="Profile sections">

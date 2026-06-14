@@ -32,20 +32,6 @@ export function daysUntilNextSession(sessions: HomeCalendarSession[]): number | 
   return Math.round((target.getTime() - today.getTime()) / 86_400_000);
 }
 
-export function welcomeContextLine(sessions: HomeCalendarSession[]): string {
-  const weekCount = countActivitiesThisWeek(sessions);
-  if (weekCount > 0) {
-    return weekCount === 1
-      ? "1 hangout coming up this week 🙂"
-      : `${weekCount} hangouts coming up this week 🙂`;
-  }
-  const days = daysUntilNextSession(sessions);
-  if (days === null) return "No hangouts yet — when you're ready, explore circles";
-  if (days === 0) return "Your next hangout is today 🙂";
-  if (days === 1) return "Your next hangout is tomorrow 🙂";
-  return `Your next hangout is in ${days} days 🙂`;
-}
-
 export function formatSessionDateTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;

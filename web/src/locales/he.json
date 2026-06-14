@@ -6,7 +6,24 @@
   "common": {
     "save": "שמירת שינויים",
     "saving": "שומר…",
-    "back": "חזרה"
+    "back": "חזרה",
+    "loading": "טוען…"
+  },
+  "nav": {
+    "appTitle": "Ritual Circles",
+    "menu": "תפריט",
+    "moreOptions": "אפשרויות נוספות",
+    "home": "בית",
+    "discoverCircles": "גילוי מעגלים",
+    "profile": "פרופיל",
+    "notifications": "התראות",
+    "notificationsUnread": "התראות — פעילות חדשה",
+    "notificationsNew": "יש לך התראות חדשות",
+    "hobbies": "תחביבים",
+    "logout": "התנתקות"
+  },
+  "errors": {
+    "sessionExpired": "פג תוקף ההתחברות. התחבר/י שוב."
   },
   "login": {
     "title": "התחברות",
@@ -17,6 +34,19 @@
     "createAccount": "חדש/ה כאן? צור/י חשבון",
     "registerTitle": "יצירת חשבון"
   },
+  "home": {
+    "greeting": "היי 👋",
+    "greetingName": "היי {{name}} 👋",
+    "weekOneHangout": "מפגש אחד השבוע 🙂",
+    "weekManyHangouts": "{{count}} מפגשים השבוע 🙂",
+    "noHangouts": "עדיין אין מפגשים — כשתרצה/י, גלה/י מעגלים",
+    "hangoutToday": "המפגש הבא היום 🙂",
+    "hangoutTomorrow": "המפגש הבא מחר 🙂",
+    "hangoutInDays": "המפגש הבא בעוד {{count}} ימים 🙂",
+    "emptyDayTitle": "אין תוכניות ליום הזה",
+    "findCircles": "מצא/י מעגלים ליום הזה",
+    "createCircle": "צור/י מעגל ביום הזה"
+  },
   "profile": {
     "title": "פרופיל",
     "tabs": {
@@ -26,7 +56,6 @@
     },
     "personalIntro": "מה שהמעגל שלך רואה. ערוך/י שדות ושמור/י.",
     "sections": {
-      "preferences": "העדפות",
       "personalDetails": "פרטים אישיים",
       "work": "עבודה",
       "education": "השכלה",
