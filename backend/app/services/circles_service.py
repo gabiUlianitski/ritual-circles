@@ -21,6 +21,14 @@ from app.user_hobbies import user_can_join_circle
 from app.services.time_utils import next_occurrence_utc, next_session_datetime_after
 
 
+def _ritual_level_for_db(value: str | int | None) -> str | None:
+    """PostgreSQL ritual_level is TEXT; clients may send numeric level keys (1, 2, …)."""
+    if value is None:
+        return None
+    s = str(value).strip()
+    return s or None
+
+
 def _meeting_line_from_row(row: asyncpg.Record | dict[str, object]) -> str:
     mp = row.get("meeting_place") or row.get("meetingPlace")
     if mp is not None and str(mp).strip():
@@ -306,7 +314,7 @@ async def create_circle(conn: asyncpg.Connection, *, user_id: UUID, payload: Cir
                 """,
                 circle_id,
                 payload.ritualType,
-                payload.ritualLevel,
+                _ritual_level_for_db(payload.ritualLevel),
                 payload.ritualSubtype,
                 payload.modality,
                 payload.recurringTime,
