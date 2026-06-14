@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "./config";
+import { getAppLanguageCode } from "../i18n";
 import { getOrCreateDevUserId } from "./devUserId";
 import type {
   AttendanceResponse,
@@ -53,6 +54,7 @@ async function request<T>(
     signal: fetchOptions?.signal,
     headers: {
       Accept: "application/json",
+      "Accept-Language": getAppLanguageCode(),
       ...(body !== undefined && body !== null
         ? { "Content-Type": "application/json" }
         : { "Content-Type": "text/plain" }),

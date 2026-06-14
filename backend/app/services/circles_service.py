@@ -16,6 +16,7 @@ from app.schemas import (
     JoinCircleResponse,
     MeetingPlacePatch,
 )
+from app.hoby_i18n import localized_display_name
 from app.services.session_replenish import ensure_future_sessions_for_circle, ensure_future_sessions_for_user
 from app.user_hobbies import user_can_join_circle
 from app.services.time_utils import next_occurrence_utc, next_session_datetime_after
@@ -167,10 +168,11 @@ def _circle_response_from_row(
 async def hoby_meta_for_ritual_type(
     conn: asyncpg.Connection,
     ritual_type: str,
+    lang: str = "en",
 ) -> tuple[str | None, str | None]:
     row = await conn.fetchrow(
         """
-        SELECT display_name, icon
+        SELECT display_name, icon, i18n_json
         FROM hobies
         WHERE lower(trim(slug)) = lower(trim($1))
         LIMIT 1
@@ -179,7 +181,7 @@ async def hoby_meta_for_ritual_type(
     )
     if not row:
         return None, None
-    return row.get("display_name"), row.get("icon")
+    return localized_display_name(row, lang), row.get("icon")
 
 
 async def _generate_unique_invite_code(conn: asyncpg.Connection) -> str:
@@ -268,12 +270,14 @@ async def _complete_join_transaction(
         )
 
 
-async def _join_circle_response(conn: asyncpg.Connection, circle: asyncpg.Record) -> JoinCircleResponse:
-    hoby_name, hoby_icon = await hoby_meta_for_ritual_type(conn, circle["ritualType"])
+async def _join_circle_response(conn: asyncpg.Connection, circle: asyncpg.Record, lang: str = "en") -> JoinCircleResponse:
+    hoby_name, hoby_icon = await hoby_meta_for_ritual_type(conn, circle["ritualType"], lang)
     return JoinCircleResponse(circle=_circle_response_from_row(circle, hoby_name=hoby_name, hoby_icon=hoby_icon))
 
 
-async def create_circle(conn: asyncpg.Connection, *, user_id: UUID, payload: CircleCreateRequest) -> CircleResponse:
+async def create_circle(
+    conn: asyncpg.Connection, *, user_id: UUID, payload: CircleCreateRequest, lang: str = "en"
+) -> CircleResponse:
     line = ""
     if payload.meetingPlace and str(payload.meetingPlace).strip():
         line = str(payload.meetingPlace).strip()
@@ -381,7 +385,7 @@ async def create_circle(conn: asyncpg.Connection, *, user_id: UUID, payload: Cir
                 session_id,
             )
 
-    hoby_name, hoby_icon = await hoby_meta_for_ritual_type(conn, payload.ritualType)
+    hoby_name, hoby_icon = await hoby_meta_for_ritual_type(conn, payload.ritualType, lang)
     return CircleResponse(
         id=str(circle_id),
         ritualType=payload.ritualType,
@@ -404,7 +408,7 @@ async def create_circle(conn: asyncpg.Connection, *, user_id: UUID, payload: Cir
     )
 
 
-async def join_circle(conn: asyncpg.Connection, *, user_id: UUID, invite_code: str) -> JoinCircleResponse:
+async def join_circle(conn: asyncpg.Connection, *, user_id: UUID, invite_code: str, lang: str = "en") -> JoinCircleResponse:
     async with conn.transaction():
         circle = await conn.fetchrow(
             """
@@ -420,10 +424,10 @@ async def join_circle(conn: asyncpg.Connection, *, user_id: UUID, invite_code: s
 
         await _complete_join_transaction(conn, user_id=user_id, circle=circle)
 
-    return await _join_circle_response(conn, circle)
+    return await _join_circle_response(conn, circle, lang)
 
 
-async def join_circle_open(conn: asyncpg.Connection, *, user_id: UUID, circle_id: UUID) -> JoinCircleResponse:
+async def join_circle_open(conn: asyncpg.Connection, *, user_id: UUID, circle_id: UUID, lang: str = "en") -> JoinCircleResponse:
     async with conn.transaction():
         circle = await conn.fetchrow(
             """
@@ -444,7 +448,7 @@ async def join_circle_open(conn: asyncpg.Connection, *, user_id: UUID, circle_id
 
         await _complete_join_transaction(conn, user_id=user_id, circle=circle)
 
-    return await _join_circle_response(conn, circle)
+    return await _join_circle_response(conn, circle, lang)
 
 
 async def _delete_circle_if_no_future_members(conn: asyncpg.Connection, *, circle_id: UUID) -> None:
@@ -475,6 +479,7 @@ async def patch_circle(
     recurring_time: str | None = None,
     is_recurring: bool | None = None,
     meeting_place_update: MeetingPlacePatch | None = None,
+    lang: str = "en",
 ) -> CircleResponse:
     circle = await conn.fetchrow("SELECT * FROM circles WHERE id = $1", circle_id)
     if not circle:
@@ -556,7 +561,7 @@ async def patch_circle(
         await ensure_future_sessions_for_circle(conn, circle_id=circle_id)
 
     updated = await conn.fetchrow("SELECT * FROM circles WHERE id = $1", circle_id)
-    hoby_name, hoby_icon = await hoby_meta_for_ritual_type(conn, updated["ritualType"])
+    hoby_name, hoby_icon = await hoby_meta_for_ritual_type(conn, updated["ritualType"], lang)
     return _circle_response_from_row(updated, hoby_name=hoby_name, hoby_icon=hoby_icon)
 
 
@@ -753,7 +758,7 @@ async def get_next_session_attendance_roster(
     }
 
 
-async def list_circles_catalog(conn: asyncpg.Connection, *, user_id: UUID) -> list[dict[str, object]]:
+async def list_circles_catalog(conn: asyncpg.Connection, *, user_id: UUID, lang: str = "en") -> list[dict[str, object]]:
     """Circles that still have future sessions, with member counts. Invite codes omitted."""
     rows = await conn.fetch(
         """
@@ -771,8 +776,9 @@ async def list_circles_catalog(conn: asyncpg.Connection, *, user_id: UUID) -> li
                c.group_size_json AS group_size_json,
                c.cost_payment_json AS cost_payment_json,
                c.invite_only AS "inviteOnly",
-               h.display_name AS "hobyDisplayName",
+               h.display_name AS hoby_display_name_raw,
                h.icon AS "hobyIcon",
+               h.i18n_json AS hoby_i18n_json,
                COALESCE(
                    (
                        SELECT COUNT(DISTINCT a."userId")::int
@@ -831,6 +837,8 @@ async def list_circles_catalog(conn: asyncpg.Connection, *, user_id: UUID) -> li
     )
     out: list[dict[str, object]] = []
     for r in rows:
+        hoby_row = {"display_name": r.get("hoby_display_name_raw"), "i18n_json": r.get("hoby_i18n_json")}
+        hoby_display = localized_display_name(hoby_row, lang) if r.get("hoby_display_name_raw") else None
         out.append(
             {
                 "id": str(r["id"]),
@@ -847,7 +855,7 @@ async def list_circles_catalog(conn: asyncpg.Connection, *, user_id: UUID) -> li
                 "isCreator": bool(r["isCreator"]),
                 "ritualLevel": r["ritualLevel"],
                 "ritualSubtype": r["ritualSubtype"],
-                "hobyDisplayName": r["hobyDisplayName"],
+                "hobyDisplayName": hoby_display,
                 "hobyIcon": r["hobyIcon"],
                 "groupSize": _group_size_from_json(r.get("group_size_json")),
                 "costPayment": _cost_payment_from_json(r.get("cost_payment_json")),

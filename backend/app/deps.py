@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import Depends, Header, HTTPException, Request
 
 from app.auth.jwt import decode_token
+from app.hoby_i18n import normalize_app_lang
 
 from app.db import acquire_conn
 
@@ -41,4 +42,10 @@ async def get_current_user(
 async def conn_dep(request: Request):
     async for conn in acquire_conn(request):
         yield conn
+
+
+def get_request_lang(
+    accept_language: str | None = Header(default=None, alias="Accept-Language"),
+) -> str:
+    return normalize_app_lang(accept_language)
 

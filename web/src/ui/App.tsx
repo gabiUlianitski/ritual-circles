@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, getAuthToken, setAuthToken } from "../api/client";
 import type { HomeResponse } from "../api/types";
+import i18n from "../i18n";
 import { hasAnyNotifications } from "../notificationsFeed";
 import { AppLanguageSelect } from "./AppLanguageSelect";
 import { Notifications } from "./Notifications";
@@ -120,6 +121,14 @@ export function App() {
   useEffect(() => {
     if (stage !== "login") void refresh();
   }, []);
+
+  useEffect(() => {
+    const onLang = () => {
+      if (stage !== "login") void refresh();
+    };
+    i18n.on("languageChanged", onLang);
+    return () => i18n.off("languageChanged", onLang);
+  }, [stage]);
 
   useEffect(() => {
     if (!menuOpen) return;

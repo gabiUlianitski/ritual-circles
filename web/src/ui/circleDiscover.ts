@@ -232,15 +232,13 @@ export type InterestCategoryId = "" | "sports" | "arts" | "games" | "learning" |
 
 const INTEREST_CATEGORY_IDS = new Set<string>(["sports", "arts", "games", "learning", "social"]);
 
-export const INTEREST_CATEGORIES: {
+const INTEREST_CATEGORY_DEFS: {
   id: Exclude<InterestCategoryId, "">;
-  label: string;
   icon: string;
   keywords: string[];
 }[] = [
   {
     id: "sports",
-    label: "Sports",
     icon: "🏃",
     keywords: [
       "tennis",
@@ -263,29 +261,37 @@ export const INTEREST_CATEGORIES: {
   },
   {
     id: "arts",
-    label: "Arts",
     icon: "🎨",
     keywords: ["art", "paint", "music", "photo", "craft", "draw", "dance", "theater", "film", "creative"],
   },
   {
     id: "games",
-    label: "Games",
     icon: "🎮",
     keywords: ["chess", "board", "game", "poker", "dnd", "video", "gaming", "go", "backgammon"],
   },
   {
     id: "learning",
-    label: "Learning",
     icon: "📚",
     keywords: ["book", "read", "study", "language", "learn", "coding", "programming", "course", "writing"],
   },
   {
     id: "social",
-    label: "Social",
     icon: "☕",
     keywords: ["coffee", "social", "meet", "walk", "brunch", "dinner", "tea", "talk", "network"],
   },
 ];
+
+export const INTEREST_CATEGORIES = INTEREST_CATEGORY_DEFS.map((d) => ({
+  ...d,
+  label: d.id.charAt(0).toUpperCase() + d.id.slice(1),
+}));
+
+export function getInterestCategories(t: (key: string) => string) {
+  return INTEREST_CATEGORY_DEFS.map((d) => ({
+    ...d,
+    label: t(`interestCategories.${d.id}`),
+  }));
+}
 
 function circleInterestBlob(circle: CircleListItem): string {
   return [circle.ritualType, circle.hobyDisplayName, circle.ritualSubtype]
@@ -295,7 +301,7 @@ function circleInterestBlob(circle: CircleListItem): string {
 }
 
 function circleMatchesInterestByKeywords(circle: CircleListItem, categoryId: InterestCategoryId): boolean {
-  const cat = INTEREST_CATEGORIES.find((c) => c.id === categoryId);
+  const cat = INTEREST_CATEGORY_DEFS.find((c) => c.id === categoryId);
   if (!cat) return true;
   const blob = circleInterestBlob(circle);
   return cat.keywords.some((kw) => blob.includes(kw));

@@ -47,6 +47,13 @@
     "findCircles": "Find circles for this day",
     "createCircle": "Create a circle on this day"
   },
+  "interestCategories": {
+    "sports": "Sports",
+    "arts": "Arts",
+    "games": "Games",
+    "learning": "Learning",
+    "social": "Social"
+  },
   "profile": {
     "title": "Profile",
     "tabs": {

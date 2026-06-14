@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import type { CircleListItem, Hoby, UserMeResponse } from "../api/types";
 import { AddCircleHobbyForm } from "./AddCircleHobbyForm";
@@ -13,7 +14,7 @@ import {
   getAllDiscoverCircles,
   getNearYouCircles,
   getRecommendedCircles,
-  INTEREST_CATEGORIES,
+  getInterestCategories,
   buildHobyInterestLookup,
   userHasLocationData,
   type DiscoverLevelFilter,
@@ -44,6 +45,7 @@ export function Circles(props: {
   /** When set, show circles matching this calendar day (from Home empty-day action). */
   prefilterDateIso?: string | null;
 }) {
+  const { i18n, t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CircleListItem[]>([]);
@@ -86,9 +88,11 @@ export function Circles(props: {
     setLoading(false);
   }, []);
 
+  const interestCategories = useMemo(() => getInterestCategories(t), [t, i18n.language]);
+
   useEffect(() => {
     void load();
-  }, [load, props.visitKey]);
+  }, [load, props.visitKey, i18n.language]);
 
   useEffect(() => {
     const onVisible = () => {
@@ -111,7 +115,7 @@ export function Circles(props: {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [i18n.language]);
 
   useEffect(() => {
     const link = props.deepLink;
@@ -635,7 +639,7 @@ export function Circles(props: {
                   value={interestFilter}
                   onChange={(v) => setInterestFilter(v as InterestCategoryId)}
                   disabled={loading}
-                  categories={INTEREST_CATEGORIES}
+                  categories={interestCategories}
                 />
               </DiscoverSection>
 

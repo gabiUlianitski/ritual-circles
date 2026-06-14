@@ -22,6 +22,10 @@ export function applyDocumentLanguage(lang: AppLanguageCode) {
   document.documentElement.dir = lang === "he" ? "rtl" : "ltr";
 }
 
+export function getAppLanguageCode(): AppLanguageCode {
+  return normalizeLang(localStorage.getItem(STORAGE_KEY) ?? navigator.language ?? "en");
+}
+
 export async function setAppLanguage(code: string) {
   const lang = normalizeLang(code);
   localStorage.setItem(STORAGE_KEY, lang);

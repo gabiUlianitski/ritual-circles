@@ -23,7 +23,7 @@ from app.schemas import (
     VenueSuggestionsRequest,
     VenueSuggestionsResponse,
 )
-from app.deps import CurrentUser, conn_dep, get_current_user
+from app.deps import CurrentUser, conn_dep, get_current_user, get_request_lang
 from app.user_availability_windows import availability_windows_from_row
 from app.user_hobbies import pick_hobby_for_slug
 from app.services.circle_suggestions import respond_to_circle_suggestion
@@ -117,8 +117,9 @@ async def venue_suggestions(
 async def list_circles(
     conn: asyncpg.Connection = Depends(conn_dep),
     user: CurrentUser = Depends(get_current_user),
+    lang: str = Depends(get_request_lang),
 ) -> list[CircleListItemResponse]:
-    rows = await list_circles_catalog(conn, user_id=user.id)
+    rows = await list_circles_catalog(conn, user_id=user.id, lang=lang)
     return [CircleListItemResponse(**r) for r in rows]
 
 
@@ -127,8 +128,9 @@ async def create_circle(
     payload: CircleCreateRequest,
     conn: asyncpg.Connection = Depends(conn_dep),
     user: CurrentUser = Depends(get_current_user),
+    lang: str = Depends(get_request_lang),
 ) -> CircleResponse:
-    return await create_circle_svc(conn, user_id=user.id, payload=payload)
+    return await create_circle_svc(conn, user_id=user.id, payload=payload, lang=lang)
 
 
 @router.post("/{circleId}/messages/{messageId}/suggestion", response_model=CircleResponse)
@@ -165,6 +167,7 @@ async def patch_circle(
     payload: CirclePatchRequest,
     conn: asyncpg.Connection = Depends(conn_dep),
     user: CurrentUser = Depends(get_current_user),
+    lang: str = Depends(get_request_lang),
 ) -> CircleResponse:
     try:
         cid = UUID(circleId.strip())
@@ -181,6 +184,7 @@ async def patch_circle(
         recurring_time=payload.recurringTime,
         is_recurring=payload.isRecurring,
         meeting_place_update=payload.meetingPlaceUpdate,
+        lang=lang,
     )
 
 
@@ -189,8 +193,9 @@ async def join_circle(
     inviteCode: str,
     conn: asyncpg.Connection = Depends(conn_dep),
     user: CurrentUser = Depends(get_current_user),
+    lang: str = Depends(get_request_lang),
 ) -> JoinCircleResponse:
-    return await join_circle_svc(conn, user_id=user.id, invite_code=inviteCode)
+    return await join_circle_svc(conn, user_id=user.id, invite_code=inviteCode, lang=lang)
 
 
 @router.post("/join-open", response_model=JoinCircleResponse)
@@ -198,12 +203,13 @@ async def join_circle_open(
     payload: CircleJoinByIdRequest,
     conn: asyncpg.Connection = Depends(conn_dep),
     user: CurrentUser = Depends(get_current_user),
+    lang: str = Depends(get_request_lang),
 ) -> JoinCircleResponse:
     try:
         cid = UUID(payload.circleId.strip())
     except ValueError as e:
         raise HTTPException(status_code=400, detail="invalid circleId") from e
-    return await join_circle_open_svc(conn, user_id=user.id, circle_id=cid)
+    return await join_circle_open_svc(conn, user_id=user.id, circle_id=cid, lang=lang)
 
 
 @router.post("/leave")
@@ -239,6 +245,7 @@ async def get_my_circle(
     circleId: str | None = Query(None, description="When set, return this circle if the user is a member (future sessions)."),
     conn: asyncpg.Connection = Depends(conn_dep),
     user: CurrentUser = Depends(get_current_user),
+    lang: str = Depends(get_request_lang),
 ) -> CircleMeResponse:
     cid: UUID | None = None
     if circleId is not None and circleId.strip():
@@ -251,7 +258,7 @@ async def get_my_circle(
         if cid is not None:
             raise HTTPException(status_code=404, detail="no circle")
         return CircleMeResponse(circle=None, members=[])
-    hoby_name, hoby_icon = await hoby_meta_for_ritual_type(conn, circle_row["ritualType"])
+    hoby_name, hoby_icon = await hoby_meta_for_ritual_type(conn, circle_row["ritualType"], lang)
     circle = _circle_response_from_row(circle_row, hoby_name=hoby_name, hoby_icon=hoby_icon)
     ritual_slug = str(circle_row["ritualType"] or "")
     members = []

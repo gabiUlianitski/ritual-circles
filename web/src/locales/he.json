@@ -47,6 +47,13 @@
     "findCircles": "מצא/י מעגלים ליום הזה",
     "createCircle": "צור/י מעגל ביום הזה"
   },
+  "interestCategories": {
+    "sports": "ספורט",
+    "arts": "אמנות",
+    "games": "משחקים",
+    "learning": "למידה",
+    "social": "חברתי"
+  },
   "profile": {
     "title": "פרופיל",
     "tabs": {

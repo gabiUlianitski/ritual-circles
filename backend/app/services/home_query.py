@@ -12,6 +12,7 @@ from app.schemas import (
     HomeResponse,
     SessionResponse,
 )
+from app.hoby_i18n import localized_display_name
 from app.services.circles_service import _circle_response_from_row
 from app.services.session_replenish import ensure_future_sessions_for_user
 
@@ -33,6 +34,7 @@ SELECT
   c.invite_only AS circle_invite_only,
   c.created_by AS circle_created_by,
   h.display_name AS hoby_display_name,
+  h.i18n_json AS hoby_i18n_json,
   h.icon AS hoby_icon,
   s.id AS session_id,
   s."circleId" AS session_circle_id,
@@ -63,7 +65,14 @@ LIMIT 48
 """
 
 
-def _circle_from_row(row: asyncpg.Record) -> CircleResponse:
+def _localized_hoby_name(row: asyncpg.Record, lang: str) -> str | None:
+    raw = row.get("hoby_display_name")
+    if not raw:
+        return None
+    return localized_display_name({"display_name": raw, "i18n_json": row.get("hoby_i18n_json")}, lang)
+
+
+def _circle_from_row(row: asyncpg.Record, lang: str = "en") -> CircleResponse:
     cc_raw = row.get("circle_country_code")
     cc_in = str(cc_raw).strip() if cc_raw is not None else None
     cn_raw = row.get("circle_city_name")
@@ -86,7 +95,7 @@ def _circle_from_row(row: asyncpg.Record) -> CircleResponse:
     }
     return _circle_response_from_row(
         circle_row,  # type: ignore[arg-type]
-        hoby_name=row.get("hoby_display_name"),
+        hoby_name=_localized_hoby_name(row, lang),
         hoby_icon=row.get("hoby_icon"),
     )
 
@@ -112,7 +121,7 @@ def _pending_confirmation(status: str | None) -> bool:
     return status != "attending"
 
 
-async def fetch_home(conn: asyncpg.Connection, user_id: UUID) -> HomeResponse:
+async def fetch_home(conn: asyncpg.Connection, user_id: UUID, lang: str = "en") -> HomeResponse:
     await ensure_future_sessions_for_user(conn, user_id=user_id)
     rows = await conn.fetch(_FUTURE_ATTENDANCE_SQL, user_id)
 
@@ -120,7 +129,7 @@ async def fetch_home(conn: asyncpg.Connection, user_id: UUID) -> HomeResponse:
         return HomeResponse(circle=None, nextSession=None, myAttendance=None, myCircles=[], calendarSessions=[])
 
     primary = rows[0]
-    circle = _circle_from_row(primary)
+    circle = _circle_from_row(primary, lang)
     session = _session_from_row(primary)
     my_att = _attendance_from_row(primary, user_id)
 
@@ -135,7 +144,7 @@ async def fetch_home(conn: asyncpg.Connection, user_id: UUID) -> HomeResponse:
             session=sess,
             circleId=str(row["session_circle_id"]),
             ritualType=row["ritual_type"],
-            hobyDisplayName=row.get("hoby_display_name"),
+            hobyDisplayName=_localized_hoby_name(row, lang),
             hobyIcon=row.get("hoby_icon"),
             myAttendance=att,
             attendingCount=int(row.get("attending_count") or 0),
@@ -148,7 +157,7 @@ async def fetch_home(conn: asyncpg.Connection, user_id: UUID) -> HomeResponse:
         if cid in seen_circles:
             continue
         seen_circles.add(cid)
-        c = _circle_from_row(row)
+        c = _circle_from_row(row, lang)
         created_by = row.get("circle_created_by")
         is_creator = created_by is not None and created_by == user_id
         my_circles.append(

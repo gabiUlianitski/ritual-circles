@@ -4,7 +4,13 @@ from uuid import uuid4
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.deps import conn_dep
+from app.deps import conn_dep, get_request_lang
+from app.hoby_i18n import (
+    localized_display_name,
+    localized_interest_category,
+    localized_levels_types,
+    localized_short_description,
+)
 from app.schemas import (
     GroupSizeSpec,
     HobyCreateRequest,
@@ -69,30 +75,34 @@ def _group_size_to_json(spec: GroupSizeSpec | None) -> dict[str, object] | None:
     return spec.model_dump(exclude_none=True)
 
 
-def _hoby_response_from_row(r: asyncpg.Record) -> HobyResponse:
+def _hoby_response_from_row(r: asyncpg.Record, lang: str = "en") -> HobyResponse:
+    levels, types = localized_levels_types(r, lang)
     return HobyResponse(
         id=str(r["id"]),
         slug=r["slug"],
-        displayName=r["display_name"],
-        shortDescription=r["short_description"],
+        displayName=localized_display_name(r, lang) or r["display_name"],
+        shortDescription=localized_short_description(r, lang),
         icon=r["icon"],
-        levels=r["levels_json"],
-        types=r["types_json"],
-        interestCategory=r["interest_category"],
+        levels=levels,
+        types=types,
+        interestCategory=localized_interest_category(r["interest_category"], lang),
         groupSize=_group_size_from_row(r.get("group_size_json")),
     )
 
 
 _HOBY_SELECT = """
-    SELECT id, slug, display_name, short_description, icon, levels_json, types_json, interest_category, group_size_json
+    SELECT id, slug, display_name, short_description, icon, levels_json, types_json, interest_category, group_size_json, i18n_json
     FROM hobies
 """
 
 
 @router.get("")
-async def list_hobies(conn: asyncpg.Connection = Depends(conn_dep)) -> list[HobyResponse]:
+async def list_hobies(
+    conn: asyncpg.Connection = Depends(conn_dep),
+    lang: str = Depends(get_request_lang),
+) -> list[HobyResponse]:
     rows = await conn.fetch(f"{_HOBY_SELECT} ORDER BY display_name ASC")
-    return [_hoby_response_from_row(r) for r in rows]
+    return [_hoby_response_from_row(r, lang) for r in rows]
 
 
 @router.post("/precheck", response_model=HobyPrecheckResponse)
@@ -108,6 +118,7 @@ async def precheck_hoby(
 async def create_hoby(
     payload: HobyCreateRequest,
     conn: asyncpg.Connection = Depends(conn_dep),
+    lang: str = Depends(get_request_lang),
 ) -> HobyResponse:
     dn = payload.displayName.strip()
     if not dn:
@@ -173,7 +184,7 @@ async def create_hoby(
     )
     row = await conn.fetchrow(f"{_HOBY_SELECT} WHERE slug = $1", slug)
     assert row is not None
-    return _hoby_response_from_row(row)
+    return _hoby_response_from_row(row, lang)
 
 
 @router.patch("/{slug}", response_model=HobyResponse)
@@ -181,6 +192,7 @@ async def update_hoby(
     slug: str,
     payload: HobyUpdateRequest,
     conn: asyncpg.Connection = Depends(conn_dep),
+    lang: str = Depends(get_request_lang),
 ) -> HobyResponse:
     slug_s = slug.strip()
     if not slug_s:
@@ -255,5 +267,5 @@ async def update_hoby(
 
     updated = await conn.fetchrow(f"{_HOBY_SELECT} WHERE slug = $1", slug_s)
     assert updated is not None
-    return _hoby_response_from_row(updated)
+    return _hoby_response_from_row(updated, lang)
 
