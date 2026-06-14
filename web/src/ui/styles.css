@@ -160,6 +160,19 @@ a { color: inherit; }
   gap: 12px;
 }
 
+.login-lang-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.app-language-select {
+  max-width: 220px;
+}
+
+[dir="rtl"] .login-lang-row {
+  justify-content: flex-start;
+}
+
 .login-google-btn-wrap {
   display: flex;
   justify-content: center;

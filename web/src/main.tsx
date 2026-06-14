@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { App } from "./ui/App";
 import { api } from "./api/client";
+import "./i18n";
 import "./ui/styles.css";
 
 function Root() {

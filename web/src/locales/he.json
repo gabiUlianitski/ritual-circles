@@ -1,0 +1,50 @@
+{
+  "appLanguage": {
+    "label": "שפת האפליקציה",
+    "hint": "משנה תפריטים וכפתורים ב-Ritual Circles."
+  },
+  "common": {
+    "save": "שמירת שינויים",
+    "saving": "שומר…",
+    "back": "חזרה"
+  },
+  "login": {
+    "title": "התחברות",
+    "subtitle": "התחבר/י עם האימייל והסיסמה שבהם נרשמת/ת, או המשך/י עם Google.",
+    "email": "אימייל",
+    "password": "סיסמה",
+    "signIn": "התחברות באימייל",
+    "createAccount": "חדש/ה כאן? צור/י חשבון",
+    "registerTitle": "יצירת חשבון"
+  },
+  "profile": {
+    "title": "פרופיל",
+    "tabs": {
+      "personal": "עליך",
+      "hobbies": "תחביבים",
+      "security": "אבטחה"
+    },
+    "personalIntro": "מה שהמעגל שלך רואה. ערוך/י שדות ושמור/י.",
+    "sections": {
+      "preferences": "העדפות",
+      "personalDetails": "פרטים אישיים",
+      "work": "עבודה",
+      "education": "השכלה",
+      "contact": "פרטי קשר"
+    },
+    "fields": {
+      "languages": "שפות",
+      "languagesHint": "הוסף/י שפות שאת/ה מדבר/ת",
+      "livesIn": "גר/ה ב",
+      "from": "מ",
+      "birthday": "יום הולדת",
+      "name": "שם",
+      "username": "שם משתמש",
+      "availability": "זמינות",
+      "email": "אימייל",
+      "phone": "טלפון",
+      "memberSince": "חבר/ה מאז"
+    },
+    "saved": "הפרופיל נשמר."
+  }
+}

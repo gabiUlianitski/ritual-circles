@@ -1,0 +1,50 @@
+{
+  "appLanguage": {
+    "label": "App language",
+    "hint": "Changes menus and buttons in Ritual Circles."
+  },
+  "common": {
+    "save": "Save changes",
+    "saving": "Saving…",
+    "back": "Back"
+  },
+  "login": {
+    "title": "Sign in",
+    "subtitle": "Sign in with the email and password you used when you joined, or continue with Google.",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in with email",
+    "createAccount": "New here? Create account",
+    "registerTitle": "Create account"
+  },
+  "profile": {
+    "title": "Profile",
+    "tabs": {
+      "personal": "About you",
+      "hobbies": "Hobbies",
+      "security": "Security"
+    },
+    "personalIntro": "What your circle can see. Tap fields to edit, then save.",
+    "sections": {
+      "preferences": "Preferences",
+      "personalDetails": "Personal details",
+      "work": "Work",
+      "education": "Education",
+      "contact": "Contact info"
+    },
+    "fields": {
+      "languages": "Languages",
+      "languagesHint": "Add languages you speak",
+      "livesIn": "Lives in",
+      "from": "From",
+      "birthday": "Birthday",
+      "name": "Name",
+      "username": "Username",
+      "availability": "Availability",
+      "email": "Email",
+      "phone": "Phone",
+      "memberSince": "Member since"
+    },
+    "saved": "Profile saved."
+  }
+}

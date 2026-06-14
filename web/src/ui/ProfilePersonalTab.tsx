@@ -1,5 +1,7 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import type { UserMeResponse } from "../api/types";
+import { AppLanguageSelect } from "./AppLanguageSelect";
 import { ProfileAvailabilityPicker } from "./ProfileAvailabilityPicker";
 import { FormError } from "./FormError";
 import { formatLanguagesSummary, ProfileLanguagesPicker } from "./ProfileLanguagesPicker";
@@ -105,18 +107,26 @@ export function ProfilePersonalTab(props: {
   saveError?: string | null;
   saveInfo?: string | null;
 }) {
+  const { t } = useTranslation();
   const { me } = props;
   const fullName = [props.firstName.trim(), props.lastName.trim()].filter(Boolean).join(" ") || "—";
 
   return (
     <div className="profile-personal-fb stack" aria-labelledby="profile-personal-heading">
       <p id="profile-personal-heading" className="profile-personal-fb-sub">
-        Like Facebook About — what your circle can see. Tap fields to edit, then save.
+        {t("profile.personalIntro")}
       </p>
 
-      <ProfileFbSection title="Personal details">
+      <ProfileFbSection title={t("profile.sections.preferences")}>
+        <ProfileFbRow icon={<IconLanguages />} last>
+          <div className="profile-fb-about-primary">{t("appLanguage.label")}</div>
+          <AppLanguageSelect disabled={props.working} />
+        </ProfileFbRow>
+      </ProfileFbSection>
+
+      <ProfileFbSection title={t("profile.sections.personalDetails")}>
         <ProfileFbRow icon={<IconLocation />}>
-          <div className="profile-fb-about-primary">Lives in</div>
+          <div className="profile-fb-about-primary">{t("profile.fields.livesIn")}</div>
           <ProfilePlaceAutocomplete
             value={props.city}
             onChange={props.onCity}
@@ -126,7 +136,7 @@ export function ProfilePersonalTab(props: {
           />
         </ProfileFbRow>
         <ProfileFbRow icon={<IconHomeTown />}>
-          <div className="profile-fb-about-primary">From</div>
+          <div className="profile-fb-about-primary">{t("profile.fields.from")}</div>
           <ProfilePlaceAutocomplete
             value={props.hometown}
             onChange={props.onHometown}
@@ -136,7 +146,7 @@ export function ProfilePersonalTab(props: {
           />
         </ProfileFbRow>
         <ProfileFbRow icon={<IconBirthday />}>
-          <div className="profile-fb-about-primary">Birthday</div>
+          <div className="profile-fb-about-primary">{t("profile.fields.birthday")}</div>
           <input
             type="date"
             className="profile-fb-about-input profile-fb-about-input--date"
@@ -150,7 +160,7 @@ export function ProfilePersonalTab(props: {
           ) : null}
         </ProfileFbRow>
         <ProfileFbRow icon={<IconLanguages />}>
-          <div className="profile-fb-about-primary">Languages</div>
+          <div className="profile-fb-about-primary">{t("profile.fields.languages")}</div>
           <ProfileLanguagesPicker
             value={props.languages}
             onChange={props.onLanguages}
@@ -159,11 +169,11 @@ export function ProfilePersonalTab(props: {
           {props.languages.length > 0 ? (
             <div className="profile-fb-about-secondary">{formatLanguagesSummary(props.languages)}</div>
           ) : (
-            <div className="profile-fb-about-secondary muted">Add languages you speak</div>
+            <div className="profile-fb-about-secondary muted">{t("profile.fields.languagesHint")}</div>
           )}
         </ProfileFbRow>
         <ProfileFbRow icon={<IconUsername />}>
-          <div className="profile-fb-about-primary">Name</div>
+          <div className="profile-fb-about-primary">{t("profile.fields.name")}</div>
           <div className="profile-fb-about-name-row">
             <input
               className="profile-fb-about-input"
@@ -185,11 +195,11 @@ export function ProfilePersonalTab(props: {
           {fullName !== "—" ? <div className="profile-fb-about-secondary">{fullName}</div> : null}
         </ProfileFbRow>
         <ProfileFbRow icon={<IconUsername />}>
-          <div className="profile-fb-about-primary">Username</div>
+          <div className="profile-fb-about-primary">{t("profile.fields.username")}</div>
           <div className="profile-fb-about-value">@{me.user_name}</div>
         </ProfileFbRow>
         <ProfileFbRow icon={<IconAvailability />} last>
-          <div className="profile-fb-about-primary">Availability</div>
+          <div className="profile-fb-about-primary">{t("profile.fields.availability")}</div>
           <ProfileAvailabilityPicker
             value={props.availabilityWindows}
             onChange={props.onAvailabilityWindows}
@@ -198,7 +208,7 @@ export function ProfilePersonalTab(props: {
         </ProfileFbRow>
       </ProfileFbSection>
 
-      <ProfileFbSection title="Work">
+      <ProfileFbSection title={t("profile.sections.work")}>
         <ProfileFbRow icon={<IconWork />} last>
           <input
             className="profile-fb-about-input"
@@ -216,7 +226,7 @@ export function ProfilePersonalTab(props: {
         </ProfileFbRow>
       </ProfileFbSection>
 
-      <ProfileFbSection title="Education">
+      <ProfileFbSection title={t("profile.sections.education")}>
         <ProfileFbRow icon={<IconEducation />} last>
           <input
             className="profile-fb-about-input"
@@ -234,13 +244,13 @@ export function ProfilePersonalTab(props: {
         </ProfileFbRow>
       </ProfileFbSection>
 
-      <ProfileFbSection title="Contact info">
+      <ProfileFbSection title={t("profile.sections.contact")}>
         <ProfileFbRow icon={<IconEmail />}>
-          <div className="profile-fb-about-primary">Email</div>
+          <div className="profile-fb-about-primary">{t("profile.fields.email")}</div>
           <div className="profile-fb-about-value">{me.email?.trim() ? me.email : "—"}</div>
         </ProfileFbRow>
         <ProfileFbRow icon={<IconPhone />}>
-          <div className="profile-fb-about-primary">Phone</div>
+          <div className="profile-fb-about-primary">{t("profile.fields.phone")}</div>
           <input
             className="profile-fb-about-input"
             type="tel"
@@ -252,7 +262,7 @@ export function ProfilePersonalTab(props: {
           />
         </ProfileFbRow>
         <ProfileFbRow icon={<IconMemberSince />} last>
-          <div className="profile-fb-about-primary">Member since</div>
+          <div className="profile-fb-about-primary">{t("profile.fields.memberSince")}</div>
           <div className="profile-fb-about-value">{formatMemberSince(me.createdAt)}</div>
         </ProfileFbRow>
       </ProfileFbSection>
@@ -270,7 +280,7 @@ export function ProfilePersonalTab(props: {
         disabled={props.working || !props.firstName.trim()}
         onClick={props.onSave}
       >
-        {props.working ? "Saving…" : "Save changes"}
+        {props.working ? t("common.saving") : t("common.save")}
       </button>
     </div>
   );

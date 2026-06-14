@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { GoogleLogin } from "@react-oauth/google";
 import { api, setAuthToken } from "../api/client";
+import { AppLanguageSelect } from "./AppLanguageSelect";
 import { FormError } from "./FormError";
 
 const USER_NAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
@@ -12,6 +14,7 @@ export function Login(props: {
   loading: boolean;
   googleClientId?: string;
 }) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<LoginMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -234,16 +237,18 @@ export function Login(props: {
 
   return (
     <div className="card stack">
-      <div className="h1">{mode === "login" ? "Sign in" : "Create account"}</div>
+      <div className="login-lang-row">
+        <AppLanguageSelect />
+      </div>
+      <div className="h1">{mode === "login" ? t("login.title") : t("login.registerTitle")}</div>
       <div className="muted">
-        {mode === "login" ? (
-          <>Sign in with the email and password you used when you joined, or continue with Google.</>
-        ) : (
+        {mode === "login" ? <>{t("login.subtitle")}</> : null}
+        {mode === "register" ? (
           <>
             Your <strong>username</strong> is unique in the app (like a handle). First and last name are what people
             see in your circle. Or create an account with Google below.
           </>
-        )}
+        ) : null}
       </div>
 
       {googleEnabled ? (
@@ -265,9 +270,9 @@ export function Login(props: {
         </div>
       ) : null}
 
-      <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <input placeholder={t("login.email")} value={email} onChange={(e) => setEmail(e.target.value)} />
       <input
-        placeholder="Password"
+        placeholder={t("login.password")}
         type="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
@@ -311,7 +316,7 @@ export function Login(props: {
         }
         onClick={() => void submit()}
       >
-        {working ? "Working…" : mode === "login" ? "Sign in with email" : "Create account with email"}
+        {working ? "Working…" : mode === "login" ? t("login.signIn") : "Create account with email"}
       </button>
 
       <button
@@ -322,7 +327,7 @@ export function Login(props: {
           setError(null);
         }}
       >
-        {mode === "login" ? "New here? Create account" : "Already have an account? Sign in"}
+        {mode === "login" ? t("login.createAccount") : "Already have an account? Sign in"}
       </button>
     </div>
   );

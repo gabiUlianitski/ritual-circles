@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import type { UserLanguageItem, UserMeResponse } from "../api/types";
 import {
@@ -12,6 +13,7 @@ import { ProfilePersonalTab } from "./ProfilePersonalTab";
 type ProfileTab = "personal" | "hobbies" | "security";
 
 export function Profile(props: { onBack: () => void; onLogout: () => void }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<ProfileTab>("personal");
   const [me, setMe] = useState<UserMeResponse | null>(null);
   const [firstName, setFirstName] = useState("");
@@ -80,7 +82,7 @@ export function Profile(props: { onBack: () => void; onLogout: () => void }) {
         phone: phone.trim() ? phone.trim() : null,
         availabilityWindows,
       });
-      setInfo("Personal details saved.");
+      setInfo(t("profile.saved"));
       await load();
     } catch (e) {
       setError(String(e));
@@ -134,10 +136,10 @@ export function Profile(props: { onBack: () => void; onLogout: () => void }) {
     <div className="card stack">
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <div className="h1" style={{ marginBottom: 0 }}>
-          Profile
+          {t("profile.title")}
         </div>
         <button type="button" style={{ width: "auto" }} onClick={props.onBack} disabled={working || pwWorking}>
-          Back
+          {t("common.back")}
         </button>
       </div>
 
@@ -153,7 +155,7 @@ export function Profile(props: { onBack: () => void; onLogout: () => void }) {
               aria-selected={tab === "personal"}
               onClick={() => setTab("personal")}
             >
-              Personal details
+              {t("profile.tabs.personal")}
             </button>
             <button
               type="button"
@@ -162,7 +164,7 @@ export function Profile(props: { onBack: () => void; onLogout: () => void }) {
               aria-selected={tab === "hobbies"}
               onClick={() => setTab("hobbies")}
             >
-              Hobbies
+              {t("profile.tabs.hobbies")}
             </button>
             <button
               type="button"
@@ -171,7 +173,7 @@ export function Profile(props: { onBack: () => void; onLogout: () => void }) {
               aria-selected={tab === "security"}
               onClick={() => setTab("security")}
             >
-              Security
+              {t("profile.tabs.security")}
             </button>
           </div>
 
