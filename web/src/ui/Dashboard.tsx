@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { HomeResponse } from "../api/types";
 import { CircleDetails } from "./CircleDetails";
 import { HomeCalendar } from "./HomeCalendar";
@@ -30,6 +31,7 @@ export function Dashboard(props: {
   onGoFindCircles: (prefillDateIso?: string) => void;
   userFirstName?: string | null;
 }) {
+  const { t } = useTranslation();
   const [detailsCircleId, setDetailsCircleId] = useState<string | null>(null);
   const [detailsInitialTab, setDetailsInitialTab] = useState<"details" | "chat" | "scheduled">("details");
   const calendarSessions = props.home.calendarSessions ?? [];
@@ -90,8 +92,8 @@ export function Dashboard(props: {
         onFindCircles={() => props.onGoFindCircles()}
       />
 
-      <section className="home-upcoming stack" aria-label="Upcoming this week">
-        <h2 className="home-section-title">Upcoming this week</h2>
+      <section className="home-upcoming stack" aria-label={t("home.upcomingThisWeek")}>
+        <h2 className="home-section-title">{t("home.upcomingThisWeek")}</h2>
         <HomeWeekStrip sessions={calendarSessions} selectedDay={selectedDay} onSelectDay={setSelectedDay} />
         {showEmptyDayPrompt && selectedDay ? (
           <HomeEmptyDayPrompt
@@ -109,7 +111,7 @@ export function Dashboard(props: {
           aria-expanded={showFullCalendar}
           onClick={() => setShowFullCalendar((v) => !v)}
         >
-          {showFullCalendar ? "Hide full calendar" : "View full calendar"}
+          {showFullCalendar ? t("home.hideFullCalendar") : t("home.viewFullCalendar")}
         </button>
       ) : null}
 

@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import type { Hoby, HobyPrecheckResponse } from "../api/types";
+import { BidiText } from "./BidiText";
 import {
   levelsForSelectedType,
   parseHobyLevelsFlat,
@@ -57,6 +59,7 @@ function levelRowsFromHoby(levels: HobyLevelRow[]): HobyManualRow[] {
 }
 
 export function Hobies(props: { onBack: () => void }) {
+  const { t, i18n } = useTranslation();
   const [hobies, setHobies] = useState<Hoby[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,7 +121,7 @@ export function Hobies(props: { onBack: () => void }) {
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [i18n.language]);
 
   useEffect(() => {
     setOpenTypeKey(null);
@@ -188,10 +191,10 @@ export function Hobies(props: { onBack: () => void }) {
       const levels = useAI ? undefined : rowsToLevelsPayload(levelRows);
       const types = useAI ? undefined : rowsToTypesPayload(typeRows);
       if (!useAI && levels === undefined && types === undefined) {
-        setError("Add at least one type or one level, or turn on AI to generate them.");
+        setError(t("hobbiesPage.errNeedTypeOrLevel"));
         return;
       }
-      setSaveStep("Checking the catalogue…");
+      setSaveStep(t("hobbiesPage.checkingCatalogue"));
       const pr = await api.precheckNewHoby({ displayName: dn });
       if (pr.blockedReason) {
         setPrecheckBlock(pr);
@@ -201,7 +204,7 @@ export function Hobies(props: { onBack: () => void }) {
       }
       setPrecheckBlock(null);
       setSaveNote(pr.aiNote || null);
-      setSaveStep("Saving hoby…");
+      setSaveStep(t("hobbiesPage.savingHobby"));
       const gsErr = validateGroupSize(addGroupSize);
       if (gsErr) {
         setAddGroupSizeError(gsErr);
@@ -257,13 +260,13 @@ export function Hobies(props: { onBack: () => void }) {
   async function saveHobyEdits(slug: string) {
     const dn = editDisplayName.trim();
     if (!dn) {
-      setError("Hoby name is required.");
+      setError(t("hobbiesPage.errNameRequired"));
       return;
     }
     const levels = rowsToLevelsPayloadWithKeys(editLevelRows);
     const types = rowsToTypesPayloadWithKeys(editTypeRows);
     if (!levels && !types) {
-      setError("Add at least one type or one level.");
+      setError(t("hobbiesPage.errNeedMetadata"));
       return;
     }
     const gsErr = validateGroupSize(editGroupSize);
@@ -332,28 +335,28 @@ export function Hobies(props: { onBack: () => void }) {
     return types.reduce((m, t) => Math.max(m, t.levels.length), 0);
   }, [types, hobyLevelsFlat]);
 
-  function typeLevelHint(t: HobyTypeRow) {
+  function typeLevelHint(typeRow: HobyTypeRow) {
     const shared = hobyLevelsFlat.length > 0;
-    const legacyNested = t.levels.length > 0 && !shared;
-    if (shared) return `${hobyLevelsFlat.length} levels`;
-    if (legacyNested) return `${t.levels.length} levels`;
-    return "Open";
+    const legacyNested = typeRow.levels.length > 0 && !shared;
+    if (shared) return t("hobbiesPage.levelsCount", { count: hobyLevelsFlat.length });
+    if (legacyNested) return t("hobbiesPage.levelsCount", { count: typeRow.levels.length });
+    return t("hobbiesPage.open");
   }
 
-  function renderTypeBubble(t: HobyTypeRow, index: number) {
-    const title = t.label || t.key;
+  function renderTypeBubble(typeRow: HobyTypeRow, index: number) {
+    const title = typeRow.label || typeRow.key;
     return (
       <button
-        key={t.key}
+        key={typeRow.key}
         type="button"
         className="hoby-type-bubble"
         data-bubble={index % 5}
-        onClick={() => setOpenTypeKey(t.key)}
-        aria-label={`${title}, ${typeLevelHint(t)}`}
+        onClick={() => setOpenTypeKey(typeRow.key)}
+        aria-label={`${title}, ${typeLevelHint(typeRow)}`}
       >
         <span className="hoby-type-bubble-label">{title}</span>
-        {t.description ? <span className="hoby-type-bubble-desc">{t.description}</span> : null}
-        <span className="hoby-type-bubble-meta">{typeLevelHint(t)}</span>
+        {typeRow.description ? <span className="hoby-type-bubble-desc">{typeRow.description}</span> : null}
+        <span className="hoby-type-bubble-meta">{typeLevelHint(typeRow)}</span>
       </button>
     );
   }
@@ -390,13 +393,15 @@ export function Hobies(props: { onBack: () => void }) {
                 </span>
               ) : null}
               <div>
-                <div style={{ fontWeight: 650 }}>{panelHoby.displayName}</div>
+                <div style={{ fontWeight: 650 }}>
+                  <BidiText>{panelHoby.displayName}</BidiText>
+                </div>
                 <div className="muted" style={{ maxWidth: 560 }} title={`slug: ${panelHoby.slug}`}>
                   {hobySubtitle(panelHoby)}
                 </div>
                 {!isEditing && panelHoby.groupSize ? (
                   <div className="muted" style={{ fontSize: "0.85em", marginTop: 4 }}>
-                    Preferred group: {formatGroupSizeSummary(panelHoby.groupSize)}
+                    {t("hobbiesPage.preferredGroup", { summary: formatGroupSizeSummary(panelHoby.groupSize) })}
                   </div>
                 ) : null}
               </div>
@@ -404,8 +409,12 @@ export function Hobies(props: { onBack: () => void }) {
             <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               {!isEditing ? (
                 <span className="pill">
-                  {types.length ? `${types.length} types` : hobyLevelsFlat.length ? "legacy levels" : "No metadata"}
-                  {totalLevelCount ? ` · ${totalLevelCount} levels total` : null}
+                  {types.length
+                    ? t("hobbiesPage.typesCount", { count: types.length })
+                    : hobyLevelsFlat.length
+                      ? t("hobbiesPage.legacyLevels")
+                      : t("hobbiesPage.noMetadata")}
+                  {totalLevelCount ? t("hobbiesPage.levelsTotal", { count: totalLevelCount }) : null}
                 </span>
               ) : null}
               {!isEditing ? (
@@ -419,14 +428,14 @@ export function Hobies(props: { onBack: () => void }) {
                     beginEditHoby(panelHoby);
                   }}
                 >
-                  Modify
+                  {t("common.modify")}
                 </button>
               ) : null}
               <button
                 type="button"
                 className="icon-btn icon-btn--ghost icon-btn--square"
-                aria-label="Collapse hobby details"
-                title="Collapse"
+                aria-label={t("hobbiesPage.collapseAria")}
+                title={t("hobbiesPage.collapse")}
                 onClick={(e) => {
                   e.stopPropagation();
                   cancelEditHoby();
@@ -449,36 +458,36 @@ export function Hobies(props: { onBack: () => void }) {
           {isEditing ? (
             <div className="stack hoby-edit-form" style={{ gap: 12, marginTop: 4 }}>
               <div className="muted" style={{ fontSize: "0.88em" }}>
-                Slug stays <code>{slug}</code> so existing circles keep working.
+                {t("hobbiesPage.slugStays", { slug })}
               </div>
               <label className="stack" style={{ gap: 6 }}>
                 <span className="muted" style={{ fontSize: "0.88em" }}>
-                  Name
+                  {t("hobbiesPage.nameLabel")}
                 </span>
                 <input
                   value={editDisplayName}
                   onChange={(e) => setEditDisplayName(e.target.value)}
-                  placeholder="Hoby name"
+                  placeholder={t("hobbiesPage.hobbyName")}
                 />
               </label>
               <label className="stack" style={{ gap: 6 }}>
                 <span className="muted" style={{ fontSize: "0.88em" }}>
-                  Short description
+                  {t("hobbiesPage.shortDescription")}
                 </span>
                 <input
                   value={editShortDescription}
                   onChange={(e) => setEditShortDescription(e.target.value)}
-                  placeholder="One line about this hoby"
+                  placeholder={t("hobbiesPage.shortDescriptionPlaceholder")}
                 />
               </label>
               <label className="stack" style={{ gap: 6 }}>
                 <span className="muted" style={{ fontSize: "0.88em" }}>
-                  Icon (emoji)
+                  {t("hobbiesPage.iconLabel")}
                 </span>
                 <input
                   value={editIcon}
                   onChange={(e) => setEditIcon(e.target.value)}
-                  placeholder="e.g. ♟️"
+                  placeholder={t("hobbiesPage.iconPlaceholder")}
                   maxLength={8}
                 />
               </label>
@@ -489,8 +498,8 @@ export function Hobies(props: { onBack: () => void }) {
                 onChangeLevels={setEditLevelRows}
               />
               <CreateCircleGroupSizeStep
-                title="Preferred group size"
-                helper="Default when someone creates a circle for this hoby."
+                title={t("hobbiesPage.groupSizeTitle")}
+                helper={t("hobbiesPage.groupSizeHelper")}
                 showTip={false}
                 value={editGroupSize}
                 fieldError={editGroupSizeError}
@@ -508,10 +517,10 @@ export function Hobies(props: { onBack: () => void }) {
                   disabled={loading || !editDisplayName.trim()}
                   onClick={() => void saveHobyEdits(slug)}
                 >
-                  {loading ? "Saving…" : "Save changes"}
+                  {loading ? t("common.saving") : t("common.save")}
                 </button>
                 <button type="button" style={{ width: "auto" }} disabled={loading} onClick={cancelEditHoby}>
-                  Cancel
+                  {t("common.cancel")}
                 </button>
               </div>
             </div>
@@ -519,7 +528,7 @@ export function Hobies(props: { onBack: () => void }) {
             <>
               {!types.length && hobyLevelsFlat.length ? (
                 <div className="hoby-types-thread" style={{ gap: 8 }}>
-                  <div className="hoby-types-thread-hint muted">Levels</div>
+                  <div className="hoby-types-thread-hint muted">{t("hobbiesPage.levels")}</div>
                   <div className="hoby-level-bubbles" role="list">
                     {hobyLevelsFlat.map((lv, i) => renderLevelBubble(lv, i))}
                   </div>
@@ -530,9 +539,9 @@ export function Hobies(props: { onBack: () => void }) {
                 <div className="hoby-types-thread" style={{ gap: 8 }}>
                   {openTypeKey === null ? (
                     <>
-                      <div className="hoby-types-thread-hint muted">Tap a type to see levels</div>
+                      <div className="hoby-types-thread-hint muted">{t("hobbiesPage.tapTypeForLevels")}</div>
                       <div className="hoby-type-bubbles" role="list">
-                        {types.map((t, i) => renderTypeBubble(t, i))}
+                        {types.map((typeRow, i) => renderTypeBubble(typeRow, i))}
                       </div>
                     </>
                   ) : (
@@ -543,7 +552,7 @@ export function Hobies(props: { onBack: () => void }) {
                         style={{ width: "auto" }}
                         onClick={() => setOpenTypeKey(null)}
                       >
-                        ← Types
+                        {t("hobbiesPage.backToTypes")}
                       </button>
                       <div className="hoby-type-bubble hoby-type-bubble--anchor is-static">
                         <span className="hoby-type-bubble-label">{openType?.label ?? openTypeKey}</span>
@@ -556,7 +565,7 @@ export function Hobies(props: { onBack: () => void }) {
                           {levelsForOpenType.map((lv, i) => renderLevelBubble(lv, i))}
                         </div>
                       ) : (
-                        <div className="muted">No levels defined for this type.</div>
+                        <div className="muted">{t("hobbiesPage.noLevelsForType")}</div>
                       )}
                     </>
                   )}
@@ -574,41 +583,41 @@ export function Hobies(props: { onBack: () => void }) {
   return (
     <div className="card stack">
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <div className="h1">Hobies</div>
+        <div className="h1">{t("hobbiesPage.title")}</div>
         <button style={{ width: "auto" }} onClick={props.onBack} disabled={loading}>
-          Back
+          {t("common.back")}
         </button>
       </div>
 
       {error ? <FormError>{error}</FormError> : null}
 
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <div className="muted">Browse existing hobies or add a new one.</div>
+        <div className="muted">{t("hobbiesPage.intro")}</div>
         <button style={{ width: "auto" }} className="primary" onClick={() => setShowAdd((v) => !v)} disabled={loading}>
-          {showAdd ? "Close" : "Add hoby"}
+          {showAdd ? t("common.close") : t("hobbiesPage.addHobby")}
         </button>
       </div>
 
       <label className="stack" style={{ gap: 6 }}>
         <span className="muted" style={{ fontSize: "0.88em" }}>
-          Search by name, description, or slug
+          {t("hobbiesPage.searchLabel")}
         </span>
         <input
           type="search"
           enterKeyHint="search"
           autoComplete="off"
-          placeholder="Type to filter the list…"
+          placeholder={t("hobbiesPage.searchPlaceholder")}
           value={listFilter}
           onChange={(e) => setListFilter(e.target.value)}
-          aria-label="Filter hobies list"
+          aria-label={t("hobbiesPage.searchAria")}
         />
       </label>
 
       {showAdd ? (
         <div className="card stack" style={{ padding: 12 }}>
           <div className="row" style={{ justifyContent: "space-between" }}>
-            <div style={{ fontWeight: 650 }}>New hoby</div>
-            <span className="pill">{useAI ? "AI assist" : "Manual form"}</span>
+            <div style={{ fontWeight: 650 }}>{t("hobbiesPage.newHobby")}</div>
+            <span className="pill">{useAI ? t("hobbiesPage.aiAssist") : t("hobbiesPage.manualForm")}</span>
           </div>
           {saveStep ? <div className="muted">{saveStep}</div> : null}
           {saveNote ? (
@@ -618,7 +627,7 @@ export function Hobies(props: { onBack: () => void }) {
           ) : null}
           {precheckBlock?.blockedReason ? (
             <div className="notice" role="status">
-              <div>{precheckBlock.message ?? "This name can’t be added as a new hoby right now."}</div>
+              <div>{precheckBlock.message ?? t("hobbiesPage.precheckBlocked")}</div>
               {precheckBlock.duplicateDetail ? (
                 <div className="muted" style={{ marginTop: 6, fontSize: "0.9em" }}>
                   {precheckBlock.duplicateDetail}
@@ -627,7 +636,7 @@ export function Hobies(props: { onBack: () => void }) {
             </div>
           ) : null}
           <input
-            placeholder="Hoby name (e.g. Tennis)"
+            placeholder={t("hobbiesPage.hobbyNamePlaceholder")}
             value={displayName}
             spellCheck={true}
             onChange={(e) => setDisplayName(e.target.value)}
@@ -635,7 +644,7 @@ export function Hobies(props: { onBack: () => void }) {
           {precheckBlock?.similarExisting?.length ? (
             <div className="stack" style={{ gap: 6 }}>
               <div className="muted" style={{ fontWeight: 600, fontSize: "0.9em" }}>
-                Catalogue matches
+                {t("hobbiesPage.catalogueMatches")}
               </div>
               {precheckBlock.similarExisting.map((s) => (
                 <div key={s.slug} className="muted" style={{ fontSize: "0.92em" }}>
@@ -646,7 +655,7 @@ export function Hobies(props: { onBack: () => void }) {
           ) : null}
           {precheckBlock?.suggestedNames?.length ? (
             <div className="stack" style={{ gap: 8 }}>
-              <div className="muted">You might have meant:</div>
+              <div className="muted">{t("hobbiesPage.mightHaveMeant")}</div>
               <div className="row" style={{ flexWrap: "wrap", gap: 8, alignItems: "center" }}>
                 {precheckBlock.suggestedNames.map((sug) => (
                   <button
@@ -673,7 +682,7 @@ export function Hobies(props: { onBack: () => void }) {
               onChange={(e) => setUseAI(e.target.checked)}
               style={{ width: 18, height: 18 }}
             />
-            <span className="muted">Use AI to suggest types and a shared levels ladder. Uncheck to fill types and levels in the form below.</span>
+            <span className="muted">{t("hobbiesPage.aiCheckbox")}</span>
           </label>
           {!useAI ? (
             <HobyManualMetadataEditor
@@ -683,14 +692,11 @@ export function Hobies(props: { onBack: () => void }) {
               onChangeLevels={setLevelRows}
             />
           ) : (
-            <div className="muted">
-              AI proposes real variants in types, and one shared skill ladder stored in levels — not “commuting vs
-              recreational” as types.
-            </div>
+            <div className="muted">{t("hobbiesPage.aiHint")}</div>
           )}
           <CreateCircleGroupSizeStep
-            title="Preferred group size"
-            helper="Default when someone creates a circle for this hoby."
+            title={t("hobbiesPage.groupSizeTitle")}
+            helper={t("hobbiesPage.groupSizeHelper")}
             showTip={false}
             value={addGroupSize}
             fieldError={addGroupSizeError}
@@ -705,7 +711,7 @@ export function Hobies(props: { onBack: () => void }) {
             disabled={loading || !displayName.trim()}
             onClick={() => void addHoby()}
           >
-            {loading ? "Working…" : "Save hoby"}
+            {loading ? t("common.working") : t("hobbiesPage.saveHobby")}
           </button>
         </div>
       ) : null}
@@ -715,15 +721,15 @@ export function Hobies(props: { onBack: () => void }) {
           className="row"
           style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}
         >
-          <div style={{ fontWeight: 650 }}>Existing hobies</div>
-          <div className="hoby-browse-toggle" role="group" aria-label="How to show hobies">
+          <div style={{ fontWeight: 650 }}>{t("hobbiesPage.existingTitle")}</div>
+          <div className="hoby-browse-toggle" role="group" aria-label={t("hobbiesPage.layoutAria")}>
             <button
               type="button"
               className={browseLayout === "list" ? "is-active" : ""}
               aria-pressed={browseLayout === "list"}
               onClick={() => setBrowseLayout("list")}
             >
-              List
+              {t("hobbiesPage.layoutList")}
             </button>
             <button
               type="button"
@@ -731,7 +737,7 @@ export function Hobies(props: { onBack: () => void }) {
               aria-pressed={browseLayout === "icons"}
               onClick={() => setBrowseLayout("icons")}
             >
-              Icons
+              {t("hobbiesPage.layoutIcons")}
             </button>
           </div>
         </div>
@@ -767,13 +773,15 @@ export function Hobies(props: { onBack: () => void }) {
                         </span>
                       ) : null}
                       <div>
-                        <div style={{ fontWeight: 650 }}>{h.displayName}</div>
+                        <div style={{ fontWeight: 650 }}>
+                          <BidiText>{h.displayName}</BidiText>
+                        </div>
                         <div className="muted" title={`slug: ${h.slug}`}>
                           {hobySubtitle(h)}
                         </div>
                       </div>
                     </div>
-                    <span className="pill">{visuallyOpen ? "Hide" : "Details"}</span>
+                    <span className="pill">{visuallyOpen ? t("common.hide") : t("common.details")}</span>
                   </div>
                 </div>
                 <div
@@ -812,7 +820,7 @@ export function Hobies(props: { onBack: () => void }) {
                             {initial}
                           </span>
                         )}
-                        <span className="hoby-icon-tile-name">{h.displayName}</span>
+                        <BidiText className="hoby-icon-tile-name">{h.displayName}</BidiText>
                       </button>
                     );
                   })}
@@ -826,10 +834,10 @@ export function Hobies(props: { onBack: () => void }) {
               </>
             )
           ) : (
-            <div className="muted">No hobies match your search.</div>
+            <div className="muted">{t("hobbiesPage.noMatch")}</div>
           )
         ) : (
-          <div className="muted">{loading ? "Loading…" : "No hobies yet."}</div>
+          <div className="muted">{loading ? t("common.loading") : t("hobbiesPage.empty")}</div>
         )}
       </div>
     </div>

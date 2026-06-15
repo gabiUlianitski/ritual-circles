@@ -1,6 +1,8 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { AttendanceStatus, HomeCalendarSession } from "../api/types";
 import { api } from "../api/client";
+import { BidiText } from "./BidiText";
 import {
   formatSessionDateTimeHero,
   getUpcomingSessions,
@@ -16,6 +18,7 @@ export function HomeNextActivityCard(props: {
   onRefresh?: () => Promise<void> | void;
   onFindCircles?: () => void;
 }) {
+  const { t } = useTranslation();
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,10 +27,10 @@ export function HomeNextActivityCard(props: {
   if (!next) {
     return (
       <section className="home-hero home-hero--empty card stack" aria-label="Next activity">
-        <p className="home-hero-empty-text">No hangouts on your calendar yet</p>
+        <p className="home-hero-empty-text">{t("home.noCalendarYet")}</p>
         {props.onFindCircles ? (
           <button type="button" className="home-btn-text home-hero-empty-link" onClick={props.onFindCircles}>
-            Explore circles
+            {t("home.exploreCircles")}
           </button>
         ) : null}
       </section>
@@ -67,13 +70,15 @@ export function HomeNextActivityCard(props: {
             </span>
           ) : null}
           <div className="home-hero-copy">
-            <h2 className="home-hero-title">{title}</h2>
+            <BidiText as="h2" className="home-hero-title">
+              {title}
+            </BidiText>
             <p className="home-hero-time">{formatSessionDateTimeHero(next.session.dateTime)}</p>
           </div>
           {pending ? (
-            <span className="home-status-badge home-status-badge--pending">Pending</span>
+            <span className="home-status-badge home-status-badge--pending">{t("home.pending")}</span>
           ) : (
-            <span className="home-status-badge home-status-badge--confirmed">Confirmed</span>
+            <span className="home-status-badge home-status-badge--confirmed">{t("home.confirmed")}</span>
           )}
         </div>
         <CircleParticipationDisplay
@@ -91,7 +96,7 @@ export function HomeNextActivityCard(props: {
           disabled={working || imComing}
           onClick={() => void setAttendance("attending")}
         >
-          {working && !imComing ? "Saving…" : "I'm in ✅"}
+          {working && !imComing ? t("common.saving") : t("home.imIn")}
         </button>
         <button
           type="button"
@@ -99,7 +104,7 @@ export function HomeNextActivityCard(props: {
           disabled={working || (!imComing && pending)}
           onClick={() => void setAttendance("not_attending")}
         >
-          {working && imComing ? "Saving…" : "Not now"}
+          {working && imComing ? t("common.saving") : t("home.notNow")}
         </button>
       </div>
       {error ? <FormError>{error}</FormError> : null}

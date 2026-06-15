@@ -1,6 +1,8 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { AttendanceStatus, HomeCalendarSession } from "../api/types";
 import { api } from "../api/client";
+import { BidiText } from "./BidiText";
 import {
   activityTypeClass,
   formatSessionDateTimeHero,
@@ -16,6 +18,7 @@ export function HomeSessionEvents(props: {
   onOpenCircle?: (circleId: string) => void;
   onRefresh?: () => Promise<void> | void;
 }) {
+  const { t } = useTranslation();
   const [workingSessionId, setWorkingSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,7 +69,7 @@ export function HomeSessionEvents(props: {
                   </span>
                 ) : null}
                 <div className="home-session-event-copy">
-                  <div className="home-session-event-title">{title}</div>
+                  <BidiText className="home-session-event-title">{title}</BidiText>
                   <div className="home-session-event-time">{formatSessionDateTimeHero(item.session.dateTime)}</div>
                   <CircleParticipationDisplay
                     memberCount={memberCount}
@@ -79,9 +82,9 @@ export function HomeSessionEvents(props: {
             <div className="home-session-event-actions">
               {!circleFull ? (
                 imComing ? (
-                  <span className="home-status-badge home-status-badge--confirmed">Confirmed</span>
+                  <span className="home-status-badge home-status-badge--confirmed">{t("home.confirmed")}</span>
                 ) : (
-                  <span className="home-status-badge home-status-badge--pending">Pending</span>
+                  <span className="home-status-badge home-status-badge--pending">{t("home.pending")}</span>
                 )
               ) : null}
               <div className="home-session-event-btns">
@@ -91,7 +94,7 @@ export function HomeSessionEvents(props: {
                   disabled={busy || imComing}
                   onClick={() => void setSessionAttendance(item.session.id, "attending")}
                 >
-                  {busy && !imComing ? "Saving…" : "I'm coming ✅"}
+                  {busy && !imComing ? t("common.saving") : t("home.imComing")}
                 </button>
                 <button
                   type="button"
@@ -99,7 +102,7 @@ export function HomeSessionEvents(props: {
                   disabled={busy || (!imComing && pending)}
                   onClick={() => void setSessionAttendance(item.session.id, "not_attending")}
                 >
-                  {busy && imComing ? "Saving…" : "Not now"}
+                  {busy && imComing ? t("common.saving") : t("home.notNow")}
                 </button>
               </div>
             </div>
