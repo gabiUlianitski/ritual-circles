@@ -244,7 +244,7 @@ export function Circles(props: {
 
     if (!canJoin) {
       return {
-        label: "Add hobby to join",
+        label: t("discoverPage.addHobbyToJoin"),
         busy: false,
         disabled: false,
         secondary: true,
@@ -254,7 +254,7 @@ export function Circles(props: {
 
     if (c.inviteOnly === false) {
       return {
-        label: "Join",
+        label: t("discoverPage.join"),
         busy: joining,
         disabled: busy,
         onJoin: () => void joinOpenCircle(c.id),
@@ -262,7 +262,7 @@ export function Circles(props: {
     }
 
     return {
-      label: "Request to join",
+      label: t("discoverPage.requestJoin"),
       busy: joining,
       disabled: busy,
       onJoin: () => {
@@ -280,7 +280,7 @@ export function Circles(props: {
         circle={c}
         onPress={() => openDetails(c)}
         joinAction={{
-          label: "Open",
+          label: t("discoverPage.open"),
           secondary: true,
           onJoin: () => openDetails(c),
         }}
@@ -295,7 +295,7 @@ export function Circles(props: {
         circle={c}
         onPress={() => openDetails(c)}
         joinAction={{
-          label: "Manage",
+          label: t("discoverPage.manage"),
           secondary: true,
           onJoin: () => openDetails(c),
         }}
@@ -366,7 +366,7 @@ export function Circles(props: {
     return (
       <div className="card stack circle-details-page">
         <button type="button" className="circle-details-back" onClick={() => setCatalogDetail(null)}>
-          ← Discover Circles
+          {t("discoverPage.backToDiscover")}
         </button>
 
         <CircleDetailsSummary
@@ -380,16 +380,16 @@ export function Circles(props: {
           <>
             <CircleDetailsPrimaryAction
               isMember={false}
-              joinLabel={joinAction?.label === "Join" ? "Join this circle" : joinAction?.label}
+              joinLabel={joinAction?.label === t("discoverPage.join") ? t("discoverPage.joinThisCircle") : joinAction?.label}
               joinDisabled={joinAction?.disabled}
               joinBusy={joinAction?.busy}
               onJoin={joinAction?.onJoin}
             />
             {!userHasJoinableHobbyForCircle(userHobies, c, hobies) ? (
               <>
-                {joinHobbyBlockedHint(userHobies, c, hobies) ? (
+                {joinHobbyBlockedHint(userHobies, c, hobies, t) ? (
                   <div className="muted" style={{ fontSize: "0.92em" }}>
-                    {joinHobbyBlockedHint(userHobies, c, hobies)}
+                    {joinHobbyBlockedHint(userHobies, c, hobies, t)}
                   </div>
                 ) : null}
                 <AddCircleHobbyForm
@@ -416,7 +416,7 @@ export function Circles(props: {
       <div className="discover-header row">
         <div className="discover-header-text">
           <div className="discover-header-title-row row">
-            <div className="hoby-browse-toggle discover-page-tabs" role="tablist" aria-label="Circles views">
+            <div className="hoby-browse-toggle discover-page-tabs" role="tablist" aria-label={t("discoverPage.tabListAria")}>
               <button
                 type="button"
                 role="tab"
@@ -424,7 +424,7 @@ export function Circles(props: {
                 aria-selected={pageTab === "discover"}
                 onClick={() => setPageTab("discover")}
               >
-                Discover Circles
+                {t("discoverPage.tabDiscover")}
               </button>
               <button
                 type="button"
@@ -433,7 +433,7 @@ export function Circles(props: {
                 aria-selected={pageTab === "mine"}
                 onClick={() => setPageTab("mine")}
               >
-                Show my circles
+                {t("discoverPage.tabMine")}
               </button>
               <button
                 type="button"
@@ -442,24 +442,24 @@ export function Circles(props: {
                 aria-selected={pageTab === "joined"}
                 onClick={() => setPageTab("joined")}
               >
-                Circles I'm in
+                {t("discoverPage.tabJoined")}
               </button>
             </div>
           </div>
           <p className="discover-subtitle muted">
             {pageTab === "discover"
-              ? "Find people who enjoy the same things as you"
+              ? t("discoverPage.subtitleDiscover")
               : pageTab === "mine"
-                ? "Circles you created and organize"
-                : "Circles you joined as a member"}
+                ? t("discoverPage.subtitleMine")
+                : t("discoverPage.subtitleJoined")}
           </p>
         </div>
         <div className="row discover-header-actions">
           <button type="button" className="primary" style={{ width: "auto" }} disabled={loading} onClick={() => openCreate()}>
-            Create
+            {t("discoverPage.create")}
           </button>
           <button style={{ width: "auto" }} onClick={props.onBack} disabled={loading}>
-            Back
+            {t("common.back")}
           </button>
         </div>
       </div>
@@ -467,18 +467,18 @@ export function Circles(props: {
       {error ? <FormError>{error}</FormError> : null}
 
       {loading ? (
-        <div className="muted">Loading…</div>
+        <div className="muted">{t("common.loading")}</div>
       ) : pageTab === "mine" ? (
         <div className="stack discover-sections">
           {myCreatedCircles.length > 0 ? (
-            <DiscoverSection title={`${myCreatedCircles.length} circle${myCreatedCircles.length === 1 ? "" : "s"}`}>
+            <DiscoverSection title={t("discoverPage.circleCount", { count: myCreatedCircles.length })}>
               <div className="discover-cards">{myCreatedCircles.map((c) => renderMyCircleCard(c))}</div>
             </DiscoverSection>
           ) : (
             <DiscoverEmptyState
-              title="You haven't created a circle yet"
-              message="Start one for your hobby — then invite people to join."
-              actionLabel="Create a circle"
+              title={t("discoverPage.emptyMineTitle")}
+              message={t("discoverPage.emptyMineMessage")}
+              actionLabel={t("discoverPage.createCircle")}
               onAction={() => openCreate()}
             />
           )}
@@ -486,14 +486,14 @@ export function Circles(props: {
       ) : pageTab === "joined" ? (
         <div className="stack discover-sections">
           {myJoinedCircles.length > 0 ? (
-            <DiscoverSection title={`${myJoinedCircles.length} circle${myJoinedCircles.length === 1 ? "" : "s"}`}>
+            <DiscoverSection title={t("discoverPage.circleCount", { count: myJoinedCircles.length })}>
               <div className="discover-cards">{myJoinedCircles.map((c) => renderJoinedCircleCard(c))}</div>
             </DiscoverSection>
           ) : (
             <DiscoverEmptyState
-              title="You're not in any circles yet"
-              message="Discover circles and join one that fits your hobby."
-              actionLabel="Discover circles"
+              title={t("discoverPage.emptyJoinedTitle")}
+              message={t("discoverPage.emptyJoinedMessage")}
+              actionLabel={t("discoverPage.discoverCirclesAction")}
               onAction={() => setPageTab("discover")}
             />
           )}
@@ -501,19 +501,19 @@ export function Circles(props: {
       ) : props.prefilterDateIso ? (
         <div className="stack discover-sections">
           <div className="discover-date-banner stack">
-            <p className="discover-date-banner-label muted">Showing circles for</p>
+            <p className="discover-date-banner-label muted">{t("discoverPage.showingFor")}</p>
             <p className="discover-date-banner-date">{formatMeetDateLabel(props.prefilterDateIso)}</p>
           </div>
 
           {datePrefilterResults.length > 0 ? (
-            <DiscoverSection title={`${datePrefilterResults.length} circle${datePrefilterResults.length === 1 ? "" : "s"} this day`}>
+            <DiscoverSection title={t("discoverPage.circlesThisDay", { count: datePrefilterResults.length })}>
               <div className="discover-cards">{datePrefilterResults.map((c) => renderDiscoverCard(c))}</div>
             </DiscoverSection>
           ) : (
             <DiscoverEmptyState
-              title="No circles found for this day"
-              message="Be the first — start something on a day that works for you."
-              actionLabel="Create your own circle"
+              title={t("discoverPage.noCirclesThisDayTitle")}
+              message={t("discoverPage.noCirclesThisDayMessage")}
+              actionLabel={t("discoverPage.createYourOwn")}
               onAction={() => openCreate(props.prefilterDateIso)}
             />
           )}
@@ -524,11 +524,11 @@ export function Circles(props: {
             <input
               type="search"
               className="discover-search-input"
-              placeholder="Search by hobby (tennis, chess, walking...)"
+              placeholder={t("discoverPage.searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               disabled={loading}
-              aria-label="Search circles"
+              aria-label={t("discoverPage.searchAria")}
             />
 
             <DiscoverFiltersCollapsible
@@ -539,11 +539,11 @@ export function Circles(props: {
               disabled={loading}
             >
               <DiscoverFilterChips
-                label="Hobby"
+                label={t("discoverPage.filterHobby")}
                 value={filterHobby}
                 disabled={loading}
                 options={[
-                  { value: "", label: "All" },
+                  { value: "", label: t("discoverPage.filterAll") },
                   ...hobies.map((h) => ({
                     value: h.slug,
                     label: (h.icon ? `${h.icon} ` : "") + h.displayName,
@@ -552,37 +552,37 @@ export function Circles(props: {
                 onChange={setFilterHobby}
               />
               <DiscoverFilterChips
-                label="Level"
+                label={t("discoverPage.filterLevel")}
                 value={filterLevel}
                 disabled={loading}
                 options={[
-                  { value: "", label: "Any" },
-                  { value: "beginner", label: "Beginner" },
-                  { value: "intermediate", label: "Intermediate" },
-                  { value: "advanced", label: "Advanced" },
+                  { value: "", label: t("discoverPage.filterAny") },
+                  { value: "beginner", label: t("discoverPage.filterBeginner") },
+                  { value: "intermediate", label: t("discoverPage.filterIntermediate") },
+                  { value: "advanced", label: t("discoverPage.filterAdvanced") },
                 ]}
                 onChange={setFilterLevel}
               />
               <DiscoverFilterChips
-                label="Time"
+                label={t("discoverPage.filterTime")}
                 value={filterTime}
                 disabled={loading}
                 options={[
-                  { value: "", label: "Any" },
-                  { value: "morning", label: "Morning" },
-                  { value: "evening", label: "Evening" },
-                  { value: "weekend", label: "Weekend" },
+                  { value: "", label: t("discoverPage.filterAny") },
+                  { value: "morning", label: t("discoverPage.filterMorning") },
+                  { value: "evening", label: t("discoverPage.filterEvening") },
+                  { value: "weekend", label: t("discoverPage.filterWeekend") },
                 ]}
                 onChange={setFilterTime}
               />
               <DiscoverFilterChips
-                label="Size"
+                label={t("discoverPage.filterSize")}
                 value={filterSize}
                 disabled={loading}
                 options={[
-                  { value: "", label: "Any" },
-                  { value: "small", label: "1–3" },
-                  { value: "growing", label: "4–5" },
+                  { value: "", label: t("discoverPage.filterAny") },
+                  { value: "small", label: t("discoverPage.filterSizeSmall") },
+                  { value: "growing", label: t("discoverPage.filterSizeGrowing") },
                 ]}
                 onChange={setFilterSize}
               />
@@ -591,42 +591,42 @@ export function Circles(props: {
 
           {hasActiveFilters ? (
             searchResults.length > 0 ? (
-              <DiscoverSection title="Results">
+              <DiscoverSection title={t("discoverPage.results")}>
                 <div className="discover-cards">{searchResults.map((c) => renderDiscoverCard(c))}</div>
               </DiscoverSection>
             ) : (
               <DiscoverEmptyState
-                title="No circles found 😔"
-                message="Try changing filters or create your own!"
-                actionLabel="Create circle"
+                title={t("discoverPage.noResultsTitle")}
+                message={t("discoverPage.noResultsMessage")}
+                actionLabel={t("discoverPage.createCircleShort")}
                 onAction={() => openCreate()}
               />
             )
           ) : joinableCircles.length === 0 ? (
             <DiscoverEmptyState
-              title="No circles available yet"
-              actionLabel="Create a circle"
+              title={t("discoverPage.noCirclesTitle")}
+              actionLabel={t("discoverPage.createCircle")}
               onAction={() => openCreate()}
             />
           ) : (
             <>
               {recommended.length > 0 ? (
-                <DiscoverSection title="Recommended for you" subtitle="We think you'll enjoy this">
+                <DiscoverSection title={t("discoverPage.recommendedTitle")} subtitle={t("discoverPage.recommendedSubtitle")}>
                   <div className="discover-cards">
                     {recommended.map((c) => renderDiscoverCard(c))}
                   </div>
                 </DiscoverSection>
               ) : (
                 <DiscoverSectionHint
-                  title="We're still learning your preferences"
-                  message="Explore circles below 👇"
+                  title={t("discoverPage.learningPrefsTitle")}
+                  message={t("discoverPage.learningPrefsMessage")}
                 />
               )}
 
               {nearYou.length > 0 ? (
                 <DiscoverSection
-                  title="Near you"
-                  subtitle="Circles happening close to your location"
+                  title={t("discoverPage.nearYouTitle")}
+                  subtitle={t("discoverPage.nearYouSubtitle")}
                 >
                   <div className="discover-cards">
                     {nearYou.map((c) => renderDiscoverCard(c))}
@@ -634,7 +634,7 @@ export function Circles(props: {
                 </DiscoverSection>
               ) : null}
 
-              <DiscoverSection title="Browse by interest">
+              <DiscoverSection title={t("discoverPage.browseInterest")}>
                 <DiscoverInterestChips
                   value={interestFilter}
                   onChange={(v) => setInterestFilter(v as InterestCategoryId)}
@@ -643,16 +643,16 @@ export function Circles(props: {
                 />
               </DiscoverSection>
 
-              <DiscoverSection title="All circles">
+              <DiscoverSection title={t("discoverPage.allCircles")}>
                 {allCircles.length > 0 ? (
                   <div className="discover-cards">
                     {allCircles.map((c) => renderDiscoverCard(c))}
                   </div>
                 ) : (
                   <DiscoverEmptyState
-                    title="No circles in this category"
-                    message="Try another interest or create your own circle."
-                    actionLabel="Create a circle"
+                    title={t("discoverPage.noCategoryTitle")}
+                    message={t("discoverPage.noCategoryMessage")}
+                    actionLabel={t("discoverPage.createCircle")}
                     onAction={() => openCreate()}
                   />
                 )}

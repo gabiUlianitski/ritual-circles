@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import type { CircleListItem } from "../api/types";
 import { circleHobyTitle } from "./circleDisplay";
 import { formatCompactSchedule, formatCompactLocation, formatParticipantsLabel } from "./circleDiscover";
@@ -16,11 +17,12 @@ export type DiscoverCircleCardProps = {
 };
 
 export function DiscoverCircleCard(props: DiscoverCircleCardProps) {
+  const { t } = useTranslation();
   const { circle } = props;
   const title = circleHobyTitle(circle);
   const location = formatCompactLocation(circle);
-  const time = formatCompactSchedule(circle);
-  const participants = formatParticipantsLabel(circle);
+  const time = formatCompactSchedule(circle, t);
+  const participants = formatParticipantsLabel(circle, t);
 
   return (
     <article className="discover-card discover-card-tappable" onClick={() => props.onPress()}>
@@ -62,7 +64,7 @@ export function DiscoverCircleCard(props: DiscoverCircleCardProps) {
             props.joinAction?.onJoin();
           }}
         >
-          {props.joinAction.busy ? "Joining…" : props.joinAction.label}
+          {props.joinAction.busy ? t("discoverPage.joining") : props.joinAction.label}
         </button>
       ) : null}
     </article>
@@ -122,6 +124,7 @@ export function DiscoverFiltersCollapsible(props: {
   disabled?: boolean;
   children: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="discover-filters-panel">
       <button
@@ -131,8 +134,10 @@ export function DiscoverFiltersCollapsible(props: {
         onClick={props.onToggle}
         disabled={props.disabled}
       >
-        <span>Filters</span>
-        {props.hasActiveFilters ? <span className="discover-filters-dot" aria-label="Filters active" /> : null}
+        <span>{t("discoverPage.filters")}</span>
+        {props.hasActiveFilters ? (
+          <span className="discover-filters-dot" aria-label={t("discoverPage.filtersActive")} />
+        ) : null}
         <span className="discover-filters-chevron" aria-hidden>
           {props.expanded ? "▾" : "▸"}
         </span>
@@ -142,7 +147,7 @@ export function DiscoverFiltersCollapsible(props: {
           {props.children}
           {props.hasActiveFilters ? (
             <button type="button" className="discover-filters-clear" onClick={props.onClear}>
-              Clear filters
+              {t("discoverPage.clearFilters")}
             </button>
           ) : null}
         </div>
@@ -157,8 +162,9 @@ export function DiscoverInterestChips(props: {
   disabled?: boolean;
   categories: { id: string; label: string; icon: string }[];
 }) {
+  const { t } = useTranslation();
   return (
-    <div className="discover-interest-scroll" role="group" aria-label="Browse by interest">
+    <div className="discover-interest-scroll" role="group" aria-label={t("discoverPage.browseInterestAria")}>
       {props.categories.map((cat) => {
         const active = props.value === cat.id;
         return (

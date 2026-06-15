@@ -1,4 +1,5 @@
 import type { CircleListItem, Hoby, UserHobyPreference } from "../api/types";
+import { dateLocale, weekdayLabelsByGetDay } from "../dateLocale";
 import { formatDiscoverCardLocation } from "../venueCardDisplay";
 import { weekdayFromIsoDate } from "./createCircleSchedule";
 import { parseIsoDate } from "./calendarMonth";
@@ -168,17 +169,36 @@ function isTomorrowDate(d: Date): boolean {
   return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
 }
 
-export function formatCompactSchedule(circle: CircleListItem): string {
+const EN_DOW_TO_GETDAY: Record<string, number> = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+};
+
+function localizeRecurringDay(day: string): string {
+  const idx = EN_DOW_TO_GETDAY[day];
+  if (idx == null) return day;
+  return weekdayLabelsByGetDay("short")[idx] ?? day;
+}
+
+export function formatCompactSchedule(
+  circle: CircleListItem,
+  t?: (key: string) => string,
+): string {
   if (circle.nextSessionAt) {
     const d = new Date(circle.nextSessionAt);
     if (!Number.isNaN(d.getTime())) {
-      if (isTomorrowDate(d)) return "Tomorrow";
-      const day = d.toLocaleDateString("en-US", { weekday: "short" });
+      if (isTomorrowDate(d)) return t ? t("discoverPage.tomorrow") : "Tomorrow";
+      const day = d.toLocaleDateString(dateLocale(), { weekday: "short" });
       return `${day} ${formatTime24(d.getHours(), d.getMinutes())}`;
     }
   }
   const parsed = parseRecurringTimePublic(circle.recurringTime);
-  if (parsed) return `${parsed.day} ${formatTime24(parsed.hour, parsed.minute)}`;
+  if (parsed) return `${localizeRecurringDay(parsed.day)} ${formatTime24(parsed.hour, parsed.minute)}`;
   return circle.recurringTime.trim() || "—";
 }
 
@@ -191,9 +211,26 @@ export function formatCompactLocation(circle: CircleListItem): string {
   });
 }
 
-export function formatParticipantsLabel(circle: CircleListItem): string {
+export function formatParticipantsLabel(
+  circle: CircleListItem,
+  t?: (key: string, opts?: Record<string, unknown>) => string,
+): string {
   const state = circleParticipationState(circle.memberCount, circle.maxSize);
-  if (state.isFull) return "Confirmed";
+  if (state.isFull) return t ? t("home.confirmed") : "Confirmed";
+  const joined = Math.max(0, circle.memberCount);
+  const capacity = Math.max(1, circle.maxSize);
+  const spotsLeft = capacity - joined;
+  if (t) {
+    const peopleInLine = joined <= 1 ? null : t("home.peopleIn", { count: joined });
+    const spotsLeftLine =
+      spotsLeft <= 0
+        ? null
+        : spotsLeft === 1
+          ? t("home.oneSpotLeft")
+          : t("home.spotsLeft", { count: spotsLeft });
+    if (peopleInLine && spotsLeftLine) return `${peopleInLine} · ${spotsLeftLine}`;
+    return peopleInLine ?? spotsLeftLine ?? "";
+  }
   if (state.peopleInLine && state.spotsLeftLine) {
     return `${state.peopleInLine} · ${state.spotsLeftLine}`;
   }
@@ -394,7 +431,7 @@ export function formatMeetDateLabel(dateIso: string): string {
   const p = parseIsoDate(dateIso);
   if (!p) return dateIso;
   const d = new Date(p.year, p.monthIndex, p.day);
-  return d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+  return d.toLocaleDateString(dateLocale(), { weekday: "long", month: "short", day: "numeric" });
 }
 
 const WEEKDAY_TOKEN = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/i;

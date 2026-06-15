@@ -57,6 +57,7 @@ export function joinHobbyBlockedHint(
   userHobies: UserHobyPreference[],
   circle: Pick<CircleListItem, "ritualType" | "ritualSubtype" | "ritualLevel">,
   hobiesCatalog?: Hoby[],
+  t?: (key: string) => string,
 ): string | null {
   if (userHasJoinableHobbyForCircle(userHobies, circle, hobiesCatalog)) return null;
   const slug = (circle.ritualType ?? "").trim().toLowerCase();
@@ -65,13 +66,13 @@ export function joinHobbyBlockedHint(
   const needUserSubtype = parseHobyTypesNested(catalogue?.types).length > 0;
   const sameSlug = userHobies.filter((h) => (h.slug ?? "").trim().toLowerCase() === slug);
   if (!sameSlug.length) {
-    return "Add this hobby to your profile with a type and level, then come back to join.";
+    return t ? t("discoverPage.joinHintAddHobby") : "Add this hobby to your profile with a type and level, then come back to join.";
   }
   if (needUserSubtype && sameSlug.every((h) => !(h.subtype?.trim()))) {
-    return "Choose a type for this hobby on your profile (Profile → Hobbies).";
+    return t ? t("discoverPage.joinHintChooseType") : "Choose a type for this hobby on your profile (Profile → Hobbies).";
   }
   if (needLevel && sameSlug.every((h) => !levelKeyIsSet(h.level))) {
-    return "Open Profile → Hobbies, tap Edit on this hobby, and choose your level.";
+    return t ? t("discoverPage.joinHintChooseLevel") : "Open Profile → Hobbies, tap Edit on this hobby, and choose your level.";
   }
   return null;
 }
