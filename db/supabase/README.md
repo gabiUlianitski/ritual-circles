@@ -1,21 +1,17 @@
 # Supabase database setup
 
-Apply schema to a **new** Supabase Postgres project:
+## Quick setup (recommended)
 
 1. Open **SQL Editor** in the Supabase dashboard.
-2. Run `db/schema.sql`.
-3. Run each migration in `db/migrations/` in numeric order (003 through 025).
+2. Paste the entire contents of **`full_migration.sql`** (this folder).
+3. Click **Run** → choose **Run without RLS** (the app uses FastAPI + `DATABASE_URL`, not Supabase anon keys).
 
-For CLI (requires `psql` and your Supabase URI):
+That single file creates all tables and indexes for a **fresh** project.
 
-```powershell
-$env:DATABASE_URL = "postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
-psql $env:DATABASE_URL -f db/schema.sql
-Get-ChildItem db/migrations/*.sql | Sort-Object Name | ForEach-Object {
-  Write-Host "Applying $($_.Name)..."
-  psql $env:DATABASE_URL -f $_.FullName
-}
-```
+## Manual setup (legacy)
 
-Use **Session mode** (port 5432) connection string on Render.  
-Use **Transaction mode** (port 6543) only for serverless clients with pgbouncer.
+Alternatively run `db/schema.sql` then each file in `db/migrations/` in order (`003` … `025`). Only use this if you are upgrading an old database.
+
+## Connection string for Render
+
+Use **Session mode** (port **5432**) as `DATABASE_URL` on Render, plus `DATABASE_SSL=require`.

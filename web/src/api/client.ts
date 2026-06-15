@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "./config";
 import { getAppLanguageCode } from "../i18n";
+import { localizeHobies } from "../hobyI18n/localizeHoby";
 import { getOrCreateDevUserId } from "./devUserId";
 import type {
   AttendanceResponse,
@@ -178,7 +179,8 @@ export const api = {
   putAttendance: (sessionId: string, status: AttendanceStatus) =>
     request<AttendanceResponse>("PUT", `/sessions/${sessionId}/attendance`, { status }),
 
-  getHobies: () => request<Hoby[]>("GET", "/hobies"),
+  getHobies: async () =>
+    localizeHobies(await request<Hoby[]>("GET", "/hobies"), getAppLanguageCode()),
   precheckNewHoby: (payload: { displayName: string }) =>
     request<HobyPrecheckResponse>("POST", "/hobies/precheck", payload),
   getCountries: () => request<CountryItem[]>("GET", "/geo/countries"),
@@ -208,4 +210,3 @@ export const api = {
   spellSuggestHobies: (payload: { slug?: string | null; displayName?: string | null }) =>
     request<HobySpellSuggestResponse>("POST", "/hobies/spell-suggest", payload),
 };
-

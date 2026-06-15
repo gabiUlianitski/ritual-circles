@@ -66,6 +66,12 @@
     "spotsLeft": "(+{{count}} spots left)",
     "peopleIn": "{{count}} people are in"
   },
+  "groupSize": {
+    "exactly": "Exactly {{count}} people",
+    "upTo": "Up to {{count}} people",
+    "atLeast": "At least {{count}} people",
+    "between": "Between {{min}} and {{max}} people"
+  },
   "interestCategories": {
     "sports": "Sports",
     "arts": "Arts",

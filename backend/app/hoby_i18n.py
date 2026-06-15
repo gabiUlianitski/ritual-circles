@@ -5,17 +5,18 @@ from typing import Any
 
 SUPPORTED_LANGS = frozenset({"en", "he"})
 
-# Fallback labels for common level keys when hoby i18n_json has no entry.
-_COMMON_LEVEL_LABELS: dict[str, dict[str, str]] = {
-    "he": {
-        "beginner": "מתחיל",
-        "intermediate": "בינוני",
-        "advanced": "מתקדם",
-        "expert": "מומחה",
-        "1": "מתחיל",
-        "2": "בינוני",
-        "3": "מתקדם",
-    },
+# Fallback labels/descriptions for common level keys when hoby i18n_json has no entry.
+_COMMON_LEVEL_HE: dict[str, dict[str, str]] = {
+    "beginner": {"label": "מתחיל", "description": "רמת מתחילים"},
+    "intermediate": {"label": "בינוני", "description": "רמת ביניים"},
+    "advanced": {"label": "מתקדם", "description": "רמת מתקדמים"},
+    "expert": {"label": "מומחה", "description": "רמת מומחים"},
+    "master": {"label": "מאסטר", "description": "רמת מאסטר"},
+    "1": {"label": "מתחיל", "description": "רמת מתחילים"},
+    "2": {"label": "בינוני", "description": "רמת ביניים"},
+    "3": {"label": "מתקדם", "description": "רמת מתקדמים"},
+    "4": {"label": "מומחה", "description": "רמת מומחים"},
+    "5": {"label": "מאסטר", "description": "רמת מאסטר"},
 }
 
 
@@ -63,7 +64,13 @@ def localized_short_description(row: dict[str, Any] | Any, lang: str) -> str | N
     return base
 
 
-def _merge_metadata_list(base: Any, translations: Any, lang: str, *, common_labels: dict[str, str] | None) -> Any:
+def _merge_metadata_list(
+    base: Any,
+    translations: Any,
+    lang: str,
+    *,
+    common_levels: dict[str, dict[str, str]] | None,
+) -> Any:
     if not isinstance(base, list):
         return base
     if lang == "en":
@@ -82,8 +89,12 @@ def _merge_metadata_list(base: Any, translations: Any, lang: str, *, common_labe
                 merged["label"] = tr_item["label"].strip()
             if isinstance(tr_item.get("description"), str) and tr_item["description"].strip():
                 merged["description"] = tr_item["description"].strip()
-        elif common_labels and key in common_labels and not merged.get("label"):
-            merged["label"] = common_labels[key]
+        elif common_levels and key in common_levels:
+            common = common_levels[key]
+            if not merged.get("label"):
+                merged["label"] = common.get("label", merged.get("label"))
+            if not merged.get("description") and common.get("description"):
+                merged["description"] = common["description"]
         out.append(merged)
     return out
 
@@ -96,9 +107,9 @@ def localized_levels_types(row: dict[str, Any] | Any, lang: str) -> tuple[Any, A
     i18n = parse_i18n_json(row.get("i18n_json") if hasattr(row, "get") else None)
     block = i18n.get(lang)
     block = block if isinstance(block, dict) else {}
-    common = _COMMON_LEVEL_LABELS.get(lang)
-    levels_out = _merge_metadata_list(levels, block.get("levels"), lang, common_labels=common)
-    types_out = _merge_metadata_list(types, block.get("types"), lang, common_labels=None)
+    common = _COMMON_LEVEL_HE if lang == "he" else None
+    levels_out = _merge_metadata_list(levels, block.get("levels"), lang, common_levels=common)
+    types_out = _merge_metadata_list(types, block.get("types"), lang, common_levels=None)
     return levels_out, types_out
 
 

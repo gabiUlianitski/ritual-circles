@@ -87,7 +87,22 @@ export function splitCostMayDecrease(state: GroupSizeState): boolean {
   return state.type === "min" || state.type === "max" || state.type === "range";
 }
 
-export function formatGroupSizeSummary(payload: GroupSizePayload): string {
+export function formatGroupSizeSummary(
+  payload: GroupSizePayload,
+  t?: (key: string, opts?: Record<string, unknown>) => string,
+): string {
+  if (t) {
+    switch (payload.type) {
+      case "fixed":
+        return t("groupSize.exactly", { count: payload.min ?? payload.max });
+      case "max":
+        return t("groupSize.upTo", { count: payload.max });
+      case "min":
+        return t("groupSize.atLeast", { count: payload.min });
+      case "range":
+        return t("groupSize.between", { min: payload.min, max: payload.max });
+    }
+  }
   switch (payload.type) {
     case "fixed":
       return `Exactly ${payload.min ?? payload.max} people`;

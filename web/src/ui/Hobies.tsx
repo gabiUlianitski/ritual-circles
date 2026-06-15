@@ -401,7 +401,9 @@ export function Hobies(props: { onBack: () => void }) {
                 </div>
                 {!isEditing && panelHoby.groupSize ? (
                   <div className="muted" style={{ fontSize: "0.85em", marginTop: 4 }}>
-                    {t("hobbiesPage.preferredGroup", { summary: formatGroupSizeSummary(panelHoby.groupSize) })}
+                    {t("hobbiesPage.preferredGroup", {
+                      summary: formatGroupSizeSummary(panelHoby.groupSize, t),
+                    })}
                   </div>
                 ) : null}
               </div>

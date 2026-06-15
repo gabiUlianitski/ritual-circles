@@ -66,6 +66,12 @@
     "spotsLeft": "(+{{count}} מקומות פנויים)",
     "peopleIn": "{{count}} משתתפים"
   },
+  "groupSize": {
+    "exactly": "בדיוק {{count}} אנשים",
+    "upTo": "עד {{count}} אנשים",
+    "atLeast": "לפחות {{count}} אנשים",
+    "between": "בין {{min}} ל-{{max}} אנשים"
+  },
   "interestCategories": {
     "sports": "ספורט",
     "arts": "אמנות",

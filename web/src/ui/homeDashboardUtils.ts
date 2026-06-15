@@ -1,5 +1,10 @@
 import type { HomeCalendarSession } from "../api/types";
+import { getAppLanguageCode } from "../i18n";
 import { circleHobyTitle } from "./circleDisplay";
+
+function dateLocale(): string | undefined {
+  return getAppLanguageCode() === "he" ? "he-IL" : undefined;
+}
 
 export function sessionTitle(item: HomeCalendarSession): string {
   return item.hobyDisplayName?.trim() || circleHobyTitle({ ritualType: item.ritualType, recurringTime: "" });
@@ -39,10 +44,11 @@ export function formatSessionDateTime(iso: string): string {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const dayDiff = Math.round((target.getTime() - today.getTime()) / 86_400_000);
-  const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
+  const locale = dateLocale();
+  const time = d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12: false });
   if (dayDiff === 0) return `Today · ${time}`;
   if (dayDiff === 1) return `Tomorrow · ${time}`;
-  const day = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  const day = d.toLocaleDateString(locale, { weekday: "short", month: "short", day: "numeric" });
   return `${day} · ${time}`;
 }
 
@@ -50,8 +56,9 @@ export function formatSessionDateTime(iso: string): string {
 export function formatSessionDateTimeHero(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  const day = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-  const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
+  const locale = dateLocale();
+  const day = d.toLocaleDateString(locale, { weekday: "short", month: "short", day: "numeric" });
+  const time = d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12: false });
   return `${day} · ${time}`;
 }
 
@@ -71,5 +78,5 @@ export function dateToIsoLocal(d: Date): string {
 }
 
 export function formatDayLabel(d: Date): string {
-  return d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+  return d.toLocaleDateString(dateLocale(), { weekday: "long", month: "short", day: "numeric" });
 }
