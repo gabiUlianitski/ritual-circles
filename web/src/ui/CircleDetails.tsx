@@ -11,7 +11,7 @@ import {
   CircleDetailsSummary,
 } from "./CircleDetailsSummary";
 import { CircleDetailsMembersSection } from "./CircleDetailsMembersSection";
-import { circleParticipationState } from "./circleParticipation";
+import { markOnboardingChatHello } from "../onboarding/onboardingState";
 
 type DetailsTab = "details" | "scheduled";
 type DetailsTabInput = DetailsTab | "chat";
@@ -265,7 +265,10 @@ export function CircleDetails(props: {
                     type="button"
                     className={`circle-details-chat-toggle${chatOpen ? " circle-details-chat-toggle--open" : ""}`}
                     aria-expanded={chatOpen}
-                    onClick={() => setChatOpen((open) => !open)}
+                    onClick={() => {
+                      if (!chatOpen) markOnboardingChatHello();
+                      setChatOpen((open) => !open);
+                    }}
                   >
                     <span className="circle-details-chat-toggle-copy">
                       <span className="circle-details-chat-prompt-lead">{t("circleDetails.chatTitle")}</span>

@@ -280,5 +280,39 @@
     "levelGettingStarted": "רק מתחיל/ה",
     "levelComfortable": "מתרגל/ת",
     "levelExperienced": "מנוסה"
+  },
+  "onboarding": {
+    "stepOf": "שלב {{step}} מתוך {{total}}",
+    "welcomeTitle": "מצא/י את האנשים שלך. עשו דברים ביחד.",
+    "welcomeSubtitle": "הצטרף/י לקבוצות קטנות עם תחביבים משותפים ופגש/י במציאות.",
+    "findCircles": "מצא/י מעגלים קרובים",
+    "createFirstCircle": "צור/י את המעגל הראשון שלי",
+    "interestsTitle": "מה את/ה אוהב/ת?",
+    "interestsSubtitle": "בחר/י כמה — נציע מעגלים שמתאימים.",
+    "pickOneInterest": "בחר/י לפחות תחום עניין אחד כדי להמשיך.",
+    "continue": "המשך/י",
+    "recommendedTitle": "מעגלים בשבילך",
+    "recommendedSubtitle": "קבוצות קטנות שמתאימות לתחומי העניין שלך.",
+    "noMatchesTitle": "עדיין אין מעגלים לתחומים האלה",
+    "noMatchesSubtitle": "היה/י הראשון/ה — התחל/י מעגל והזמן/י אחרים.",
+    "createYourOwn": "צור/י מעגל משלך",
+    "changeInterests": "שנה/י תחומי עניין",
+    "checklistTitle": "מתחילים",
+    "checklistInterests": "בחר/י תחומי עניין",
+    "checklistJoin": "הצטרף/י למעגל הראשון",
+    "checklistSchedule": "קבע/י את הפעילות הראשונה",
+    "checklistChat": "אמור/י שלום בצ'אט"
+  },
+  "emptyStates": {
+    "circlesTitle": "את/ה עדיין לא במעגלים",
+    "circlesSubtitle": "מעגלים הם קבוצות קטנות (3–6 אנשים) שנפגשות באופן קבוע.",
+    "discoverCircles": "גילוי מעגלים",
+    "createCircle": "צור/י מעגל",
+    "calendarTitle": "עדיין אין פעילויות",
+    "calendarSubtitle": "הצטרף/י למעגל או צור/י אחד כדי להתחיל לתאם מפגשים.",
+    "findCircles": "מצא/י מעגלים",
+    "notificationsTitle": "עדיין אין הודעות",
+    "notificationsSubtitle": "הצטרף/י למעגל כדי להתחיל לשוחח.",
+    "myCirclesTitle": "המעגלים שלי"
   }
 }

@@ -12,8 +12,12 @@ export function HomeCirclesList(props: {
   hideHeading?: boolean;
   listLabel?: string;
   emptyMessage?: string;
+  emptyTitle?: string;
+  emptySubtitle?: string;
   emptyActionLabel?: string;
   onEmptyAction?: () => void;
+  emptySecondaryActionLabel?: string;
+  onEmptySecondaryAction?: () => void;
   /** Show leave/drop on expanded row (created = drop, joined = leave). */
   showLeaveAction?: boolean;
   leaveActionLabel?: string;
@@ -23,14 +27,24 @@ export function HomeCirclesList(props: {
   const [error, setError] = useState<string | null>(null);
 
   if (props.items.length === 0) {
+    const title = props.emptyTitle ?? props.emptyMessage?.split("\n")[0] ?? "";
+    const subtitle = props.emptySubtitle ?? props.emptyMessage?.split("\n")[1] ?? "";
     return (
-      <div className="stack" style={{ gap: 12 }}>
-        <div className="circle-scheduled-empty muted">{props.emptyMessage ?? "No circles here yet."}</div>
-        {props.emptyActionLabel && props.onEmptyAction ? (
-          <button type="button" className="primary" style={{ width: "auto", alignSelf: "flex-start" }} onClick={props.onEmptyAction}>
-            {props.emptyActionLabel}
-          </button>
-        ) : null}
+      <div className="stack onboarding-empty-guidance" style={{ gap: 12 }}>
+        {title ? <p className="onboarding-empty-title">{title}</p> : null}
+        {subtitle ? <p className="muted">{subtitle}</p> : null}
+        <div className="onboarding-empty-actions row">
+          {props.emptyActionLabel && props.onEmptyAction ? (
+            <button type="button" className="primary" style={{ width: "auto" }} onClick={props.onEmptyAction}>
+              {props.emptyActionLabel}
+            </button>
+          ) : null}
+          {props.emptySecondaryActionLabel && props.onEmptySecondaryAction ? (
+            <button type="button" className="onboarding-secondary" style={{ width: "auto" }} onClick={props.onEmptySecondaryAction}>
+              {props.emptySecondaryActionLabel}
+            </button>
+          ) : null}
+        </div>
       </div>
     );
   }

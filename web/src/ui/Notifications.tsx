@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import {
   acknowledgeMemberCount,
@@ -145,6 +146,7 @@ export function Notifications(props: {
   onInboxChanged?: () => void;
   onHomeRefresh?: () => Promise<void> | void;
 }) {
+  const { t } = useTranslation();
   const [items, setItems] = useState<StoredNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -388,8 +390,9 @@ export function Notifications(props: {
       {error ? <FormError>{error}</FormError> : null}
 
       {!loading && !error && visibleItems.length === 0 ? (
-        <div className="muted notif-empty">
-          {filter === "unread" ? "No unread notifications." : "No notifications yet."}
+        <div className="notif-empty onboarding-empty-guidance stack">
+          <p className="onboarding-empty-title">{t("emptyStates.notificationsTitle")}</p>
+          <p className="muted">{t("emptyStates.notificationsSubtitle")}</p>
         </div>
       ) : null}
 

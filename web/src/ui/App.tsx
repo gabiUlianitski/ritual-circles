@@ -5,6 +5,7 @@ import type { HomeResponse } from "../api/types";
 import i18n from "../i18n";
 import { hasAnyNotifications } from "../notificationsFeed";
 import { AppLanguageSelect } from "./AppLanguageSelect";
+import { isNewUser } from "../onboarding/onboardingState";
 import { Notifications } from "./Notifications";
 import { FormError } from "./FormError";
 import { Login } from "./Login";
@@ -67,6 +68,8 @@ export function App() {
   const [returnStageAfterNotif, setReturnStageAfterNotif] = useState<AppStage>("dashboard");
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  const onboardingMode = home != null && isNewUser(home) && stage === "dashboard";
 
   const checkNotifications = useCallback(
     async (userId: string | null, homeCircleId: string | null | undefined) => {
@@ -243,6 +246,8 @@ export function App() {
         <div className="header-toolbar">
           {stage !== "login" ? (
             <>
+            {!onboardingMode ? (
+            <>
             <button
               type="button"
               className={`icon-btn${stage === "dashboard" ? " is-active" : ""}`}
@@ -265,6 +270,10 @@ export function App() {
             >
               <IconCircles />
             </button>
+            </>
+            ) : null}
+            {!onboardingMode ? (
+            <>
             <button
               type="button"
               className={`icon-btn${stage === "profile" ? " is-active" : ""}`}
@@ -329,6 +338,8 @@ export function App() {
                 </div>
               ) : null}
             </div>
+            </>
+          ) : null}
         </div>
       </div>
 

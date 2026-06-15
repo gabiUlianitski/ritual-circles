@@ -5663,4 +5663,173 @@ button.notif-item:hover,
   }
 }
 
+/* —— First-time user onboarding —— */
+.onboarding-screen {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 28px 22px;
+  gap: 20px;
+}
+
+.onboarding-step {
+  margin: 0;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.onboarding-title {
+  margin: 0;
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.onboarding-subtitle {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.onboarding-copy {
+  gap: 10px;
+}
+
+.onboarding-actions {
+  gap: 10px;
+  align-items: stretch;
+}
+
+.onboarding-primary {
+  width: 100%;
+  min-height: 48px;
+  font-size: 1rem;
+}
+
+.onboarding-secondary {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: #e8eef6;
+  cursor: pointer;
+}
+
+.onboarding-secondary:hover {
+  background: var(--card-bg-hover);
+}
+
+.onboarding-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.onboarding-chip {
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+  background: var(--page-bg);
+  color: #e8eef6;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+
+.onboarding-chip--active {
+  border-color: rgba(42, 109, 244, 0.75);
+  background: rgba(42, 109, 244, 0.18);
+}
+
+.onboarding-recommended-cards {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.onboarding-empty-guidance {
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.onboarding-empty-title {
+  margin: 0;
+  font-weight: 650;
+  font-size: 1.05rem;
+}
+
+.onboarding-empty-actions {
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.onboarding-checklist {
+  padding: 16px 18px;
+  gap: 10px;
+}
+
+.onboarding-checklist-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.onboarding-checklist-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.onboarding-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.92rem;
+  color: #9fb0c6;
+}
+
+.onboarding-checklist-item--done {
+  color: #e8eef6;
+}
+
+.onboarding-checklist-box {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--card-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.onboarding-checklist-item--done .onboarding-checklist-box {
+  border-color: rgba(42, 109, 244, 0.65);
+  background: rgba(42, 109, 244, 0.22);
+  color: #7eb8ff;
+}
+
+.home-primary-section,
+.home-secondary-section {
+  gap: 14px;
+}
+
+.home-secondary-section {
+  margin-top: 8px;
+  padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+}
+
+.home-section-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: #9fb0c6;
+}
 

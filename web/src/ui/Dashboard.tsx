@@ -1,13 +1,22 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { HomeResponse } from "../api/types";
+import { api } from "../api/client";
+import type { HomeResponse, UserMeResponse } from "../api/types";
+import {
+  getChecklistProgress,
+  isNewUser,
+  shouldShowChecklist,
+} from "../onboarding/onboardingState";
 import { CircleDetails } from "./CircleDetails";
 import { HomeCalendar } from "./HomeCalendar";
 import { HomeEmptyDayPrompt } from "./HomeEmptyDayPrompt";
+import { HomeCirclesList } from "./HomeCirclesList";
 import { HomeNextActivityCard } from "./HomeNextActivityCard";
 import { HomeSessionEvents } from "./HomeSessionEvents";
 import { HomeWeekStrip } from "./HomeWeekStrip";
 import { HomeWelcomeHeader } from "./HomeWelcomeHeader";
+import { OnboardingChecklist } from "./onboarding/OnboardingChecklist";
+import { OnboardingFlow } from "./onboarding/OnboardingFlow";
 import { dateToIsoLocal, getUpcomingSessions } from "./homeDashboardUtils";
 
 function ymdKey(d: Date): string {
@@ -34,9 +43,21 @@ export function Dashboard(props: {
   const { t } = useTranslation();
   const [detailsCircleId, setDetailsCircleId] = useState<string | null>(null);
   const [detailsInitialTab, setDetailsInitialTab] = useState<"details" | "chat" | "scheduled">("details");
+  const [me, setMe] = useState<UserMeResponse | null>(null);
   const calendarSessions = props.home.calendarSessions ?? [];
+  const myCircles = props.home.myCircles ?? [];
+  const hasActivities = calendarSessions.length > 0;
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(() => defaultSelectedDay(calendarSessions));
+
+  useEffect(() => {
+    void api.getMe().then(setMe).catch(() => setMe(null));
+  }, [props.home]);
+
+  const checklistProgress = useMemo(
+    () => getChecklistProgress(props.home, me?.userHobies ?? []),
+    [props.home, me?.userHobies],
+  );
 
   const selectedDaySessions = useMemo(() => {
     if (!selectedDay) return [];
@@ -46,11 +67,11 @@ export function Dashboard(props: {
       .sort((a, b) => new Date(a.session.dateTime).getTime() - new Date(b.session.dateTime).getTime());
   }, [calendarSessions, selectedDay]);
 
-  const showEmptyDayPrompt = selectedDay != null && selectedDaySessions.length === 0;
+  const showEmptyDayPrompt = selectedDay != null && selectedDaySessions.length === 0 && hasActivities;
 
-  function openCircle(circleId: string, t: "details" | "chat" | "scheduled" = "details") {
+  function openCircle(circleId: string, tab: "details" | "chat" | "scheduled" = "details") {
     setDetailsCircleId(circleId);
-    setDetailsInitialTab(t);
+    setDetailsInitialTab(tab);
   }
 
   function findCirclesForSelectedDay() {
@@ -81,57 +102,85 @@ export function Dashboard(props: {
     );
   }
 
+  if (isNewUser(props.home)) {
+    return (
+      <OnboardingFlow
+        home={props.home}
+        onRefresh={props.onRefresh}
+        onGoCreateJoin={() => props.onGoCreateJoin()}
+      />
+    );
+  }
+
   return (
     <div className="stack dashboard-home">
+      {shouldShowChecklist(props.home, checklistProgress) ? (
+        <OnboardingChecklist progress={checklistProgress} />
+      ) : null}
+
       <HomeWelcomeHeader sessions={calendarSessions} firstName={props.userFirstName} />
 
-      <HomeNextActivityCard
-        sessions={calendarSessions}
-        onOpenCircle={(id) => openCircle(id, "details")}
-        onRefresh={props.onRefresh}
-        onFindCircles={() => props.onGoFindCircles()}
-      />
-
-      <section className="home-upcoming stack" aria-label={t("home.upcomingThisWeek")}>
+      <section className="home-primary-section stack" aria-label={t("home.upcomingThisWeek")}>
         <h2 className="home-section-title">{t("home.upcomingThisWeek")}</h2>
-        <HomeWeekStrip sessions={calendarSessions} selectedDay={selectedDay} onSelectDay={setSelectedDay} />
-        {showEmptyDayPrompt && selectedDay ? (
-          <HomeEmptyDayPrompt
-            selectedDay={selectedDay}
-            onFindCircles={findCirclesForSelectedDay}
-            onCreateCircle={createCircleForSelectedDay}
-          />
+        <HomeNextActivityCard
+          sessions={calendarSessions}
+          onOpenCircle={(id) => openCircle(id, "details")}
+          onRefresh={props.onRefresh}
+          onFindCircles={() => props.onGoFindCircles()}
+          onCreateCircle={() => props.onGoCreateJoin()}
+        />
+
+        {hasActivities ? (
+          <>
+            <HomeWeekStrip sessions={calendarSessions} selectedDay={selectedDay} onSelectDay={setSelectedDay} />
+            {showEmptyDayPrompt && selectedDay ? (
+              <HomeEmptyDayPrompt
+                selectedDay={selectedDay}
+                onFindCircles={findCirclesForSelectedDay}
+                onCreateCircle={createCircleForSelectedDay}
+              />
+            ) : null}
+            <button
+              type="button"
+              className="home-btn-text home-calendar-toggle"
+              aria-expanded={showFullCalendar}
+              onClick={() => setShowFullCalendar((v) => !v)}
+            >
+              {showFullCalendar ? t("home.hideFullCalendar") : t("home.viewFullCalendar")}
+            </button>
+            <HomeCalendar
+              expanded={showFullCalendar}
+              sessions={calendarSessions}
+              selectedDay={selectedDay}
+              onSelectDay={setSelectedDay}
+            />
+            {selectedDay && selectedDaySessions.length > 0 ? (
+              <HomeSessionEvents
+                sessions={selectedDaySessions}
+                selectedDay={selectedDay}
+                onOpenCircle={(id) => openCircle(id, "details")}
+                onRefresh={props.onRefresh}
+              />
+            ) : null}
+          </>
         ) : null}
       </section>
 
-      {calendarSessions.length > 0 ? (
-        <button
-          type="button"
-          className="home-btn-text home-calendar-toggle"
-          aria-expanded={showFullCalendar}
-          onClick={() => setShowFullCalendar((v) => !v)}
-        >
-          {showFullCalendar ? t("home.hideFullCalendar") : t("home.viewFullCalendar")}
-        </button>
-      ) : null}
-
-      {calendarSessions.length > 0 ? (
-        <HomeCalendar
-          expanded={showFullCalendar}
-          sessions={calendarSessions}
-          selectedDay={selectedDay}
-          onSelectDay={setSelectedDay}
-        />
-      ) : null}
-
-      {selectedDay && selectedDaySessions.length > 0 ? (
-        <HomeSessionEvents
-          sessions={selectedDaySessions}
-          selectedDay={selectedDay}
-          onOpenCircle={(id) => openCircle(id, "details")}
+      <section className="home-secondary-section stack" aria-label={t("emptyStates.myCirclesTitle")}>
+        <h2 className="home-section-title">{t("emptyStates.myCirclesTitle")}</h2>
+        <HomeCirclesList
+          items={myCircles}
           onRefresh={props.onRefresh}
+          onOpenCircle={openCircle}
+          hideHeading
+          emptyTitle={t("emptyStates.circlesTitle")}
+          emptySubtitle={t("emptyStates.circlesSubtitle")}
+          emptyActionLabel={t("emptyStates.discoverCircles")}
+          onEmptyAction={() => props.onGoFindCircles()}
+          emptySecondaryActionLabel={t("emptyStates.createCircle")}
+          onEmptySecondaryAction={() => props.onGoCreateJoin()}
         />
-      ) : null}
+      </section>
     </div>
   );
 }

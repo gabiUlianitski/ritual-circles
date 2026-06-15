@@ -17,6 +17,7 @@ export function HomeNextActivityCard(props: {
   onOpenCircle: (circleId: string) => void;
   onRefresh?: () => Promise<void> | void;
   onFindCircles?: () => void;
+  onCreateCircle?: () => void;
 }) {
   const { t } = useTranslation();
   const [working, setWorking] = useState(false);
@@ -26,13 +27,21 @@ export function HomeNextActivityCard(props: {
 
   if (!next) {
     return (
-      <section className="home-hero home-hero--empty card stack" aria-label="Next activity">
-        <p className="home-hero-empty-text">{t("home.noCalendarYet")}</p>
-        {props.onFindCircles ? (
-          <button type="button" className="home-btn-text home-hero-empty-link" onClick={props.onFindCircles}>
-            {t("home.exploreCircles")}
-          </button>
-        ) : null}
+      <section className="home-hero home-hero--empty card stack onboarding-empty-guidance" aria-label="Next activity">
+        <p className="onboarding-empty-title">{t("emptyStates.calendarTitle")}</p>
+        <p className="home-hero-empty-text muted">{t("emptyStates.calendarSubtitle")}</p>
+        <div className="onboarding-empty-actions row">
+          {props.onFindCircles ? (
+            <button type="button" className="primary" style={{ width: "auto" }} onClick={props.onFindCircles}>
+              {t("emptyStates.findCircles")}
+            </button>
+          ) : null}
+          {props.onCreateCircle ? (
+            <button type="button" className="onboarding-secondary" style={{ width: "auto" }} onClick={props.onCreateCircle}>
+              {t("emptyStates.createCircle")}
+            </button>
+          ) : null}
+        </div>
       </section>
     );
   }

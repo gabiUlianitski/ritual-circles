@@ -280,5 +280,39 @@
     "levelGettingStarted": "Just getting started",
     "levelComfortable": "Getting comfortable",
     "levelExperienced": "Experienced"
+  },
+  "onboarding": {
+    "stepOf": "Step {{step}} of {{total}}",
+    "welcomeTitle": "Find your people. Do things together.",
+    "welcomeSubtitle": "Join small groups with shared hobbies and meet in real life.",
+    "findCircles": "Find circles near me",
+    "createFirstCircle": "Create my first circle",
+    "interestsTitle": "What do you enjoy?",
+    "interestsSubtitle": "Pick a few — we'll suggest circles that fit.",
+    "pickOneInterest": "Pick at least one interest to continue.",
+    "continue": "Continue",
+    "recommendedTitle": "Circles for you",
+    "recommendedSubtitle": "Small groups near you that match your interests.",
+    "noMatchesTitle": "No circles yet for these interests",
+    "noMatchesSubtitle": "Be the first — start a circle and invite others.",
+    "createYourOwn": "Create your own circle",
+    "changeInterests": "Change interests",
+    "checklistTitle": "Getting started",
+    "checklistInterests": "Choose your interests",
+    "checklistJoin": "Join your first circle",
+    "checklistSchedule": "Schedule your first activity",
+    "checklistChat": "Say hello in chat"
+  },
+  "emptyStates": {
+    "circlesTitle": "You're not in any circles yet",
+    "circlesSubtitle": "Circles are small groups (3–6 people) who meet regularly.",
+    "discoverCircles": "Discover circles",
+    "createCircle": "Create circle",
+    "calendarTitle": "No activities yet",
+    "calendarSubtitle": "Join a circle or create one to start scheduling meetups.",
+    "findCircles": "Find circles",
+    "notificationsTitle": "No messages yet",
+    "notificationsSubtitle": "Join a circle to start chatting.",
+    "myCirclesTitle": "My circles"
   }
 }
