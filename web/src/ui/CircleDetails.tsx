@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import type { CircleMeResponse, Hoby } from "../api/types";
 import { CircleChat } from "./CircleChat";
@@ -23,12 +24,13 @@ function normalizeTab(tab?: DetailsTabInput): DetailsTab {
 function CircleDetailsTabBar(props: {
   tab: DetailsTab;
   onTab: (tab: DetailsTab) => void;
+  t: (key: string) => string;
 }) {
   return (
     <div
       className="hoby-browse-toggle circle-details-tabs circle-details-tabs--bottom"
       role="tablist"
-      aria-label="Circle sections"
+      aria-label={props.t("circleDetails.tabListAria")}
     >
       <button
         type="button"
@@ -37,7 +39,7 @@ function CircleDetailsTabBar(props: {
         aria-selected={props.tab === "details"}
         onClick={() => props.onTab("details")}
       >
-        About
+        {props.t("circleDetails.tabAbout")}
       </button>
       <button
         type="button"
@@ -46,7 +48,7 @@ function CircleDetailsTabBar(props: {
         aria-selected={props.tab === "scheduled"}
         onClick={() => props.onTab("scheduled")}
       >
-        Make some changes
+        {props.t("circleDetails.tabEdit")}
       </button>
     </div>
   );
@@ -58,6 +60,7 @@ export function CircleDetails(props: {
   initialTab?: DetailsTabInput;
   onLeftCircle?: () => void | Promise<void>;
 }) {
+  const { t, i18n } = useTranslation();
   const [data, setData] = useState<CircleMeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
@@ -115,7 +118,7 @@ export function CircleDetails(props: {
       .getHobies()
       .then((list) => setHobies(Array.isArray(list) ? list : []))
       .catch(() => setHobies([]));
-  }, []);
+  }, [i18n.language]);
 
   const circle = data?.circle ?? null;
   const isCreator = Boolean(data?.isCreator);
@@ -171,10 +174,10 @@ export function CircleDetails(props: {
     setOptionsOpen(false);
     try {
       await navigator.clipboard.writeText(circle.inviteCode);
-      setCopyHint("Invite code copied");
+      setCopyHint(t("circleDetails.inviteCopied"));
       window.setTimeout(() => setCopyHint(null), 2500);
     } catch {
-      setCopyHint("Could not copy — try again");
+      setCopyHint(t("circleDetails.copyFailed"));
     }
   }
 
@@ -182,14 +185,14 @@ export function CircleDetails(props: {
     <div className="card stack circle-details-page">
       <div className="circle-details-topbar row">
         <button type="button" className="circle-details-back" onClick={props.onBack}>
-          ← Back
+          {t("circleDetails.back")}
         </button>
         {circle ? (
           <div className="circle-details-options-wrap" ref={optionsRef}>
             <button
               type="button"
               className="circle-details-options-btn"
-              aria-label="Circle options"
+              aria-label={t("circleDetails.optionsAria")}
               aria-expanded={optionsOpen}
               onClick={() => setOptionsOpen((v) => !v)}
             >
@@ -203,7 +206,7 @@ export function CircleDetails(props: {
                     className="circle-details-menu-action"
                     onClick={() => void copyInviteCode()}
                   >
-                    Copy invite code
+                    {t("circleDetails.copyInvite")}
                   </button>
                 ) : null}
                 {isCreator ? (
@@ -213,7 +216,7 @@ export function CircleDetails(props: {
                     disabled={working}
                     onClick={modifyCircle}
                   >
-                    Modify circle
+                    {t("circleDetails.modifyCircle")}
                   </button>
                 ) : null}
                 <button
@@ -222,7 +225,7 @@ export function CircleDetails(props: {
                   disabled={working}
                   onClick={() => void leaveOrDrop()}
                 >
-                  {isCreator ? "Delete circle" : "Leave circle"}
+                  {isCreator ? t("circleDetails.deleteCircle") : t("circleDetails.leaveCircle")}
                 </button>
               </div>
             ) : null}
@@ -257,7 +260,7 @@ export function CircleDetails(props: {
                   selectedMemberId={selectedMemberId}
                   onSelectMember={setSelectedMemberId}
                 />
-                <section ref={chatSectionRef} className="circle-details-chat-section stack" aria-label="Circle chat">
+                <section ref={chatSectionRef} className="circle-details-chat-section stack" aria-label={t("circleDetails.chatAria")}>
                   <button
                     type="button"
                     className={`circle-details-chat-toggle${chatOpen ? " circle-details-chat-toggle--open" : ""}`}
@@ -265,12 +268,12 @@ export function CircleDetails(props: {
                     onClick={() => setChatOpen((open) => !open)}
                   >
                     <span className="circle-details-chat-toggle-copy">
-                      <span className="circle-details-chat-prompt-lead">💬 Chat with your circle</span>
+                      <span className="circle-details-chat-prompt-lead">{t("circleDetails.chatTitle")}</span>
                       <span className="circle-details-chat-prompt-sub muted">
-                        Break the ice before the meetup
+                        {t("circleDetails.chatSubtitle")}
                       </span>
                       {chatIsFull ? (
-                        <span className="circle-details-chat-confirmed">✅ Your meetup is confirmed</span>
+                        <span className="circle-details-chat-confirmed">{t("circleDetails.meetupConfirmed")}</span>
                       ) : null}
                     </span>
                     <span className="circle-details-chat-toggle-icon" aria-hidden>
@@ -290,7 +293,7 @@ export function CircleDetails(props: {
                 </section>
               </>
             ) : (
-              <div className="muted">Loading…</div>
+              <div className="muted">{t("common.loading")}</div>
             )}
           </>
         )}
@@ -299,7 +302,7 @@ export function CircleDetails(props: {
         {error ? <FormError>{error}</FormError> : null}
       </div>
 
-      {isCreator ? <CircleDetailsTabBar tab={tab} onTab={setTab} /> : null}
+      {isCreator ? <CircleDetailsTabBar tab={tab} onTab={setTab} t={t} /> : null}
     </div>
   );
 }

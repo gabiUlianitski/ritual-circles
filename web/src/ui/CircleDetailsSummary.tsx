@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import type { CostPaymentPayload, GroupSizePayload, Hoby } from "../api/types";
 import { type CircleHobyFields } from "./circleDisplay";
 import {
@@ -22,18 +23,19 @@ export function CircleDetailsSummary(props: {
   memberCount?: number;
   maxSize?: number;
 }) {
+  const { t } = useTranslation();
   const { circle } = props;
   const catalogue = props.hobiesCatalog?.length
     ? findHobyCatalogue(props.hobiesCatalog, circle.ritualType)
     : undefined;
 
-  const title = formatCircleDetailsTitle(circle, catalogue);
-  const rhythm = formatCircleDetailsRhythm(circle);
-  const vibe = formatCircleDetailsVibe(circle.ritualType);
-  const scheduleChip = formatCircleScheduleChip(circle);
-  const locationChip = formatCircleLocationChip(circle);
-  const costChip = formatCircleCostChip(circle.costPayment, circle.groupSize);
-  const sizeChip = formatCircleSizeChip(props.memberCount ?? 0, props.maxSize ?? circle.maxSize ?? 6);
+  const title = formatCircleDetailsTitle(circle, catalogue, t);
+  const rhythm = formatCircleDetailsRhythm(circle, t);
+  const vibe = formatCircleDetailsVibe(circle.ritualType, t);
+  const scheduleChip = formatCircleScheduleChip(circle, t);
+  const locationChip = formatCircleLocationChip(circle, t);
+  const costChip = formatCircleCostChip(circle.costPayment, circle.groupSize, t);
+  const sizeChip = formatCircleSizeChip(props.memberCount ?? 0, props.maxSize ?? circle.maxSize ?? 6, t);
 
   return (
     <div className="circle-details-summary stack">
@@ -43,7 +45,7 @@ export function CircleDetailsSummary(props: {
         <p className="circle-details-hero-vibe muted">{vibe}</p>
       </header>
 
-      <div className="circle-details-chips" aria-label="Circle at a glance">
+      <div className="circle-details-chips" aria-label={t("circleDetails.chipsAria")}>
         <div className="circle-details-chip-row">
           <span className="circle-details-chip">📅 {scheduleChip}</span>
           <span className="circle-details-chip">📍 {locationChip}</span>
@@ -64,11 +66,16 @@ export function CircleDetailsPrimaryAction(props: {
   joinBusy?: boolean;
   onJoin?: () => void;
 }) {
+  const { t } = useTranslation();
   if (props.isMember) return null;
 
   if (!props.onJoin) return null;
 
-  const blocked = props.joinLabel && props.joinLabel !== "Join circle" && props.joinLabel !== "Join";
+  const joinLabel = t("discoverPage.join");
+  const blocked =
+    props.joinLabel &&
+    props.joinLabel !== joinLabel &&
+    props.joinLabel !== t("discoverPage.joinThisCircle");
 
   return (
     <div className="circle-details-cta stack">
@@ -78,7 +85,11 @@ export function CircleDetailsPrimaryAction(props: {
         disabled={props.joinDisabled || props.joinBusy}
         onClick={props.onJoin}
       >
-        {props.joinBusy ? "Joining…" : blocked ? props.joinLabel : "Join this circle"}
+        {props.joinBusy
+          ? t("circleDetails.joining")
+          : blocked
+            ? props.joinLabel
+            : t("circleDetails.joinThisCircle")}
       </button>
     </div>
   );

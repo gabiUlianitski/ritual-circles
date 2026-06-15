@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import type { CircleMemberResponse, CircleResponse, Hoby } from "../api/types";
 import { circleParticipationState } from "./circleParticipation";
 import { humanMemberLevelPhrase } from "./circleDetailsFormat";
@@ -27,14 +28,15 @@ function MemberBadges(props: {
   memberId: string;
   myUserId: string | null;
   creatorUserId: string | null;
+  t: (key: string) => string;
 }) {
   const isYou = Boolean(props.myUserId && props.memberId === props.myUserId);
   const isOwner = Boolean(props.creatorUserId && props.memberId === props.creatorUserId);
   if (!isYou && !isOwner) return null;
   return (
     <span className="circle-details-member-badges">
-      {isYou ? <span className="pill">You</span> : null}
-      {isOwner ? <span className="pill pill--owner">Owner</span> : null}
+      {isYou ? <span className="pill">{props.t("circleDetails.you")}</span> : null}
+      {isOwner ? <span className="pill pill--owner">{props.t("circleDetails.owner")}</span> : null}
     </span>
   );
 }
@@ -49,9 +51,13 @@ export function CircleDetailsMembersSection(props: {
   selectedMemberId: string | null;
   onSelectMember: (id: string | null) => void;
 }) {
+  const { t } = useTranslation();
   const members = dedupeMembers(props.members);
   const catalogue = findHobyCatalogue(props.hobiesCatalog, props.circle.ritualType);
   const participation = circleParticipationState(members.length, props.maxSize);
+  const joined = Math.max(0, members.length);
+  const capacity = Math.max(1, props.maxSize);
+  const spotsLeft = capacity - joined;
   const selectedMember = members.find((m) => m.id === props.selectedMemberId) ?? null;
 
   if (!members.length) return null;
@@ -66,7 +72,7 @@ export function CircleDetailsMembersSection(props: {
           className="circle-details-back"
           onClick={() => props.onSelectMember(null)}
         >
-          ← Who&apos;s coming
+          {t("circleDetails.backWhosComing")}
         </button>
         <div className="circle-details-member-profile card stack">
           <div className="circle-details-member-profile-head row">
@@ -74,13 +80,14 @@ export function CircleDetailsMembersSection(props: {
             <div>
               <div className="circle-details-member-profile-name">{name}</div>
               <div className="circle-details-member-profile-level muted">
-                {humanMemberLevelPhrase(levelRaw)}
+                {humanMemberLevelPhrase(levelRaw, t)}
               </div>
             </div>
             <MemberBadges
               memberId={selectedMember.id}
               myUserId={props.myUserId}
               creatorUserId={props.creatorUserId}
+              t={t}
             />
           </div>
           {selectedMember.city?.trim() ? (
@@ -95,19 +102,23 @@ export function CircleDetailsMembersSection(props: {
   return (
     <section className="circle-details-members-section stack">
       <div className="circle-details-members-head">
-        <h3 className="circle-details-members-title">👥 Who&apos;s coming</h3>
+        <h3 className="circle-details-members-title">{t("circleDetails.whosComing")}</h3>
         <div className="circle-details-members-meta">
           {participation.isFull ? (
             <span className="home-status-badge home-status-badge--confirmed circle-participation-full">
-              Confirmed
+              {t("home.confirmed")}
             </span>
           ) : (
             <div className="circle-participation-copy circle-participation-copy--meta">
-              {participation.peopleInLine ? (
-                <span className="circle-participation-in">{participation.peopleInLine}</span>
+              {joined > 1 ? (
+                <span className="circle-participation-in">{t("home.peopleIn", { count: joined })}</span>
               ) : null}
-              {participation.spotsLeftLine ? (
-                <span className="circle-participation-spots">{participation.spotsLeftLine}</span>
+              {spotsLeft > 0 ? (
+                <span className="circle-participation-spots">
+                  {spotsLeft === 1
+                    ? t("home.oneSpotLeft")
+                    : t("home.spotsLeft", { count: spotsLeft })}
+                </span>
               ) : null}
             </div>
           )}
@@ -130,13 +141,14 @@ export function CircleDetailsMembersSection(props: {
               <span className="circle-details-member-card-copy">
                 <span className="circle-details-member-card-name">{name}</span>
                 <span className="circle-details-member-card-level muted">
-                  {humanMemberLevelPhrase(levelRaw)}
+                  {humanMemberLevelPhrase(levelRaw, t)}
                 </span>
               </span>
               <MemberBadges
                 memberId={m.id}
                 myUserId={props.myUserId}
                 creatorUserId={props.creatorUserId}
+                t={t}
               />
             </button>
           );
