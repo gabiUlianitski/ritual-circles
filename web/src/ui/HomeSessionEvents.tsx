@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { BidiText } from "./BidiText";
 import {
   activityTypeClass,
+  formatDayLabel,
   formatSessionDateTimeHero,
   isSessionPending,
   sessionTitle,
@@ -40,7 +41,7 @@ export function HomeSessionEvents(props: {
   return (
     <div className="home-session-events stack">
       <h3 className="home-session-events-heading">
-        {props.selectedDay.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
+        {formatDayLabel(props.selectedDay)}
       </h3>
       {props.sessions.map((item) => {
         const title = sessionTitle(item);

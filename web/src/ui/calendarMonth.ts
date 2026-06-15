@@ -1,4 +1,11 @@
+import { dateLocale, weekdayLabelsByGetDay } from "../dateLocale";
+
 export const CALENDAR_DOW = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] as const;
+
+/** Localized weekday headers for calendar grids (Sunday first). */
+export function calendarDowLabels(): string[] {
+  return weekdayLabelsByGetDay("narrow");
+}
 
 export function isoFromParts(year: number, monthIndex: number, day: number): string {
   const y = year;
@@ -51,7 +58,7 @@ export function buildMonthGrid(
 }
 
 export function monthLabel(viewYear: number, viewMonthIndex: number): string {
-  return new Date(viewYear, viewMonthIndex, 1).toLocaleDateString(undefined, {
+  return new Date(viewYear, viewMonthIndex, 1).toLocaleDateString(dateLocale(), {
     month: "long",
     year: "numeric",
   });

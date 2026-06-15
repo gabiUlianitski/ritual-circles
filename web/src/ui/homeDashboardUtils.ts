@@ -1,10 +1,6 @@
 import type { HomeCalendarSession } from "../api/types";
-import { getAppLanguageCode } from "../i18n";
+import { dateLocale } from "../dateLocale";
 import { circleHobyTitle } from "./circleDisplay";
-
-function dateLocale(): string | undefined {
-  return getAppLanguageCode() === "he" ? "he-IL" : undefined;
-}
 
 export function sessionTitle(item: HomeCalendarSession): string {
   return item.hobyDisplayName?.trim() || circleHobyTitle({ ritualType: item.ritualType, recurringTime: "" });

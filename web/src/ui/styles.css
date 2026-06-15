@@ -55,6 +55,10 @@ a { color: inherit; }
   flex-shrink: 0;
 }
 
+.app-header-wrap {
+  position: relative;
+}
+
 /* Entire top bar (title + icons + menu) stacks above main content so the menu is not hidden under the dashboard card. */
 .app-header-row {
   position: relative;
@@ -128,6 +132,7 @@ a { color: inherit; }
 .app-nav-dropdown {
   position: absolute;
   right: 0;
+  left: auto;
   top: calc(100% + 8px);
   min-width: 220px;
   z-index: 50;
@@ -136,6 +141,11 @@ a { color: inherit; }
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 14px;
+}
+
+[dir="rtl"] .app-nav-dropdown {
+  right: auto;
+  left: 0;
 }
 
 .app-menu-trigger {
@@ -3186,6 +3196,11 @@ button.notif-item:hover,
 
 .home-week-day--today:not(.home-week-day--selected) {
   border-color: var(--hairline);
+}
+
+[dir="rtl"] .home-week-day-label {
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .home-week-day-label {

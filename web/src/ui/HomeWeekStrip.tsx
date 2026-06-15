@@ -1,8 +1,8 @@
 import React, { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type { HomeCalendarSession } from "../api/types";
+import { dateLocale, weekdayLabelsByGetDay } from "../dateLocale";
 import { isSessionPending } from "./homeDashboardUtils";
-
-const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 function ymdKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -21,7 +21,9 @@ export function HomeWeekStrip(props: {
   selectedDay: Date | null;
   onSelectDay: (day: Date) => void;
 }) {
+  const { i18n, t } = useTranslation();
   const today = useMemo(() => startOfDay(new Date()), []);
+  const dowLabels = useMemo(() => weekdayLabelsByGetDay("short"), [i18n.language]);
 
   const sessionsByDay = useMemo(() => {
     const map = new Map<string, HomeCalendarSession[]>();
@@ -47,7 +49,7 @@ export function HomeWeekStrip(props: {
 
   return (
     <div className="home-week-strip-wrap">
-      <div className="home-week-strip" role="list" aria-label="Upcoming this week">
+      <div className="home-week-strip" role="list" aria-label={t("home.upcomingThisWeek")}>
         {days.map((date) => {
           const key = ymdKey(date);
           const daySessions = sessionsByDay.get(key) ?? [];
@@ -70,13 +72,13 @@ export function HomeWeekStrip(props: {
               ]
                 .filter(Boolean)
                 .join(" ")}
-              aria-label={`${date.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}${
+              aria-label={`${date.toLocaleDateString(dateLocale(), { weekday: "long", month: "short", day: "numeric" })}${
                 hasSession ? `, ${daySessions.length} activity` : ""
               }`}
               aria-pressed={isSelected}
               onClick={() => props.onSelectDay(date)}
             >
-              <span className="home-week-day-label">{DOW[date.getDay()]}</span>
+              <span className="home-week-day-label">{dowLabels[date.getDay()]}</span>
               <span className="home-week-day-num">{date.getDate()}</span>
               <span className="home-week-day-dot-wrap" aria-hidden>
                 {hasSession ? (

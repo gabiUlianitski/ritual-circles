@@ -1,10 +1,11 @@
 import React, { useEffect, useId, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { formatMeetDateLong } from "./createCircleSchedule";
 import { formatHourOnlyDisplay } from "./HourOnlyPicker";
 import {
   buildMonthGrid,
-  CALENDAR_DOW,
+  calendarDowLabels,
   defaultMeetDateIso,
   monthLabel,
   parseIsoDate,
@@ -62,6 +63,7 @@ export function MeetDateTimePicker(props: {
   disabled?: boolean;
   dateId?: string;
 }) {
+  const { i18n } = useTranslation();
   const baseId = useId().replace(/:/g, "");
   const triggerId = props.dateId ?? `meet-dt-${baseId}`;
   const [open, setOpen] = useState(false);
@@ -77,6 +79,7 @@ export function MeetDateTimePicker(props: {
     () => buildMonthGrid(viewYear, viewMonth, draftDate, props.minDate),
     [viewYear, viewMonth, draftDate, props.minDate],
   );
+  const dowLabels = useMemo(() => calendarDowLabels(), [i18n.language]);
 
   const summaryLine = `${formatMeetDateLong(draftDate)} · ${formatHourOnlyDisplay(String(selectedHour))}`;
 
@@ -203,8 +206,8 @@ export function MeetDateTimePicker(props: {
                       </button>
                     </div>
                     <div className="meet-dt-weekdays" aria-hidden>
-                      {CALENDAR_DOW.map((d) => (
-                        <span key={d} className="meet-dt-weekday">
+                      {dowLabels.map((d, i) => (
+                        <span key={`${d}-${i}`} className="meet-dt-weekday">
                           {d}
                         </span>
                       ))}

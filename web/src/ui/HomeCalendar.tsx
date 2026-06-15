@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { HomeCalendarSession } from "../api/types";
+import { dateLocale, weekdayLabelsByGetDay } from "../dateLocale";
 import { isSessionPending, sessionTitle } from "./homeDashboardUtils";
 
 function startOfMonth(d: Date): Date {
@@ -24,7 +26,9 @@ export function HomeCalendar(props: {
   selectedDay: Date | null;
   onSelectDay: (day: Date) => void;
 }) {
+  const { i18n } = useTranslation();
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(new Date()));
+  const dowLabels = useMemo(() => weekdayLabelsByGetDay("narrow"), [i18n.language]);
 
   const sessionsByDay = useMemo(() => {
     const map = new Map<string, HomeCalendarSession[]>();
@@ -48,7 +52,7 @@ export function HomeCalendar(props: {
   for (let i = 0; i < firstWeekday; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
-  const monthLabel = viewMonth.toLocaleString(undefined, { month: "long", year: "numeric" });
+  const monthLabel = viewMonth.toLocaleString(dateLocale(), { month: "long", year: "numeric" });
 
   return (
     <section
@@ -82,7 +86,7 @@ export function HomeCalendar(props: {
 
           <div className="home-calendar-grid-wrap">
             <div className="home-calendar-grid home-calendar-grid--full" role="grid" aria-label={monthLabel}>
-              {["S", "M", "T", "W", "T", "F", "S"].map((label, i) => (
+              {dowLabels.map((label, i) => (
                 <div key={`hdr-${i}`} className="home-calendar-dow muted" role="columnheader">
                   {label}
                 </div>
@@ -114,7 +118,7 @@ export function HomeCalendar(props: {
                       .filter(Boolean)
                       .join(" ")}
                     onClick={() => props.onSelectDay(date)}
-                    aria-label={`${date.toLocaleDateString()}${
+                    aria-label={`${date.toLocaleDateString(dateLocale())}${
                       hasSession
                         ? `, ${daySessions.map((s) => sessionTitle(s)).join(", ")}`
                         : ""
