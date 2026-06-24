@@ -9,7 +9,7 @@ import {
 } from "./circleDetailsFormat";
 import { findHobyCatalogue, circleHobyTypeLevelLabels } from "./memberHobbyLevel";
 import { formatCompactSchedule, formatCompactLocation, formatParticipantsLabel } from "./circleDiscover";
-import { isCircleJoinable } from "./circleParticipation";
+import { isCircleJoinable, circleParticipationState } from "./circleParticipation";
 
 export type DiscoverCircleCardProps = {
   circle: CircleListItem;
@@ -48,11 +48,15 @@ export function DiscoverCircleCard(props: DiscoverCircleCardProps) {
         })
       : null;
   const vibeLine = full ? formatCircleDetailsVibe(circle.ritualType, t) : null;
+  const participation = circleParticipationState(circle.memberCount, circle.maxSize);
   const joinable = isCircleJoinable(circle.memberCount, circle.maxSize);
   const joinAction =
     props.joinAction && !joinable
       ? {
-          label: t("circleDetails.full"),
+          label: t("discoverPage.circleFull", {
+            count: participation.joined,
+            max: participation.capacity,
+          }),
           busy: false,
           disabled: true,
           secondary: true,

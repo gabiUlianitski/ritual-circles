@@ -105,8 +105,8 @@ export function CircleDetailsMembersSection(props: {
         <h3 className="circle-details-members-title">{t("circleDetails.whosComing")}</h3>
         <div className="circle-details-members-meta">
           {participation.isFull ? (
-            <span className="home-status-badge home-status-badge--confirmed circle-participation-full">
-              {t("home.confirmed")}
+            <span className="home-status-badge home-status-badge--full circle-participation-full">
+              {t("discoverPage.circleFull", { count: joined, max: capacity })}
             </span>
           ) : (
             <div className="circle-participation-copy circle-participation-copy--meta">

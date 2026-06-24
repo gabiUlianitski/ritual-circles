@@ -195,7 +195,11 @@ export function formatCircleMembersJoinedLine(memberCount: number): string | nul
 
 export function formatCircleSpotsHint(memberCount: number, maxSize: number, t?: TFn): string {
   const state = circleParticipationState(memberCount, maxSize);
-  if (state.isFull) return t ? t("home.confirmed") : "Confirmed";
+  if (state.isFull) {
+    return t
+      ? t("discoverPage.circleFull", { count: state.joined, max: state.capacity })
+      : `Full (${state.joined}/${state.capacity})`;
+  }
   if (t) {
     const joined = Math.max(0, memberCount);
     const capacity = Math.max(1, maxSize);

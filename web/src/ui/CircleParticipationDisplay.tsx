@@ -19,8 +19,8 @@ export function CircleParticipationDisplay(props: {
   if (state.isFull) {
     return (
       <div className={rootClass}>
-        <span className="home-status-badge home-status-badge--confirmed circle-participation-full">
-          {t("home.confirmed")}
+        <span className="home-status-badge home-status-badge--full circle-participation-full">
+          {t("discoverPage.circleFull", { count: joined, max: capacity })}
         </span>
       </div>
     );

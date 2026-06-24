@@ -219,6 +219,7 @@
     "noCategoryMessage": "נסה/י תחום עניין אחר או צור/י מעגל משלך.",
     "join": "הצטרפות",
     "joining": "מצטרף/ת…",
+    "circleFull": "מלא ({{count}}/{{max}})",
     "requestJoin": "בקשת הצטרפות",
     "addHobbyToJoin": "הוסף/י תחביב כדי להצטרף",
     "open": "פתיחה",

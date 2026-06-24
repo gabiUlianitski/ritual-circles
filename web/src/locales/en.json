@@ -219,6 +219,7 @@
     "noCategoryMessage": "Try another interest or create your own circle.",
     "join": "Join",
     "joining": "Joining…",
+    "circleFull": "Full ({{count}}/{{max}})",
     "requestJoin": "Request to join",
     "addHobbyToJoin": "Add hobby to join",
     "open": "Open",

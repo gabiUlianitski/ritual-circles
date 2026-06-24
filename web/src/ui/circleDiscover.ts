@@ -218,9 +218,13 @@ export function formatParticipantsLabel(
   t?: (key: string, opts?: Record<string, unknown>) => string,
 ): string {
   const state = circleParticipationState(circle.memberCount, circle.maxSize);
-  if (state.isFull) return t ? t("circleDetails.full") : "Full";
-  const joined = Math.max(0, circle.memberCount);
-  const capacity = Math.max(1, circle.maxSize);
+  if (state.isFull) {
+    return t
+      ? t("discoverPage.circleFull", { count: state.joined, max: state.capacity })
+      : `Full (${state.joined}/${state.capacity})`;
+  }
+  const joined = state.joined;
+  const capacity = state.capacity;
   const spotsLeft = capacity - joined;
   if (t) {
     const peopleInLine = joined <= 1 ? null : t("home.peopleIn", { count: joined });
