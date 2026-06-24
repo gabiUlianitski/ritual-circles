@@ -1,12 +1,21 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import type { CircleListItem } from "../api/types";
+import type { CircleListItem, Hoby } from "../api/types";
 import { circleHobyTitle } from "./circleDisplay";
+import {
+  formatCircleDetailsTitle,
+  formatCircleDetailsVibe,
+  formatCircleScheduleShort,
+} from "./circleDetailsFormat";
+import { findHobyCatalogue, circleHobyTypeLevelLabels } from "./memberHobbyLevel";
 import { formatCompactSchedule, formatCompactLocation, formatParticipantsLabel } from "./circleDiscover";
 
 export type DiscoverCircleCardProps = {
   circle: CircleListItem;
   onPress: () => void;
+  /** Onboarding step 3: show level, vibe, and full location (no ellipsis). */
+  fullDescription?: boolean;
+  hobiesCatalog?: Hoby[];
   joinAction?: {
     label: string;
     busy?: boolean;
@@ -19,20 +28,42 @@ export type DiscoverCircleCardProps = {
 export function DiscoverCircleCard(props: DiscoverCircleCardProps) {
   const { t } = useTranslation();
   const { circle } = props;
-  const title = circleHobyTitle(circle);
+  const catalogue = props.hobiesCatalog?.length
+    ? findHobyCatalogue(props.hobiesCatalog, circle.ritualType)
+    : undefined;
+  const full = props.fullDescription === true;
+  const title = full
+    ? formatCircleDetailsTitle(circle, catalogue, t)
+    : circleHobyTitle(circle);
   const location = formatCompactLocation(circle);
-  const time = formatCompactSchedule(circle, t);
+  const time = full ? formatCircleScheduleShort(circle, t) : formatCompactSchedule(circle, t);
   const participants = formatParticipantsLabel(circle, t);
+  const typeLevel = catalogue ? circleHobyTypeLevelLabels(circle, catalogue) : null;
+  const typeLevelLine =
+    full && typeLevel && typeLevel.type !== "—"
+      ? t("discoverPage.typeLevelLine", {
+          type: typeLevel.type,
+          level: typeLevel.level,
+        })
+      : null;
+  const vibeLine = full ? formatCircleDetailsVibe(circle.ritualType, t) : null;
 
   return (
-    <article className="discover-card discover-card-tappable" onClick={() => props.onPress()}>
+    <article
+      className={`discover-card discover-card-tappable${full ? " discover-card--full" : ""}`}
+      onClick={() => props.onPress()}
+    >
       <div className="discover-card-body">
         <div className="discover-card-head">
-          <span className="discover-card-icon" aria-hidden>
-            {circle.hobyIcon || "🎯"}
-          </span>
+          {!full && (
+            <span className="discover-card-icon" aria-hidden>
+              {circle.hobyIcon || "🎯"}
+            </span>
+          )}
           <h3 className="discover-card-title">{title}</h3>
         </div>
+        {vibeLine ? <p className="discover-card-vibe muted">{vibeLine}</p> : null}
+        {typeLevelLine ? <p className="discover-card-type-level muted">{typeLevelLine}</p> : null}
         <ul className="discover-card-meta">
           <li>
             <span className="discover-card-meta-icon" aria-hidden>

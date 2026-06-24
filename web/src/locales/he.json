@@ -228,7 +228,8 @@
     "tomorrow": "מחר",
     "joinHintAddHobby": "הוסף/י תחביב זה לפרופיל עם סוג ורמה, ואז חזור/י להצטרף.",
     "joinHintChooseType": "בחר/י סוג לתחביב בפרופיל (פרופיל → תחביבים).",
-    "joinHintChooseLevel": "פתח/י פרופיל → תחביבים, לחץ/י עריכה על התחביב ובחר/י רמה."
+    "joinHintChooseLevel": "פתח/י פרופיל → תחביבים, לחץ/י עריכה על התחביב ובחר/י רמה.",
+    "typeLevelLine": "סוג: {{type}} · רמה: {{level}}"
   },
   "circleDetails": {
     "back": "→ חזרה",

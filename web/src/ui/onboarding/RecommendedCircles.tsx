@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
-import type { CircleListItem } from "../../api/types";
+import type { CircleListItem, Hoby } from "../../api/types";
 import { DiscoverCircleCard } from "../DiscoverCircleCard";
 import { FormError } from "../FormError";
 import { scoreCircleForUser } from "../circleDiscover";
@@ -15,6 +15,7 @@ export function RecommendedCircles(props: {
 }) {
   const { t, i18n } = useTranslation();
   const [catalog, setCatalog] = useState<CircleListItem[]>([]);
+  const [hobies, setHobies] = useState<Hoby[]>([]);
   const [loading, setLoading] = useState(true);
   const [joinBusyId, setJoinBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,11 +26,11 @@ export function RecommendedCircles(props: {
       setLoading(true);
       setError(null);
       try {
-        const [list, me] = await Promise.all([api.listCircles(), api.getMe()]);
+        const [list, hobbyList] = await Promise.all([api.listCircles(), api.getHobies()]);
         if (!cancelled) {
           setCatalog(Array.isArray(list) ? list.filter((c) => !c.isYours) : []);
+          setHobies(Array.isArray(hobbyList) ? hobbyList : []);
         }
-        void me;
       } catch (e) {
         if (!cancelled) {
           setCatalog([]);
@@ -89,6 +90,8 @@ export function RecommendedCircles(props: {
             <DiscoverCircleCard
               key={c.id}
               circle={c}
+              fullDescription
+              hobiesCatalog={hobies}
               onPress={() => {}}
               joinAction={
                 c.inviteOnly === false

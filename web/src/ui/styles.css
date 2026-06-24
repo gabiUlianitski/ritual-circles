@@ -1633,6 +1633,25 @@ button.hoby-thread-back:hover {
   min-width: 0;
 }
 
+.discover-card--full .discover-card-meta-text {
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.discover-card-vibe,
+.discover-card-type-level {
+  margin: 0 0 8px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.discover-card--full .discover-card-body {
+  padding-bottom: 12px;
+}
+
 .discover-card-meta-icon {
   flex-shrink: 0;
   width: 1.25rem;
@@ -5744,7 +5763,7 @@ button.notif-item:hover,
 }
 
 .onboarding-recommended-cards {
-  max-height: 420px;
+  max-height: 520px;
   overflow-y: auto;
 }
 

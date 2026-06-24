@@ -228,7 +228,8 @@
     "tomorrow": "Tomorrow",
     "joinHintAddHobby": "Add this hobby to your profile with a type and level, then come back to join.",
     "joinHintChooseType": "Choose a type for this hobby on your profile (Profile → Hobbies).",
-    "joinHintChooseLevel": "Open Profile → Hobbies, tap Edit on this hobby, and choose your level."
+    "joinHintChooseLevel": "Open Profile → Hobbies, tap Edit on this hobby, and choose your level.",
+    "typeLevelLine": "Type: {{type}} · Level: {{level}}"
   },
   "circleDetails": {
     "back": "← Back",
