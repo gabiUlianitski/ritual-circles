@@ -1633,6 +1633,18 @@ button.hoby-thread-back:hover {
   min-width: 0;
 }
 
+.discover-card--full {
+  overflow: visible;
+}
+
+.discover-card--full .discover-card-meta li {
+  align-items: flex-start;
+}
+
+.discover-card--full .discover-card-meta-icon {
+  margin-top: 0.1em;
+}
+
 .discover-card--full .discover-card-meta-text {
   overflow: visible;
   text-overflow: unset;
@@ -1649,7 +1661,7 @@ button.hoby-thread-back:hover {
 }
 
 .discover-card--full .discover-card-body {
-  padding-bottom: 12px;
+  padding-bottom: 14px;
 }
 
 .discover-card-meta-icon {
@@ -5803,8 +5815,17 @@ button.notif-item:hover,
 }
 
 .onboarding-recommended-cards {
-  max-height: 520px;
-  overflow-y: auto;
+  /* Let cards grow to full height; page scrolls — avoids clipped join buttons / locations */
+  max-height: none;
+  overflow: visible;
+}
+
+.onboarding-recommended-cards > .discover-card {
+  flex-shrink: 0;
+}
+
+.onboarding-recommended-cards > .discover-card--full {
+  overflow: visible;
 }
 
 .onboarding-empty-guidance {
