@@ -19,7 +19,11 @@ export function OnboardingHome(props: {
     <div className="onboarding-screen card stack">
       <OnboardingStepIndicator step={1} />
       <div className="onboarding-copy stack">
-        <h1 className="onboarding-title">{t("onboarding.welcomeTitle")}</h1>
+        <h1 className="onboarding-title">
+          {t("onboarding.welcomeTitleLead")}
+          <br />
+          {t("onboarding.welcomeTitle")}
+        </h1>
         <p className="onboarding-subtitle muted">{t("onboarding.welcomeSubtitle")}</p>
       </div>
       <div className="onboarding-actions stack">
@@ -30,6 +34,7 @@ export function OnboardingHome(props: {
           {t("onboarding.createFirstCircle")}
         </button>
       </div>
+      <p className="onboarding-subtitle muted">{t("onboarding.welcomeReassurance")}</p>
     </div>
   );
 }
