@@ -9,6 +9,7 @@ import {
 } from "./circleDetailsFormat";
 import { findHobyCatalogue, circleHobyTypeLevelLabels } from "./memberHobbyLevel";
 import { formatCompactSchedule, formatCompactLocation, formatParticipantsLabel } from "./circleDiscover";
+import { isCircleJoinable } from "./circleParticipation";
 
 export type DiscoverCircleCardProps = {
   circle: CircleListItem;
@@ -47,6 +48,17 @@ export function DiscoverCircleCard(props: DiscoverCircleCardProps) {
         })
       : null;
   const vibeLine = full ? formatCircleDetailsVibe(circle.ritualType, t) : null;
+  const joinable = isCircleJoinable(circle.memberCount, circle.maxSize);
+  const joinAction =
+    props.joinAction && !joinable
+      ? {
+          label: t("circleDetails.full"),
+          busy: false,
+          disabled: true,
+          secondary: true,
+          onJoin: () => {},
+        }
+      : props.joinAction;
 
   return (
     <article
@@ -85,17 +97,17 @@ export function DiscoverCircleCard(props: DiscoverCircleCardProps) {
           </li>
         </ul>
       </div>
-      {props.joinAction ? (
+      {joinAction ? (
         <button
           type="button"
-          className={`discover-card-join${props.joinAction.secondary ? " discover-card-join-secondary" : " primary"}`}
-          disabled={props.joinAction.disabled || props.joinAction.busy}
+          className={`discover-card-join${joinAction.secondary ? " discover-card-join-secondary" : " primary"}`}
+          disabled={joinAction.disabled || joinAction.busy}
           onClick={(e) => {
             e.stopPropagation();
-            props.joinAction?.onJoin();
+            joinAction.onJoin();
           }}
         >
-          {props.joinAction.busy ? t("discoverPage.joining") : props.joinAction.label}
+          {joinAction.busy ? t("discoverPage.joining") : joinAction.label}
         </button>
       ) : null}
     </article>

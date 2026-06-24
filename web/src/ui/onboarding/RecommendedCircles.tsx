@@ -5,6 +5,7 @@ import type { CircleListItem, Hoby } from "../../api/types";
 import { DiscoverCircleCard } from "../DiscoverCircleCard";
 import { FormError } from "../FormError";
 import { scoreCircleForUser } from "../circleDiscover";
+import { isCircleJoinable } from "../circleParticipation";
 import { OnboardingBackButton, OnboardingStepIndicator } from "./OnboardingHome";
 
 export function RecommendedCircles(props: {
@@ -52,8 +53,9 @@ export function RecommendedCircles(props: {
 
   const recommended = useMemo(() => {
     const slugSet = new Set(props.interestSlugs.map((s) => s.toLowerCase()));
-    const matched = catalog.filter((c) => slugSet.has(c.ritualType.trim().toLowerCase()));
-    const pool = matched.length > 0 ? matched : catalog;
+    const joinable = catalog.filter((c) => isCircleJoinable(c.memberCount, c.maxSize));
+    const matched = joinable.filter((c) => slugSet.has(c.ritualType.trim().toLowerCase()));
+    const pool = matched.length > 0 ? matched : joinable;
     return [...pool]
       .map((circle) => ({ circle, score: scoreCircleForUser(circle, userHobies, null) }))
       .sort((a, b) => b.score - a.score || b.circle.memberCount - a.circle.memberCount)

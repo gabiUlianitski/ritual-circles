@@ -5,7 +5,7 @@ import { weekdayFromIsoDate } from "./createCircleSchedule";
 import { parseIsoDate } from "./calendarMonth";
 import { levelKeyToString } from "./hobyLevelKey";
 
-import { circleParticipationState } from "./circleParticipation";
+import { circleParticipationState, isCircleJoinable as circleIsJoinable } from "./circleParticipation";
 
 export type DiscoverLevelFilter = "" | "beginner" | "intermediate" | "advanced";
 export type DiscoverTimeFilter = "" | "morning" | "evening" | "weekend";
@@ -100,7 +100,9 @@ export function getRecommendedCircles(
   userCity?: string | null,
   limit = 5,
 ): CircleListItem[] {
-  const candidates = circles.filter((c) => !c.isYours);
+  const candidates = circles.filter(
+    (c) => !c.isYours && circleIsJoinable(c.memberCount, c.maxSize),
+  );
   if (!candidates.length) return [];
 
   return [...candidates]
@@ -216,7 +218,7 @@ export function formatParticipantsLabel(
   t?: (key: string, opts?: Record<string, unknown>) => string,
 ): string {
   const state = circleParticipationState(circle.memberCount, circle.maxSize);
-  if (state.isFull) return t ? t("home.confirmed") : "Confirmed";
+  if (state.isFull) return t ? t("circleDetails.full") : "Full";
   const joined = Math.max(0, circle.memberCount);
   const capacity = Math.max(1, circle.maxSize);
   const spotsLeft = capacity - joined;
@@ -250,7 +252,7 @@ export function formatOptionalDescription(
 export function formatCompactInfo(circle: CircleListItem): string {
   const state = circleParticipationState(circle.memberCount, circle.maxSize);
   const people = state.isFull
-    ? "Confirmed"
+    ? "Full"
     : state.peopleInLine ?? state.spotsLeftLine ?? formatParticipantsLabel(circle);
   return `${people} · ${formatCompactSchedule(circle)}`;
 }

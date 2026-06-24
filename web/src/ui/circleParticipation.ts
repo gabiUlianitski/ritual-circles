@@ -42,3 +42,9 @@ export function circleParticipationState(memberCount: number, maxSize: number): 
     spotsLeftLine: formatSpotsLeftLine(spotsLeft),
   };
 }
+
+/** True when a new member can still join (under maxSize). */
+export function isCircleJoinable(memberCount: number, maxSize: number): boolean {
+  const capacity = Math.max(1, maxSize);
+  return Math.max(0, memberCount) < capacity;
+}

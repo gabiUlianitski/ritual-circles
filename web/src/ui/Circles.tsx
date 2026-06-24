@@ -22,6 +22,7 @@ import {
   type DiscoverTimeFilter,
   type InterestCategoryId,
 } from "./circleDiscover";
+import { isCircleJoinable } from "./circleParticipation";
 import {
   DiscoverCircleCard,
   DiscoverEmptyState,
@@ -241,6 +242,16 @@ export function Circles(props: {
     const busy = joinBusyId !== null;
     const joining = joinBusyId === c.id;
     const canJoin = userHasJoinableHobbyForCircle(userHobies, c, hobies);
+
+    if (!isCircleJoinable(c.memberCount, c.maxSize)) {
+      return {
+        label: t("circleDetails.full"),
+        busy: false,
+        disabled: true,
+        secondary: true,
+        onJoin: () => {},
+      };
+    }
 
     if (!canJoin) {
       return {
