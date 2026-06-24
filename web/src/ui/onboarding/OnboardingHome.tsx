@@ -10,6 +10,20 @@ export function OnboardingStepIndicator(props: { step: number; total?: number })
   );
 }
 
+export function OnboardingBackButton(props: { onClick: () => void; disabled?: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      className="onboarding-back-btn"
+      onClick={props.onClick}
+      disabled={props.disabled}
+    >
+      {t("common.back")}
+    </button>
+  );
+}
+
 export function OnboardingHome(props: {
   onFindCircles: () => void;
   onCreateCircle: () => void;

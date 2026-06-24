@@ -5,7 +5,7 @@ import type { CircleListItem, Hoby } from "../../api/types";
 import { DiscoverCircleCard } from "../DiscoverCircleCard";
 import { FormError } from "../FormError";
 import { scoreCircleForUser } from "../circleDiscover";
-import { OnboardingStepIndicator } from "./OnboardingHome";
+import { OnboardingBackButton, OnboardingStepIndicator } from "./OnboardingHome";
 
 export function RecommendedCircles(props: {
   interestSlugs: string[];
@@ -76,7 +76,10 @@ export function RecommendedCircles(props: {
 
   return (
     <div className="onboarding-screen card stack">
-      <OnboardingStepIndicator step={3} />
+      <div className="onboarding-top-nav">
+        <OnboardingBackButton onClick={props.onBack} disabled={joinBusyId !== null} />
+        <OnboardingStepIndicator step={3} />
+      </div>
       <div className="onboarding-copy stack">
         <h1 className="onboarding-title">{t("onboarding.recommendedTitle")}</h1>
         <p className="onboarding-subtitle muted">{t("onboarding.recommendedSubtitle")}</p>
@@ -119,12 +122,15 @@ export function RecommendedCircles(props: {
 
       {error ? <FormError>{error}</FormError> : null}
 
-      <div className="onboarding-actions stack">
-        <button type="button" className="primary onboarding-primary" onClick={props.onCreateCircle}>
+      <div className="onboarding-actions row">
+        <OnboardingBackButton onClick={props.onBack} disabled={joinBusyId !== null} />
+        <button
+          type="button"
+          className="primary onboarding-primary"
+          disabled={joinBusyId !== null}
+          onClick={props.onCreateCircle}
+        >
           {t("onboarding.createYourOwn")}
-        </button>
-        <button type="button" className="onboarding-secondary" onClick={props.onBack}>
-          {t("onboarding.changeInterests")}
         </button>
       </div>
     </div>

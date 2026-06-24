@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import type { Hoby } from "../../api/types";
 import { FormError } from "../FormError";
-import { OnboardingStepIndicator } from "./OnboardingHome";
+import { OnboardingBackButton, OnboardingStepIndicator } from "./OnboardingHome";
 
 export function InterestsSelection(props: {
   initialSelected: string[];
@@ -62,7 +62,10 @@ export function InterestsSelection(props: {
 
   return (
     <div className="onboarding-screen card stack">
-      <OnboardingStepIndicator step={2} />
+      <div className="onboarding-top-nav">
+        <OnboardingBackButton onClick={props.onBack} disabled={saving} />
+        <OnboardingStepIndicator step={2} />
+      </div>
       <div className="onboarding-copy stack">
         <h1 className="onboarding-title">{t("onboarding.interestsTitle")}</h1>
         <p className="onboarding-subtitle muted">{t("onboarding.interestsSubtitle")}</p>
@@ -93,9 +96,7 @@ export function InterestsSelection(props: {
       {error ? <FormError>{error}</FormError> : null}
 
       <div className="onboarding-actions row">
-        <button type="button" style={{ width: "auto" }} onClick={props.onBack} disabled={saving}>
-          {t("common.back")}
-        </button>
+        <OnboardingBackButton onClick={props.onBack} disabled={saving} />
         <button type="button" className="primary onboarding-primary" disabled={saving || loading} onClick={() => void handleContinue()}>
           {saving ? t("common.saving") : t("onboarding.continue")}
         </button>

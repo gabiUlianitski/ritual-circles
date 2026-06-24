@@ -5696,6 +5696,46 @@ button.notif-item:hover,
   text-align: center;
 }
 
+.onboarding-top-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.onboarding-back-btn {
+  align-self: flex-start;
+  width: auto;
+  padding: 4px 0;
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--accent, #2a6df4);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.onboarding-back-btn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.onboarding-back-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.onboarding-actions.row {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.onboarding-actions.row .onboarding-primary {
+  flex: 1;
+  min-width: min(100%, 12rem);
+}
+
 .onboarding-title {
   margin: 0;
   font-size: 1.55rem;
