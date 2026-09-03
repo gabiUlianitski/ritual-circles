@@ -81,6 +81,7 @@ export function OnboardingFlow(props: {
     <OnboardingHome
       onFindCircles={props.guest ? () => props.onGoFindCircles?.() : () => goTo("interests")}
       onCreateCircle={startCreate}
+      showStep={!props.guest}
     />
   );
 }

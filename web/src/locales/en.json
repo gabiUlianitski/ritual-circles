@@ -49,7 +49,8 @@
     "noticeJoin": "Create a free account to join this circle.",
     "noticeCreateCircle": "Create a free account to start your own circle.",
     "noticeSaveInterests": "Create a free account to save your interests.",
-    "noticeCreateAccount": "Create your free account — it takes a minute."
+    "noticeCreateAccount": "Create your free account — it takes a minute.",
+    "mustRegisterTitle": "Registration required"
   },
   "home": {
     "greeting": "Hi 👋",

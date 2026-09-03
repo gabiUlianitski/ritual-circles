@@ -49,7 +49,8 @@
     "noticeJoin": "צור/י חשבון חינמי כדי להצטרף לקבוצה הזו.",
     "noticeCreateCircle": "צור/י חשבון חינמי כדי לפתוח קבוצה משלך.",
     "noticeSaveInterests": "צור/י חשבון חינמי כדי לשמור את התחומים שמעניינים אותך.",
-    "noticeCreateAccount": "צור/י חשבון חינמי — זה לוקח דקה."
+    "noticeCreateAccount": "צור/י חשבון חינמי — זה לוקח דקה.",
+    "mustRegisterTitle": "נדרשת הרשמה"
   },
   "home": {
     "greeting": "היי 👋",

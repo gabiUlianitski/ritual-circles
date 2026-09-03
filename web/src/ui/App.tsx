@@ -15,6 +15,7 @@ import { CreateJoinCircle } from "./CreateJoinCircle";
 import { Profile } from "./Profile";
 import { Hobies } from "./Hobies";
 import { Circles } from "./Circles";
+import { GuestRegisterPrompt } from "./GuestRegisterPrompt";
 
 type AppStage = "login" | "dashboard" | "createJoin" | "profile" | "hobies" | "circles" | "notifications";
 
@@ -68,6 +69,7 @@ export function App() {
   const [loading, setLoading] = useState(false);
   const [guest, setGuest] = useState(() => !getAuthToken() && isGuestMode());
   const [guestNotice, setGuestNotice] = useState<string | null>(null);
+  const [guestGateOpen, setGuestGateOpen] = useState(false);
   const [stage, setStage] = useState<AppStage>(
     getAuthToken() || (!getAuthToken() && isGuestMode()) ? "dashboard" : "login",
   );
@@ -227,6 +229,7 @@ export function App() {
     setGuestMode(false);
     setGuest(false);
     setGuestNotice(null);
+    setGuestGateOpen(false);
     setStage("dashboard");
     await refresh();
   }
@@ -235,6 +238,7 @@ export function App() {
     setGuestMode(true);
     setGuest(true);
     setGuestNotice(null);
+    setGuestGateOpen(false);
     setError(null);
     setHome(GUEST_HOME);
     setStage("dashboard");
@@ -244,7 +248,19 @@ export function App() {
   function requestRegister(notice?: string) {
     setMenuOpen(false);
     setGuestNotice(notice ?? t("guest.noticeDefault"));
+    setGuestGateOpen(true);
+  }
+
+  function goToRegister(notice?: string) {
+    setMenuOpen(false);
+    setGuestGateOpen(false);
+    setGuestNotice(notice ?? t("guest.noticeDefault"));
     setStage("login");
+  }
+
+  function dismissGuestGate() {
+    setGuestGateOpen(false);
+    setGuestNotice(null);
   }
 
   function logout() {
@@ -252,6 +268,7 @@ export function App() {
     setGuestMode(false);
     setGuest(false);
     setGuestNotice(null);
+    setGuestGateOpen(false);
     setHome(null);
     setError(null);
     setMenuOpen(false);
@@ -382,7 +399,7 @@ export function App() {
                     role="menuitem"
                     onClick={() => {
                       setMenuOpen(false);
-                      if (guest) requestRegister(t("guest.noticeCreateAccount"));
+                      if (guest) goToRegister(t("guest.noticeCreateAccount"));
                       else logout();
                     }}
                     disabled={loading}
@@ -399,6 +416,14 @@ export function App() {
 
       {error ? <FormError>{error}</FormError> : null}
 
+      {guestGateOpen && guestNotice ? (
+        <GuestRegisterPrompt
+          message={guestNotice}
+          onConfirm={() => goToRegister(guestNotice)}
+          onDismiss={dismissGuestGate}
+        />
+      ) : null}
+
       {stage === "login" ? (
         <Login
           googleClientId={(import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim()}
@@ -413,6 +438,7 @@ export function App() {
             guest
               ? () => {
                   setGuestNotice(null);
+                  setGuestGateOpen(false);
                   setStage("dashboard");
                 }
               : undefined

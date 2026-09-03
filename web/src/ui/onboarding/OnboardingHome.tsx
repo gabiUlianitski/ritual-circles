@@ -27,11 +27,13 @@ export function OnboardingBackButton(props: { onClick: () => void; disabled?: bo
 export function OnboardingHome(props: {
   onFindCircles: () => void;
   onCreateCircle: () => void;
+  /** Guests never reach steps 2–3 (interests need an account), so no counter. */
+  showStep?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <div className="onboarding-screen card stack">
-      <OnboardingStepIndicator step={1} />
+      {props.showStep ? <OnboardingStepIndicator step={1} /> : null}
       <div className="onboarding-copy stack">
         <h1 className="onboarding-title">
           {t("onboarding.welcomeTitleLead")}
