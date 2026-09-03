@@ -83,6 +83,7 @@ export type UserMeResponse = {
   /** ISO timestamp from server */
   createdAt: string | null;
   passwordSet: boolean;
+  onboardingCompleted?: boolean;
 };
 
 export type UserUpdateRequest = Partial<
@@ -101,6 +102,7 @@ export type UserUpdateRequest = Partial<
     | "availabilityWindows"
     | "availability_day"
     | "availability_time"
+    | "onboardingCompleted"
   >
 >;
 

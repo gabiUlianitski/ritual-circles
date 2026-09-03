@@ -23,7 +23,7 @@ from app.schemas import (
     VenueSuggestionsRequest,
     VenueSuggestionsResponse,
 )
-from app.deps import CurrentUser, conn_dep, get_current_user, get_request_lang
+from app.deps import CurrentUser, conn_dep, get_current_user, get_optional_user, get_request_lang
 from app.user_availability_windows import availability_windows_from_row
 from app.user_hobbies import pick_hobby_for_slug
 from app.services.circle_suggestions import respond_to_circle_suggestion
@@ -53,7 +53,7 @@ async def venue_suggestions(
     if not payload.ritualType.strip():
         raise HTTPException(status_code=400, detail="ritualType is required")
     try:
-        async with asyncio.timeout(95):
+        async with asyncio.timeout(40):
             items, near, center_lat, center_lon = await suggest_venues_near_address(
                 address=payload.address.strip(),
                 ritual_type=payload.ritualType.strip(),
@@ -67,7 +67,7 @@ async def venue_suggestions(
         center_lat: float | None = None
         center_lon: float | None = None
         try:
-            async with asyncio.timeout(35):
+            async with asyncio.timeout(12):
                 items, near, center_lat, center_lon = await _suggest_osm_nominatim_only(
                     address=payload.address.strip(),
                     ritual_type=payload.ritualType.strip(),
@@ -80,7 +80,7 @@ async def venue_suggestions(
             try:
                 geo = await asyncio.wait_for(
                     geocode_address_with_fallback(address=payload.address.strip()),
-                    timeout=18.0,
+                    timeout=8.0,
                 )
                 if geo:
                     near = str(geo.get("formatted_address") or payload.address.strip())
@@ -116,10 +116,12 @@ async def venue_suggestions(
 @router.get("", response_model=list[CircleListItemResponse])
 async def list_circles(
     conn: asyncpg.Connection = Depends(conn_dep),
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser | None = Depends(get_optional_user),
     lang: str = Depends(get_request_lang),
 ) -> list[CircleListItemResponse]:
-    rows = await list_circles_catalog(conn, user_id=user.id, lang=lang)
+    # Guests browse read-only: no membership, so nothing is "yours".
+    viewer_id = user.id if user else UUID(int=0)
+    rows = await list_circles_catalog(conn, user_id=viewer_id, lang=lang)
     return [CircleListItemResponse(**r) for r in rows]
 
 

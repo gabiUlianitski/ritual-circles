@@ -40,6 +40,17 @@
     "createAccount": "חדש/ה כאן? צור/י חשבון",
     "registerTitle": "יצירת חשבון"
   },
+  "guest": {
+    "lookAround": "רק להסתכל קודם",
+    "keepLooking": "להמשיך להסתכל",
+    "createAccount": "יצירת חשבון",
+    "createAccountToJoin": "צור/י חשבון כדי להצטרף",
+    "noticeDefault": "צור/י חשבון חינמי כדי להמשיך.",
+    "noticeJoin": "צור/י חשבון חינמי כדי להצטרף לקבוצה הזו.",
+    "noticeCreateCircle": "צור/י חשבון חינמי כדי לפתוח קבוצה משלך.",
+    "noticeSaveInterests": "צור/י חשבון חינמי כדי לשמור את התחומים שמעניינים אותך.",
+    "noticeCreateAccount": "צור/י חשבון חינמי — זה לוקח דקה."
+  },
   "home": {
     "greeting": "היי 👋",
     "greetingName": "היי {{name}} 👋",
@@ -60,6 +71,8 @@
     "noCalendarYet": "עדיין אין מפגשים ביומן",
     "exploreCircles": "גלה/י מעגלים",
     "upcomingThisWeek": "השבוע הקרוב",
+    "previousWeek": "שבוע קודם",
+    "nextWeek": "שבוע הבא",
     "viewFullCalendar": "יומן מלא",
     "hideFullCalendar": "הסתר יומן מלא",
     "oneSpotLeft": "(+מקום אחד פנוי)",
@@ -302,10 +315,11 @@
     "createYourOwn": "צור/י מעגל משלך",
     "changeInterests": "שנה/י תחומי עניין",
     "checklistTitle": "מתחילים",
+    "checklistProgress": "{{done}} מתוך {{total}}",
+    "checklistDismiss": "הסתר/י את הרשימה",
     "checklistInterests": "בחר/י תחומי עניין",
     "checklistJoin": "הצטרף/י למעגל הראשון",
-    "checklistSchedule": "קבע/י את הפעילות הראשונה",
-    "checklistChat": "אמור/י שלום בצ'אט"
+    "checklistCreate": "צור/י את המעגל הראשון"
   },
   "emptyStates": {
     "circlesTitle": "את/ה עדיין לא במעגלים",

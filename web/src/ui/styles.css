@@ -3185,11 +3185,50 @@ button.notif-item:hover,
   gap: 12px;
 }
 
+.home-week-strip-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .home-week-strip-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   margin: 0 -4px;
   padding: 0 4px 4px;
+}
+
+.home-week-nav {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: #9eb4d4;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.home-week-nav:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.16);
+  color: #dce8ff;
+}
+
+.home-week-nav:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+[dir="rtl"] .home-week-nav {
+  transform: scaleX(-1);
 }
 
 .home-week-strip {
@@ -5588,6 +5627,51 @@ button.notif-item:hover,
   cursor: default;
 }
 
+.create-venue-searching {
+  gap: 8px;
+  padding: 14px;
+}
+
+.create-venue-searching-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.create-venue-searching-title {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.create-venue-searching-note {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.create-venue-spinner {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(147, 197, 253, 0.25);
+  border-top-color: #93c5fd;
+  animation: create-venue-spin 0.8s linear infinite;
+}
+
+@keyframes create-venue-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .create-venue-spinner {
+    animation-duration: 2.4s;
+  }
+}
+
 .create-venue-skeleton-icon {
   width: 18px;
   height: 18px;
@@ -5852,30 +5936,64 @@ button.notif-item:hover,
 }
 
 .onboarding-checklist {
-  padding: 16px 18px;
-  gap: 10px;
+  display: block;
+  padding: 8px 10px;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.onboarding-checklist-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .onboarding-checklist-title {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 650;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #9fb0c6;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.onboarding-checklist-count {
+  font-size: 0.72rem;
+  color: #7c8ca3;
+}
+
+.onboarding-checklist-close {
+  margin-inline-start: auto;
+  border: 0;
+  background: transparent;
+  color: #8fa1b8;
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.onboarding-checklist-close:hover {
+  color: #e8eef6;
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .onboarding-checklist-list {
   list-style: none;
-  margin: 0;
+  margin: 6px 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
 .onboarding-checklist-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 0.92rem;
+  gap: 8px;
+  font-size: 0.82rem;
   color: #9fb0c6;
 }
 
@@ -5884,14 +6002,14 @@ button.notif-item:hover,
 }
 
 .onboarding-checklist-box {
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
   border: 1px solid var(--card-border);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: 0.6rem;
   flex-shrink: 0;
 }
 

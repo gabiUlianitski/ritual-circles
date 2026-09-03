@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, getAuthToken, setAuthToken } from "../api/client";
 import type { HomeResponse } from "../api/types";
+import { isGuestMode, setGuestMode } from "../guestMode";
 import i18n from "../i18n";
 import { hasAnyNotifications } from "../notificationsFeed";
 import { AppLanguageSelect } from "./AppLanguageSelect";
-import { isNewUser } from "../onboarding/onboardingState";
+import { shouldShowWelcomeTutorial } from "../onboarding/onboardingState";
 import { Notifications } from "./Notifications";
 import { FormError } from "./FormError";
 import { Login } from "./Login";
@@ -16,6 +17,15 @@ import { Hobies } from "./Hobies";
 import { Circles } from "./Circles";
 
 type AppStage = "login" | "dashboard" | "createJoin" | "profile" | "hobies" | "circles" | "notifications";
+
+/** Guests have no account, so Home is empty without calling the API. */
+const GUEST_HOME: HomeResponse = {
+  circle: null,
+  nextSession: null,
+  myAttendance: null,
+  myCircles: [],
+  calendarSessions: [],
+};
 
 export type CirclesDeepLink = { circleId: string; initialTab: "details" | "chat" };
 
@@ -56,11 +66,16 @@ export function App() {
   const [home, setHome] = useState<HomeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [stage, setStage] = useState<AppStage>(getAuthToken() ? "dashboard" : "login");
+  const [guest, setGuest] = useState(() => !getAuthToken() && isGuestMode());
+  const [guestNotice, setGuestNotice] = useState<string | null>(null);
+  const [stage, setStage] = useState<AppStage>(
+    getAuthToken() || (!getAuthToken() && isGuestMode()) ? "dashboard" : "login",
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const [hasUnread, setHasUnread] = useState(false);
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [userFirstName, setUserFirstName] = useState<string | null>(null);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const [circlesDeepLink, setCirclesDeepLink] = useState<CirclesDeepLink | null>(null);
   const [circlesVisitKey, setCirclesVisitKey] = useState(0);
   const [discoverDateFilter, setDiscoverDateFilter] = useState<string | null>(null);
@@ -69,7 +84,14 @@ export function App() {
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
-  const onboardingMode = home != null && isNewUser(home) && stage === "dashboard";
+  const onboardingMode =
+    home != null &&
+    stage === "dashboard" &&
+    shouldShowWelcomeTutorial(home, {
+      guest,
+      meLoaded: guest || myUserId != null,
+      onboardingCompleted,
+    });
 
   const checkNotifications = useCallback(
     async (userId: string | null, homeCircleId: string | null | undefined) => {
@@ -87,6 +109,15 @@ export function App() {
   );
 
   async function refresh() {
+    if (guest) {
+      setHome(GUEST_HOME);
+      setMyUserId(null);
+      setUserFirstName(null);
+      setOnboardingCompleted(false);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     let nextHome: HomeResponse | null = null;
@@ -102,6 +133,7 @@ export function App() {
         userId = me.id;
         setMyUserId(me.id);
         setUserFirstName(me.first_name ?? null);
+        setOnboardingCompleted(Boolean(me.onboardingCompleted));
       }
     } catch (e) {
       const msg = String(e);
@@ -156,7 +188,7 @@ export function App() {
   }, [menuOpen]);
 
   useEffect(() => {
-    if (stage === "login") {
+    if (stage === "login" || guest) {
       setMyUserId(null);
       return;
     }
@@ -164,7 +196,7 @@ export function App() {
       .getMe()
       .then((me) => setMyUserId(me.id))
       .catch(() => setMyUserId(null));
-  }, [stage]);
+  }, [stage, guest]);
 
   useEffect(() => {
     if (stage === "login") {
@@ -192,18 +224,41 @@ export function App() {
   }, [stage, myUserId, home?.circle?.id, checkNotifications]);
 
   async function authed() {
+    setGuestMode(false);
+    setGuest(false);
+    setGuestNotice(null);
     setStage("dashboard");
     await refresh();
   }
 
+  function startGuest() {
+    setGuestMode(true);
+    setGuest(true);
+    setGuestNotice(null);
+    setError(null);
+    setHome(GUEST_HOME);
+    setStage("dashboard");
+  }
+
+  /** Guest tried something that needs an account (join, create, save interests). */
+  function requestRegister(notice?: string) {
+    setMenuOpen(false);
+    setGuestNotice(notice ?? t("guest.noticeDefault"));
+    setStage("login");
+  }
+
   function logout() {
     setAuthToken(null);
+    setGuestMode(false);
+    setGuest(false);
+    setGuestNotice(null);
     setHome(null);
     setError(null);
     setMenuOpen(false);
     setHasUnread(false);
     setMyUserId(null);
     setCirclesDeepLink(null);
+    setOnboardingCompleted(false);
     setStage("login");
   }
 
@@ -272,7 +327,7 @@ export function App() {
             </button>
             </>
             ) : null}
-            {!onboardingMode ? (
+            {!onboardingMode && !guest ? (
             <>
             <button
               type="button"
@@ -316,25 +371,24 @@ export function App() {
               {menuOpen ? (
                 <div id="app-nav-menu" className="app-nav-dropdown stack" role="menu" aria-label={t("nav.moreOptions")}>
                   <AppLanguageSelect variant="menu" disabled={loading} />
-                  {stage !== "login" ? (
-                    <>
-                  <button type="button" className="app-nav-item" role="menuitem" onClick={() => navigateFromMenu("hobies")}>
-                    {t("nav.hobbies")}
-                  </button>
+                  {!guest ? (
+                    <button type="button" className="app-nav-item" role="menuitem" onClick={() => navigateFromMenu("hobies")}>
+                      {t("nav.hobbies")}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
-                    className="app-nav-item danger"
+                    className={guest ? "app-nav-item" : "app-nav-item danger"}
                     role="menuitem"
                     onClick={() => {
                       setMenuOpen(false);
-                      logout();
+                      if (guest) requestRegister(t("guest.noticeCreateAccount"));
+                      else logout();
                     }}
                     disabled={loading}
                   >
-                    {t("nav.logout")}
+                    {guest ? t("guest.createAccount") : t("nav.logout")}
                   </button>
-                    </>
-                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -352,6 +406,17 @@ export function App() {
             await authed();
           }}
           loading={loading}
+          notice={guestNotice}
+          initialMode={guestNotice ? "register" : "login"}
+          onGuest={startGuest}
+          onKeepLooking={
+            guest
+              ? () => {
+                  setGuestNotice(null);
+                  setStage("dashboard");
+                }
+              : undefined
+          }
         />
       ) : stage === "profile" ? (
         <Profile onBack={() => navigate("dashboard")} onLogout={logout} />
@@ -382,6 +447,8 @@ export function App() {
           onDeepLinkConsumed={() => setCirclesDeepLink(null)}
           visitKey={circlesVisitKey}
           prefilterDateIso={discoverDateFilter}
+          guest={guest}
+          onRegisterRequest={requestRegister}
         />
       ) : stage === "createJoin" ? (
         <CreateJoinCircle
@@ -403,7 +470,13 @@ export function App() {
         <Dashboard
           home={home}
           onRefresh={refresh}
+          guest={guest}
+          onRegisterRequest={requestRegister}
           onGoCreateJoin={(dateIso) => {
+            if (guest) {
+              requestRegister(t("guest.noticeCreateCircle"));
+              return;
+            }
             setCreateMeetDate(dateIso ?? null);
             navigate("createJoin");
           }}

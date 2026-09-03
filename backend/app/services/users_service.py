@@ -55,7 +55,8 @@ async def get_user(conn: asyncpg.Connection, *, user_id: UUID):
           preferred_hoby_subtype,
           user_hobies_json,
           created_at,
-          (password_hash IS NOT NULL) AS password_set
+          (password_hash IS NOT NULL) AS password_set,
+          COALESCE(onboarding_completed, true) AS onboarding_completed
         FROM users
         WHERE id = $1
         """,
@@ -207,6 +208,9 @@ async def upsert_user(conn: asyncpg.Connection, *, user_id: UUID, payload: UserU
                 raise HTTPException(status_code=400, detail=str(e)) from e
             sets.append(f"availability_time = ${len(params) + 1}")
             params.append(at)
+        if "onboardingCompleted" in dump and dump["onboardingCompleted"] is not None:
+            sets.append(f"onboarding_completed = ${len(params) + 1}")
+            params.append(bool(dump["onboardingCompleted"]))
 
         if sets:
             sql = f"UPDATE users SET {', '.join(sets)} WHERE id = $1"

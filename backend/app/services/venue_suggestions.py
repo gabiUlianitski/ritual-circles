@@ -20,12 +20,14 @@ from app.services.venue_hoby_blurb import google_hoby_relation, osm_hoby_relatio
 
 logger = logging.getLogger(__name__)
 
+# Budget: the whole request must answer well inside the client's 50s abort, so the
+# user gets suggestions or a clear "add your own place" instead of an endless spinner.
 _MAX_SEARCH_RADIUS_M = 28_000
-_OVERPASS_CALL_TIMEOUT_S = 55.0
-_GEOCODE_TIMEOUT_S = 18.0
-_OSM_GATHER_TIMEOUT_S = 65.0
-_OSM_TOTAL_TIMEOUT_S = 85.0
-_NOMINATIM_ONLY_TIMEOUT_S = 22.0
+_OVERPASS_CALL_TIMEOUT_S = 16.0
+_GEOCODE_TIMEOUT_S = 10.0
+_OSM_GATHER_TIMEOUT_S = 20.0
+_OSM_TOTAL_TIMEOUT_S = 28.0
+_NOMINATIM_ONLY_TIMEOUT_S = 12.0
 
 
 def _candidate_pos_key(c: dict[str, Any]) -> tuple:
@@ -823,7 +825,7 @@ async def suggest_venues_near_address(
     cfg = load_google_maps_config()
     if cfg:
         try:
-            async with asyncio.timeout(35):
+            async with asyncio.timeout(12):
                 out, near, lat, lon = await _suggest_google(
                     address=address,
                     ritual_type=ritual_type,

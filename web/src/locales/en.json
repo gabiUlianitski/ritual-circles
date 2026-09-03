@@ -40,6 +40,17 @@
     "createAccount": "New here? Create account",
     "registerTitle": "Create account"
   },
+  "guest": {
+    "lookAround": "Look around first",
+    "keepLooking": "Keep looking",
+    "createAccount": "Create account",
+    "createAccountToJoin": "Create account to join",
+    "noticeDefault": "Create a free account to continue.",
+    "noticeJoin": "Create a free account to join this circle.",
+    "noticeCreateCircle": "Create a free account to start your own circle.",
+    "noticeSaveInterests": "Create a free account to save your interests.",
+    "noticeCreateAccount": "Create your free account — it takes a minute."
+  },
   "home": {
     "greeting": "Hi 👋",
     "greetingName": "Hi {{name}} 👋",
@@ -60,6 +71,8 @@
     "noCalendarYet": "No hangouts on your calendar yet",
     "exploreCircles": "Explore circles",
     "upcomingThisWeek": "Upcoming this week",
+    "previousWeek": "Previous week",
+    "nextWeek": "Next week",
     "viewFullCalendar": "View full calendar",
     "hideFullCalendar": "Hide full calendar",
     "oneSpotLeft": "(+1 spot left)",
@@ -302,10 +315,11 @@
     "createYourOwn": "Create your own circle",
     "changeInterests": "Change interests",
     "checklistTitle": "Getting started",
+    "checklistProgress": "{{done}} of {{total}}",
+    "checklistDismiss": "Hide this list",
     "checklistInterests": "Choose your interests",
     "checklistJoin": "Join your first circle",
-    "checklistSchedule": "Schedule your first activity",
-    "checklistChat": "Say hello in chat"
+    "checklistCreate": "Create your first circle"
   },
   "emptyStates": {
     "circlesTitle": "You're not in any circles yet",

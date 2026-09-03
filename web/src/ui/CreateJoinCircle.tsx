@@ -40,10 +40,10 @@ export function CreateJoinCircle(props: {
 
       {tab === "join" ? (
         <div className="row create-join-mode-tabs">
-          <button className={tab === "create" ? "primary" : ""} onClick={() => setTab("create")} disabled={working}>
+          <button onClick={() => setTab("create")} disabled={working}>
             Create
           </button>
-          <button className={tab === "join" ? "primary" : ""} onClick={() => setTab("join")} disabled={working}>
+          <button className="primary" onClick={() => setTab("join")} disabled={working}>
             Join
           </button>
         </div>

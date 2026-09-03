@@ -13,6 +13,7 @@ import {
 } from "../parseCustomPlaceInput";
 import {
   findVenueSuggestionsForHobby,
+  VENUE_SUGGEST_SLOW_HINT_MS,
   VENUE_SUGGEST_TIMEOUT_MS,
   venueSearchAddress,
   venueSuggestErrorMessage,
@@ -36,25 +37,30 @@ function isCityAreaFallbackVenue(v: VenueSuggestionItem): boolean {
   return /\(city area\)/i.test(v.name?.trim() ?? "");
 }
 
-function VenueSkeletonCards() {
+function VenueSearchProgress(props: {
+  activityLabel: string;
+  cityLabel: string;
+  slow: boolean;
+  onCancel: () => void;
+}) {
   return (
-    <div className="create-venue-list-wrap" aria-hidden>
-      <ul className="create-venue-list">
-        {[0, 1, 2].map((i) => (
-          <li key={i} className="create-venue-row-item create-venue-row-item--skeleton">
-            <div className="create-venue-icon-col">
-              <div className="create-venue-skeleton-icon" />
-            </div>
-            <div className="create-venue-row-body">
-              <div className="create-venue-row-line1">
-                <div className="create-venue-skeleton-line create-venue-skeleton-line--title" />
-                <div className="create-venue-skeleton-line create-venue-skeleton-line--dist" />
-              </div>
-              <div className="create-venue-skeleton-line create-venue-skeleton-line--tag" />
-            </div>
-          </li>
-        ))}
-      </ul>
+    <div className="create-venue-searching card stack" role="status" aria-live="polite">
+      <div className="create-venue-searching-head">
+        <span className="create-venue-spinner" aria-hidden />
+        <p className="create-venue-searching-title">
+          {props.activityLabel
+            ? `Looking for ${props.activityLabel} places in ${props.cityLabel}…`
+            : `Looking for places in ${props.cityLabel}…`}
+        </p>
+      </div>
+      <p className="create-venue-searching-note muted">
+        {props.slow
+          ? "Still searching public map data — this can take up to a minute. You can add your own place below instead."
+          : "Checking public map data for spots that fit your activity."}
+      </p>
+      <button type="button" className="create-circle-link-btn" onClick={props.onCancel}>
+        Stop searching
+      </button>
     </div>
   );
 }
@@ -133,6 +139,7 @@ export function CreateCircleVenuePicker(props: {
   keepMeetingPlaceOnSearch?: boolean;
 }) {
   const [venueLoading, setVenueLoading] = useState(false);
+  const [searchIsSlow, setSearchIsSlow] = useState(false);
   const [venues, setVenues] = useState<VenueSuggestionItem[]>([]);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lon: number } | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -144,6 +151,8 @@ export function CreateCircleVenuePicker(props: {
   const [addedCustom, setAddedCustom] = useState<VenueSuggestionItem | null>(null);
   const [addedCustomParsed, setAddedCustomParsed] = useState<ParsedCustomPlace | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  /** Aborts we trigger ourselves (cancel / unmount) must not surface as errors. */
+  const silentAbortRef = useRef<AbortController | null>(null);
 
   const addressForVenueSearch = useMemo(
     () => venueSearchAddress(props.citySelected, props.cityQuery, ""),
@@ -175,6 +184,7 @@ export function CreateCircleVenuePicker(props: {
     const ac = new AbortController();
     abortRef.current = ac;
     setVenueLoading(true);
+    setSearchIsSlow(false);
     setLocalError(null);
     setVenues([]);
     setMapCenter(null);
@@ -186,6 +196,9 @@ export function CreateCircleVenuePicker(props: {
       setAddedCustomParsed(null);
     }
 
+    const slowHint = window.setTimeout(() => {
+      if (abortRef.current === ac) setSearchIsSlow(true);
+    }, VENUE_SUGGEST_SLOW_HINT_MS);
     const t = window.setTimeout(() => ac.abort(), VENUE_SUGGEST_TIMEOUT_MS);
     try {
       const r = await findVenueSuggestionsForHobby(
@@ -206,11 +219,15 @@ export function CreateCircleVenuePicker(props: {
         setLocalError("No suggestions — add your own place below.");
       }
     } catch (e) {
-      if (ac.signal.aborted || abortRef.current !== ac) return;
+      if (silentAbortRef.current === ac || abortRef.current !== ac) return;
       setLocalError(venueSuggestErrorMessage(e));
     } finally {
       window.clearTimeout(t);
-      if (abortRef.current === ac) setVenueLoading(false);
+      window.clearTimeout(slowHint);
+      if (abortRef.current === ac) {
+        setVenueLoading(false);
+        setSearchIsSlow(false);
+      }
     }
   }, [
     addressForVenueSearch,
@@ -222,6 +239,17 @@ export function CreateCircleVenuePicker(props: {
     props.keepMeetingPlaceOnSearch,
   ]);
 
+  const cancelVenueSearch = useCallback(() => {
+    const ac = abortRef.current;
+    if (!ac) return;
+    silentAbortRef.current = ac;
+    ac.abort();
+    abortRef.current = null;
+    setVenueLoading(false);
+    setSearchIsSlow(false);
+    setLocalError("Search stopped. Add your own place below, or search again.");
+  }, []);
+
   const runVenueSearchRef = useRef(runVenueSearch);
   runVenueSearchRef.current = runVenueSearch;
 
@@ -230,7 +258,10 @@ export function CreateCircleVenuePicker(props: {
     if (!props.citySelected.trim() || !props.ritualType.trim()) return;
     void runVenueSearchRef.current();
     return () => {
-      abortRef.current?.abort();
+      const ac = abortRef.current;
+      if (!ac) return;
+      silentAbortRef.current = ac;
+      ac.abort();
     };
   }, [props.venueSearchNonce, props.citySelected, props.ritualType]);
 
@@ -322,6 +353,12 @@ export function CreateCircleVenuePicker(props: {
 
   const showSuggestions = Boolean(props.citySelected.trim());
 
+  const activitySearchLabel = [props.ritualType.trim(), props.ritualSubtype.trim()]
+    .filter(Boolean)
+    .join(" · ");
+  const citySearchLabel =
+    props.citySelected.trim().split(",")[0]?.trim() || props.cityQuery.trim() || "your city";
+
   function suggestedVenueAddressLabel(venue: VenueSuggestionItem, displayName: string): string {
     const searchCity =
       props.citySelected.trim().split(",")[0]?.trim() ||
@@ -383,10 +420,12 @@ export function CreateCircleVenuePicker(props: {
           {localError && !venueLoading ? <FormError>{localError}</FormError> : null}
 
           {venueLoading ? (
-            <>
-              <VenueSkeletonCards />
-              {localError ? <FormError>{localError}</FormError> : null}
-            </>
+            <VenueSearchProgress
+              activityLabel={activitySearchLabel}
+              cityLabel={citySearchLabel}
+              slow={searchIsSlow}
+              onCancel={cancelVenueSearch}
+            />
           ) : (
             <>
               {mapUrl ? (

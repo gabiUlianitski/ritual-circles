@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { HomeCalendarSession } from "../api/types";
 import { dateLocale, weekdayLabelsByGetDay } from "../dateLocale";
@@ -24,6 +24,7 @@ export function HomeWeekStrip(props: {
   const { i18n, t } = useTranslation();
   const today = useMemo(() => startOfDay(new Date()), []);
   const dowLabels = useMemo(() => weekdayLabelsByGetDay("short"), [i18n.language]);
+  const [weekOffset, setWeekOffset] = useState(0);
 
   const sessionsByDay = useMemo(() => {
     const map = new Map<string, HomeCalendarSession[]>();
@@ -41,58 +42,83 @@ export function HomeWeekStrip(props: {
     const list: Date[] = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(today);
-      d.setDate(d.getDate() + i);
+      d.setDate(d.getDate() + weekOffset * 7 + i);
       list.push(d);
     }
     return list;
-  }, [today]);
+  }, [today, weekOffset]);
+
+  const rangeLabel = `${days[0].toLocaleDateString(dateLocale(), { month: "short", day: "numeric" })} – ${days[6].toLocaleDateString(dateLocale(), { month: "short", day: "numeric" })}`;
 
   return (
-    <div className="home-week-strip-wrap">
-      <div className="home-week-strip" role="list" aria-label={t("home.upcomingThisWeek")}>
-        {days.map((date) => {
-          const key = ymdKey(date);
-          const daySessions = sessionsByDay.get(key) ?? [];
-          const hasSession = daySessions.length > 0;
-          const hasPending = daySessions.some(isSessionPending);
-          const isSelected = props.selectedDay != null && sameDay(date, props.selectedDay);
-          const isToday = sameDay(date, today);
+    <div className="home-week-strip-row">
+      <button
+        type="button"
+        className="home-week-nav"
+        aria-label={t("home.previousWeek")}
+        title={t("home.previousWeek")}
+        disabled={weekOffset === 0}
+        onClick={() => setWeekOffset((w) => Math.max(0, w - 1))}
+      >
+        ‹
+      </button>
 
-          return (
-            <button
-              key={key}
-              type="button"
-              role="listitem"
-              className={[
-                "home-week-day",
-                hasSession ? "home-week-day--has" : "home-week-day--no-activity",
-                hasPending ? "home-week-day--pending" : "",
-                isSelected ? "home-week-day--selected" : "",
-                isToday ? "home-week-day--today" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              aria-label={`${date.toLocaleDateString(dateLocale(), { weekday: "long", month: "short", day: "numeric" })}${
-                hasSession ? `, ${daySessions.length} activity` : ""
-              }`}
-              aria-pressed={isSelected}
-              onClick={() => props.onSelectDay(date)}
-            >
-              <span className="home-week-day-label">{dowLabels[date.getDay()]}</span>
-              <span className="home-week-day-num">{date.getDate()}</span>
-              <span className="home-week-day-dot-wrap" aria-hidden>
-                {hasSession ? (
-                  <span
-                    className={`home-week-day-dot${hasPending ? " home-week-day-dot--pending" : " home-week-day-dot--confirmed"}`}
-                  />
-                ) : (
-                  <span className="home-week-day-dot home-week-day-dot--empty" />
-                )}
-              </span>
-            </button>
-          );
-        })}
+      <div className="home-week-strip-wrap">
+        <div className="home-week-strip" role="list" aria-label={rangeLabel}>
+          {days.map((date) => {
+            const key = ymdKey(date);
+            const daySessions = sessionsByDay.get(key) ?? [];
+            const hasSession = daySessions.length > 0;
+            const hasPending = daySessions.some(isSessionPending);
+            const isSelected = props.selectedDay != null && sameDay(date, props.selectedDay);
+            const isToday = sameDay(date, today);
+
+            return (
+              <button
+                key={key}
+                type="button"
+                role="listitem"
+                className={[
+                  "home-week-day",
+                  hasSession ? "home-week-day--has" : "home-week-day--no-activity",
+                  hasPending ? "home-week-day--pending" : "",
+                  isSelected ? "home-week-day--selected" : "",
+                  isToday ? "home-week-day--today" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-label={`${date.toLocaleDateString(dateLocale(), { weekday: "long", month: "short", day: "numeric" })}${
+                  hasSession ? `, ${daySessions.length} activity` : ""
+                }`}
+                aria-pressed={isSelected}
+                onClick={() => props.onSelectDay(date)}
+              >
+                <span className="home-week-day-label">{dowLabels[date.getDay()]}</span>
+                <span className="home-week-day-num">{date.getDate()}</span>
+                <span className="home-week-day-dot-wrap" aria-hidden>
+                  {hasSession ? (
+                    <span
+                      className={`home-week-day-dot${hasPending ? " home-week-day-dot--pending" : " home-week-day-dot--confirmed"}`}
+                    />
+                  ) : (
+                    <span className="home-week-day-dot home-week-day-dot--empty" />
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      <button
+        type="button"
+        className="home-week-nav"
+        aria-label={t("home.nextWeek")}
+        title={t("home.nextWeek")}
+        onClick={() => setWeekOffset((w) => w + 1)}
+      >
+        ›
+      </button>
     </div>
   );
 }

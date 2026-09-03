@@ -45,6 +45,9 @@ export function Circles(props: {
   visitKey?: number;
   /** When set, show circles matching this calendar day (from Home empty-day action). */
   prefilterDateIso?: string | null;
+  /** Guest = browsing without an account: read-only, join/create ask to register. */
+  guest?: boolean;
+  onRegisterRequest?: (notice?: string) => void;
 }) {
   const { i18n, t } = useTranslation();
   const [loading, setLoading] = useState(true);
@@ -77,7 +80,11 @@ export function Circles(props: {
     setError(null);
     let err: string | null = null;
     try {
-      const [list, profile] = await Promise.all([api.listCircles(), api.getMe()]);
+      // Guests have no profile to load; the catalog is readable without an account.
+      const [list, profile] = await Promise.all([
+        api.listCircles(),
+        props.guest ? Promise.resolve(null) : api.getMe(),
+      ]);
       setCatalog(Array.isArray(list) ? list : []);
       setMe(profile);
     } catch (e) {
@@ -87,7 +94,7 @@ export function Circles(props: {
     }
     if (err) setError(err);
     setLoading(false);
-  }, []);
+  }, [props.guest]);
 
   const interestCategories = useMemo(() => getInterestCategories(t), [t, i18n.language]);
 
@@ -211,6 +218,7 @@ export function Circles(props: {
   }
 
   async function refreshProfile() {
+    if (props.guest) return;
     try {
       setMe(await api.getMe());
     } catch {
@@ -219,6 +227,10 @@ export function Circles(props: {
   }
 
   function openCreate(dateIso?: string) {
+    if (props.guest) {
+      props.onRegisterRequest?.(t("guest.noticeCreateCircle"));
+      return;
+    }
     setFormInitialMeetDate(dateIso);
     setFormInitialTab("create");
     setShowForm(true);
@@ -238,6 +250,15 @@ export function Circles(props: {
 
   function joinActionFor(c: CircleListItem) {
     if (c.isYours) return null;
+
+    if (props.guest) {
+      return {
+        label: t("guest.createAccountToJoin"),
+        busy: false,
+        disabled: false,
+        onJoin: () => props.onRegisterRequest?.(t("guest.noticeJoin")),
+      };
+    }
 
     const busy = joinBusyId !== null;
     const joining = joinBusyId === c.id;
@@ -525,7 +546,7 @@ export function Circles(props: {
               title={t("discoverPage.noCirclesThisDayTitle")}
               message={t("discoverPage.noCirclesThisDayMessage")}
               actionLabel={t("discoverPage.createYourOwn")}
-              onAction={() => openCreate(props.prefilterDateIso)}
+              onAction={() => openCreate(props.prefilterDateIso ?? undefined)}
             />
           )}
         </div>

@@ -3,9 +3,11 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import type { HomeResponse, UserMeResponse } from "../api/types";
 import {
+  dismissChecklist,
   getChecklistProgress,
-  isNewUser,
+  isChecklistDismissed,
   shouldShowChecklist,
+  shouldShowWelcomeTutorial,
 } from "../onboarding/onboardingState";
 import { CircleDetails } from "./CircleDetails";
 import { HomeCalendar } from "./HomeCalendar";
@@ -39,6 +41,8 @@ export function Dashboard(props: {
   onGoCreateJoin: (prefillDateIso?: string) => void;
   onGoFindCircles: (prefillDateIso?: string) => void;
   userFirstName?: string | null;
+  guest?: boolean;
+  onRegisterRequest?: (notice?: string) => void;
 }) {
   const { t } = useTranslation();
   const [detailsCircleId, setDetailsCircleId] = useState<string | null>(null);
@@ -51,8 +55,14 @@ export function Dashboard(props: {
   const [selectedDay, setSelectedDay] = useState<Date | null>(() => defaultSelectedDay(calendarSessions));
 
   useEffect(() => {
+    if (props.guest) {
+      setMe(null);
+      return;
+    }
     void api.getMe().then(setMe).catch(() => setMe(null));
-  }, [props.home]);
+  }, [props.home, props.guest]);
+
+  const [checklistDismissed, setChecklistDismissed] = useState(() => isChecklistDismissed());
 
   const checklistProgress = useMemo(
     () => getChecklistProgress(props.home, me?.userHobies ?? []),
@@ -102,20 +112,35 @@ export function Dashboard(props: {
     );
   }
 
-  if (isNewUser(props.home)) {
+  if (
+    shouldShowWelcomeTutorial(props.home, {
+      guest: props.guest,
+      meLoaded: props.guest || me != null,
+      onboardingCompleted: me?.onboardingCompleted,
+    })
+  ) {
     return (
       <OnboardingFlow
         home={props.home}
         onRefresh={props.onRefresh}
         onGoCreateJoin={() => props.onGoCreateJoin()}
+        onGoFindCircles={() => props.onGoFindCircles()}
+        guest={props.guest}
+        onRegisterRequest={props.onRegisterRequest}
       />
     );
   }
 
   return (
     <div className="stack dashboard-home">
-      {shouldShowChecklist(props.home, checklistProgress) ? (
-        <OnboardingChecklist progress={checklistProgress} />
+      {shouldShowChecklist(checklistProgress, checklistDismissed) ? (
+        <OnboardingChecklist
+          progress={checklistProgress}
+          onDismiss={() => {
+            dismissChecklist();
+            setChecklistDismissed(true);
+          }}
+        />
       ) : null}
 
       <HomeWelcomeHeader sessions={calendarSessions} firstName={props.userFirstName} />

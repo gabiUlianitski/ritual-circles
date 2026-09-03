@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import type { HomeResponse } from "../../api/types";
@@ -16,9 +16,18 @@ export function OnboardingFlow(props: {
   home: HomeResponse;
   onRefresh: () => Promise<void> | void;
   onGoCreateJoin: () => void;
+  onGoFindCircles?: () => void;
+  guest?: boolean;
+  onRegisterRequest?: (notice?: string) => void;
 }) {
-  const [step, setStep] = useState<OnboardingStep>(() => getOnboardingStep());
+  const { t } = useTranslation();
+  const [step, setStep] = useState<OnboardingStep>(() => (props.guest ? "welcome" : getOnboardingStep()));
   const [interestSlugs, setInterestSlugs] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (props.guest) return;
+    void api.patchMe({ onboardingCompleted: true }).catch(() => {});
+  }, [props.guest]);
 
   function goTo(next: OnboardingStep) {
     setOnboardingStep(next);
@@ -31,6 +40,10 @@ export function OnboardingFlow(props: {
   }
 
   async function saveInterests(slugs: string[]) {
+    if (props.guest) {
+      props.onRegisterRequest?.(t("guest.noticeSaveInterests"));
+      return;
+    }
     await api.patchMe({
       userHobies: slugs.map((slug) => ({ slug, subtype: null, level: null })),
     });
@@ -66,7 +79,7 @@ export function OnboardingFlow(props: {
 
   return (
     <OnboardingHome
-      onFindCircles={() => goTo("interests")}
+      onFindCircles={props.guest ? () => props.onGoFindCircles?.() : () => goTo("interests")}
       onCreateCircle={startCreate}
     />
   );

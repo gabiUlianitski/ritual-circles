@@ -53,6 +53,7 @@ def _user_me_from_row(row) -> UserMeResponse:
         preferred_hoby_subtype=first.subtype if first else row.get("preferred_hoby_subtype"),
         createdAt=row["created_at"],
         passwordSet=bool(row["password_set"]),
+        onboardingCompleted=bool(row.get("onboarding_completed", False)),
     )
 
 

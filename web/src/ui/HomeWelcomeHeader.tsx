@@ -1,12 +1,13 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { HomeCalendarSession } from "../api/types";
 import {
   countActivitiesThisWeek,
   daysUntilNextSession,
 } from "./homeDashboardUtils";
 
-function welcomeContextLine(sessions: HomeCalendarSession[], t: (key: string, opts?: object) => string): string {
+function welcomeContextLine(sessions: HomeCalendarSession[], t: TFunction): string {
   const weekCount = countActivitiesThisWeek(sessions);
   if (weekCount > 0) {
     return weekCount === 1

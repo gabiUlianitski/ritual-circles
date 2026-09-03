@@ -91,6 +91,7 @@ class UserMeResponse(BaseModel):
     preferred_hoby_subtype: str | None = None
     createdAt: datetime | None = None
     passwordSet: bool = False
+    onboardingCompleted: bool = False
 
 
 class UserUpdateRequest(BaseModel):
@@ -111,6 +112,7 @@ class UserUpdateRequest(BaseModel):
     availabilityWindows: list[str] | None = None
     availability_day: str | None = None
     availability_time: str | None = None
+    onboardingCompleted: bool | None = None
 
 
 class PasswordChangeRequest(BaseModel):

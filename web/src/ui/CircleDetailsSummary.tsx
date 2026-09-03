@@ -18,6 +18,7 @@ export function CircleDetailsSummary(props: {
     modality?: string;
     costPayment?: CostPaymentPayload | null;
     groupSize?: GroupSizePayload | null;
+    maxSize?: number;
   };
   hobiesCatalog?: Hoby[];
   memberCount?: number;

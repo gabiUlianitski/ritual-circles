@@ -12,9 +12,16 @@ export function Login(props: {
   onAuthed: () => Promise<void> | void;
   loading: boolean;
   googleClientId?: string;
+  /** Start read-only browsing without an account. */
+  onGuest?: () => void;
+  /** Shown when the user was sent here from a guest action that needs an account. */
+  notice?: string | null;
+  /** Return to guest browsing instead of signing in. */
+  onKeepLooking?: () => void;
+  initialMode?: "login" | "register";
 }) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<LoginMode>("login");
+  const [mode, setMode] = useState<LoginMode>(props.initialMode ?? "login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -237,6 +244,7 @@ export function Login(props: {
   return (
     <div className="card stack">
       <div className="h1">{mode === "login" ? t("login.title") : t("login.registerTitle")}</div>
+      {props.notice ? <p className="onboarding-empty-title">{props.notice}</p> : null}
       <div className="muted">
         {mode === "login" ? <>{t("login.subtitle")}</> : null}
         {mode === "register" ? (
@@ -325,6 +333,16 @@ export function Login(props: {
       >
         {mode === "login" ? t("login.createAccount") : "Already have an account? Sign in"}
       </button>
+
+      {props.onKeepLooking ? (
+        <button type="button" className="onboarding-secondary" disabled={working} onClick={props.onKeepLooking}>
+          {t("guest.keepLooking")}
+        </button>
+      ) : props.onGuest ? (
+        <button type="button" className="onboarding-secondary" disabled={working} onClick={props.onGuest}>
+          {t("guest.lookAround")}
+        </button>
+      ) : null}
     </div>
   );
 }

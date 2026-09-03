@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
   preferred_hoby_level INTEGER NULL,
   preferred_hoby_subtype TEXT NULL,
   user_hobies_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+  onboarding_completed BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

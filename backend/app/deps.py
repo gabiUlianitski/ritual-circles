@@ -39,6 +39,17 @@ async def get_current_user(
     raise HTTPException(status_code=401, detail="Missing auth")
 
 
+async def get_optional_user(
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+) -> CurrentUser | None:
+    """Read-only endpoints that guests may browse without an account."""
+    try:
+        return await get_current_user(authorization=authorization, x_user_id=x_user_id)
+    except HTTPException:
+        return None
+
+
 async def conn_dep(request: Request):
     async for conn in acquire_conn(request):
         yield conn
