@@ -154,12 +154,12 @@ export function Login(props: {
           setError("Choose a password of at least 6 characters.");
           return;
         }
-        const em = email.trim();
-        if (!em || !em.includes("@")) {
-          setError("Please enter a valid email address.");
+        const ident = email.trim();
+        if (!ident) {
+          setError(t("login.needEmailOrUsername"));
           return;
         }
-        const { token } = await api.login({ email: em, password });
+        const { token } = await api.login({ email: ident, password });
         await finishAuth(token);
       } else {
         const v = validateRegister();
@@ -322,7 +322,11 @@ export function Login(props: {
         </div>
       ) : null}
 
-      <input placeholder={t("login.email")} value={email} onChange={(e) => setEmail(e.target.value)} />
+      <input
+        placeholder={mode === "login" ? t("login.emailOrUsername") : t("login.email")}
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
       <input
         placeholder={t("login.password")}
         type="password"

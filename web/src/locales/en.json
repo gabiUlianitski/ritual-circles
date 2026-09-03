@@ -33,8 +33,10 @@
   },
   "login": {
     "title": "Sign in",
-    "subtitle": "Sign in with the email and password you used when you joined, or continue with Google.",
+    "subtitle": "Sign in with your email, username, or first name, and the password you used when you joined. Or continue with Google.",
     "email": "Email",
+    "emailOrUsername": "Email, username, or first name",
+    "needEmailOrUsername": "Enter your email, username, or first name.",
     "password": "Password",
     "signIn": "Sign in with email",
     "createAccount": "New here? Create account",

@@ -88,15 +88,43 @@ async def register_with_email_password(
 
 
 async def login_with_email_password(conn: asyncpg.Connection, *, email: str, password: str) -> str:
-    email_norm = email.strip().lower()
-    row = await conn.fetchrow(
-        """
-        SELECT id, password_hash
-        FROM users
-        WHERE LOWER(email) = $1
-        """,
-        email_norm,
-    )
+    ident = email.strip()
+    if not ident:
+        raise HTTPException(status_code=401, detail="invalid credentials")
+
+    ident_l = ident.lower()
+    row = None
+    if "@" in ident:
+        row = await conn.fetchrow(
+            """
+            SELECT id, password_hash
+            FROM users
+            WHERE LOWER(email) = $1
+            """,
+            ident_l,
+        )
+    else:
+        row = await conn.fetchrow(
+            """
+            SELECT id, password_hash
+            FROM users
+            WHERE LOWER(TRIM(user_name)) = $1
+            """,
+            ident_l,
+        )
+        if not row:
+            matches = await conn.fetch(
+                """
+                SELECT id, password_hash
+                FROM users
+                WHERE LOWER(TRIM(first_name)) = $1
+                  AND password_hash IS NOT NULL
+                """,
+                ident_l,
+            )
+            if len(matches) == 1:
+                row = matches[0]
+
     if not row or not row["password_hash"]:
         raise HTTPException(status_code=401, detail="invalid credentials")
 

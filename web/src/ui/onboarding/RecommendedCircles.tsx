@@ -87,6 +87,8 @@ export function RecommendedCircles(props: {
         <p className="onboarding-subtitle muted">{t("onboarding.recommendedSubtitle")}</p>
       </div>
 
+      {error ? <FormError>{error}</FormError> : null}
+
       {loading ? (
         <p className="muted">{t("common.loading")}</p>
       ) : recommended.length > 0 ? (
@@ -121,8 +123,6 @@ export function RecommendedCircles(props: {
           <p className="muted">{t("onboarding.noMatchesSubtitle")}</p>
         </div>
       )}
-
-      {error ? <FormError>{error}</FormError> : null}
 
       <div className="onboarding-actions row">
         <OnboardingBackButton onClick={props.onBack} disabled={joinBusyId !== null} />

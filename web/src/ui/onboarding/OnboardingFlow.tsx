@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
-import type { HomeResponse } from "../../api/types";
+import type { Hoby, HomeResponse } from "../../api/types";
+import { parseHobyLevelKey } from "../hobyLevelKey";
+import { parseHobyLevelsFlat } from "../hobyMetadata";
 import {
   clearOnboardingFlow,
   getOnboardingStep,
@@ -11,6 +13,14 @@ import {
 import { InterestsSelection } from "./InterestsSelection";
 import { OnboardingHome } from "./OnboardingHome";
 import { RecommendedCircles } from "./RecommendedCircles";
+
+/** Lowest catalogue level for a hobby, so a new member can join circles. */
+function entryLevelForHoby(hobies: Hoby[], slug: string): string | number {
+  const target = slug.trim().toLowerCase();
+  const match = hobies.find((h) => h.slug.trim().toLowerCase() === target);
+  const first = parseHobyLevelsFlat(match?.levels)[0]?.key;
+  return (first ? parseHobyLevelKey(first) : null) ?? "beginner";
+}
 
 export function OnboardingFlow(props: {
   home: HomeResponse;
@@ -45,8 +55,14 @@ export function OnboardingFlow(props: {
       props.onRegisterRequest?.(t("guest.noticeSaveInterests"));
       return;
     }
+    // Joining requires a level on the hobby, so start everyone at the entry level.
+    const hobies = await api.getHobies().catch(() => [] as Hoby[]);
     await api.patchMe({
-      userHobies: slugs.map((slug) => ({ slug, subtype: null, level: null })),
+      userHobies: slugs.map((slug) => ({
+        slug,
+        subtype: null,
+        level: entryLevelForHoby(hobies, slug),
+      })),
     });
     setInterestSlugs(slugs);
     goTo("recommended");
