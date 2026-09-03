@@ -2,11 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import type { CircleListItem, Hoby, UserMeResponse } from "../api/types";
-import { AddCircleHobbyForm } from "./AddCircleHobbyForm";
 import { CircleDetails } from "./CircleDetails";
 import { CircleDetailsPrimaryAction, CircleDetailsSummary } from "./CircleDetailsSummary";
 import { CreateJoinCircle } from "./CreateJoinCircle";
-import { hobbiesFromMe, joinHobbyBlockedHint, userHasJoinableHobbyForCircle } from "./circleJoinHobby";
+import { hobbiesFromMe } from "./circleJoinHobby";
 import {
   applyDiscoverFilters,
   filterCirclesByMeetDate,
@@ -273,7 +272,7 @@ export function Circles(props: {
       };
     }
 
-    if (c.inviteOnly === false) {
+    if (!c.inviteOnly) {
       return {
         label: t("discoverPage.join"),
         busy: joining,
@@ -406,24 +405,6 @@ export function Circles(props: {
               joinBusy={joinAction?.busy}
               onJoin={joinAction?.onJoin}
             />
-            {!userHasJoinableHobbyForCircle(userHobies, c, hobies) ? (
-              <>
-                {joinHobbyBlockedHint(userHobies, c, hobies, t) ? (
-                  <div className="muted" style={{ fontSize: "0.92em" }}>
-                    {joinHobbyBlockedHint(userHobies, c, hobies, t)}
-                  </div>
-                ) : null}
-                <AddCircleHobbyForm
-                  circle={c}
-                  hobies={hobies}
-                  savedHobbies={userHobies}
-                  onCancel={() => setCatalogDetail(null)}
-                  onSaved={async () => {
-                    await refreshProfile();
-                  }}
-                />
-              </>
-            ) : null}
           </>
         ) : null}
 
