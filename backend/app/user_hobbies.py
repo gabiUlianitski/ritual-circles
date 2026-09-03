@@ -134,6 +134,30 @@ def user_can_join_circle(row: Any, circle: Any) -> bool:
     return False
 
 
+def with_hobby_for_slug(
+    row: Any, *, slug: str, level: str | int | None, subtype: str | None = None
+) -> list[UserHobyPreference] | None:
+    """Profile hobbies plus `slug` at `level`. None when nothing needs to change."""
+    target = (slug or "").strip()
+    if not target:
+        return None
+    resolved = parse_hoby_level_key(level)
+    if not _level_is_set(resolved):
+        return None
+
+    hobbies = user_hobies_from_row(row)
+    for pref in hobbies:
+        if pref.slug.strip().lower() != target.lower():
+            continue
+        if _level_is_set(pref.level):
+            return None
+        break
+
+    kept = [p for p in hobbies if p.slug.strip().lower() != target.lower()]
+    kept.append(UserHobyPreference(slug=target, subtype=(subtype or "").strip() or None, level=resolved))
+    return normalize_user_hobies(kept)
+
+
 def pick_hobby_for_slug(row: Any, slug: str) -> UserHobyPreference | None:
     """Member's saved hobby entry matching a circle ritualType slug."""
     target = (slug or "").strip().lower()

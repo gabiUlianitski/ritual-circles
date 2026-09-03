@@ -15,6 +15,7 @@ from app.user_hobbies import (
     sync_legacy_preferred_columns,
     user_hobies_from_row,
     user_hobies_to_json,
+    with_hobby_for_slug,
 )
 from app.user_availability_windows import normalize_availability_windows
 from app.user_languages import UserLanguage, normalize_user_languages
@@ -217,6 +218,79 @@ async def upsert_user(conn: asyncpg.Connection, *, user_id: UUID, payload: UserU
             await conn.execute(sql, *params)
 
     return await get_user(conn, user_id=user_id)
+
+
+def _lowest_catalogue_level(levels_raw: object) -> str | int | None:
+    data = levels_raw
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(data, list):
+        return None
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        key = str(item.get("key") or item.get("level") or "").strip()
+        if key:
+            return key
+    return None
+
+
+async def ensure_user_hobby(
+    conn: asyncpg.Connection,
+    *,
+    user_id: UUID,
+    slug: str,
+    preferred_level: str | int | None = None,
+    subtype: str | None = None,
+) -> None:
+    """Add a hobby (with a level) to a profile when it is missing or level-less."""
+    target = (slug or "").strip()
+    if not target:
+        return
+
+    row = await conn.fetchrow(
+        """
+        SELECT user_hobies_json, preferred_hoby_slug, preferred_hoby_level, preferred_hoby_subtype
+        FROM users
+        WHERE id = $1
+        """,
+        user_id,
+    )
+    if not row:
+        return
+
+    level = preferred_level
+    if level is None or (isinstance(level, str) and not level.strip()):
+        level = _lowest_catalogue_level(
+            await conn.fetchval("SELECT levels_json FROM hobies WHERE LOWER(slug) = LOWER($1)", target)
+        )
+    if level is None or (isinstance(level, str) and not level.strip()):
+        level = "beginner"
+
+    updated = with_hobby_for_slug(row, slug=target, level=level, subtype=subtype)
+    if updated is None:
+        return
+
+    rows_json = user_hobies_to_json(updated)
+    pref_slug, pref_subtype, pref_level = sync_legacy_preferred_columns(rows_json)
+    await conn.execute(
+        """
+        UPDATE users
+        SET user_hobies_json = $2::jsonb,
+            preferred_hoby_slug = $3,
+            preferred_hoby_subtype = $4,
+            preferred_hoby_level = $5
+        WHERE id = $1
+        """,
+        user_id,
+        json.dumps(rows_json),
+        pref_slug,
+        pref_subtype,
+        pref_level,
+    )
 
 
 async def update_device_token(conn: asyncpg.Connection, *, user_id: UUID, payload: DeviceTokenRequest) -> None:

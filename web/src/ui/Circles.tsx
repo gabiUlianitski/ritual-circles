@@ -262,7 +262,6 @@ export function Circles(props: {
 
     const busy = joinBusyId !== null;
     const joining = joinBusyId === c.id;
-    const canJoin = userHasJoinableHobbyForCircle(userHobies, c, hobies);
 
     if (!isCircleJoinable(c.memberCount, c.maxSize)) {
       return {
@@ -271,16 +270,6 @@ export function Circles(props: {
         disabled: true,
         secondary: true,
         onJoin: () => {},
-      };
-    }
-
-    if (!canJoin) {
-      return {
-        label: t("discoverPage.addHobbyToJoin"),
-        busy: false,
-        disabled: false,
-        secondary: true,
-        onJoin: () => openDetails(c),
       };
     }
 

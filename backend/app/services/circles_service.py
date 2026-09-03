@@ -19,6 +19,7 @@ from app.schemas import (
 from app.hoby_i18n import localized_display_name
 from app.services.session_replenish import ensure_future_sessions_for_circle, ensure_future_sessions_for_user
 from app.user_hobbies import user_can_join_circle
+from app.services.users_service import ensure_user_hobby
 from app.services.time_utils import next_occurrence_utc, next_session_datetime_after
 
 
@@ -239,10 +240,17 @@ async def _complete_join_transaction(
         """,
         user_id,
     )
-    if not user_row or not user_can_join_circle(user_row, circle):
-        raise HTTPException(
-            status_code=403,
-            detail="Add this circle's hobby with your level on your profile before joining",
+    if not user_row:
+        raise HTTPException(status_code=400, detail="user must exist before joining a circle")
+
+    if not user_can_join_circle(user_row, circle):
+        # Joining is the intent: adopt the circle's hobby instead of blocking.
+        await ensure_user_hobby(
+            conn,
+            user_id=user_id,
+            slug=str(circle.get("ritualType") or ""),
+            preferred_level=circle.get("ritual_level"),
+            subtype=circle.get("ritual_subtype"),
         )
 
     future_sessions = await conn.fetch(
@@ -297,6 +305,15 @@ async def create_circle(
     exists = await conn.fetchrow("SELECT 1 FROM users WHERE id = $1", user_id)
     if not exists:
         raise HTTPException(status_code=400, detail="user must exist before creating a circle")
+
+    # Creating a circle for a hobby means you do it: keep the profile in step.
+    await ensure_user_hobby(
+        conn,
+        user_id=user_id,
+        slug=payload.ritualType,
+        preferred_level=payload.ritualLevel,
+        subtype=payload.ritualSubtype,
+    )
 
     circle_id = uuid4()
     invite_code = await _generate_unique_invite_code(conn)
