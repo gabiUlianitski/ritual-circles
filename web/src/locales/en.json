@@ -38,7 +38,10 @@
     "password": "Password",
     "signIn": "Sign in with email",
     "createAccount": "New here? Create account",
-    "registerTitle": "Create account"
+    "registerTitle": "Create account",
+    "haveAccount": "Already have an account? Sign in",
+    "welcomeTitle": "Welcome to Ritual Circles",
+    "welcomeSubtitle": "Sign in, create an account, or look around first."
   },
   "guest": {
     "lookAround": "Look around first",
@@ -50,7 +53,9 @@
     "noticeCreateCircle": "Create a free account to start your own circle.",
     "noticeSaveInterests": "Create a free account to save your interests.",
     "noticeCreateAccount": "Create your free account — it takes a minute.",
-    "mustRegisterTitle": "Registration required"
+    "mustRegisterTitle": "Registration required",
+    "signInOrRegister": "Sign in or create account",
+    "backToSignIn": "Back to sign in"
   },
   "home": {
     "greeting": "Hi 👋",

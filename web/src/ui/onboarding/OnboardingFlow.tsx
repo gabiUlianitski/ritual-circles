@@ -19,6 +19,7 @@ export function OnboardingFlow(props: {
   onGoFindCircles?: () => void;
   guest?: boolean;
   onRegisterRequest?: (notice?: string) => void;
+  onBackToAuth?: () => void;
 }) {
   const { t } = useTranslation();
   const [step, setStep] = useState<OnboardingStep>(() => (props.guest ? "welcome" : getOnboardingStep()));
@@ -82,6 +83,7 @@ export function OnboardingFlow(props: {
       onFindCircles={props.guest ? () => props.onGoFindCircles?.() : () => goTo("interests")}
       onCreateCircle={startCreate}
       showStep={!props.guest}
+      onBackToAuth={props.guest ? props.onBackToAuth : undefined}
     />
   );
 }

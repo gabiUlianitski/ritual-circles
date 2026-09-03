@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, getAuthToken, setAuthToken } from "../api/client";
 import type { HomeResponse } from "../api/types";
-import { isGuestMode, setGuestMode } from "../guestMode";
 import i18n from "../i18n";
 import { hasAnyNotifications } from "../notificationsFeed";
 import { AppLanguageSelect } from "./AppLanguageSelect";
@@ -67,12 +66,11 @@ export function App() {
   const [home, setHome] = useState<HomeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [guest, setGuest] = useState(() => !getAuthToken() && isGuestMode());
+  /** Guest browsing is per-visit: a reload always returns to sign in / register. */
+  const [guest, setGuest] = useState(false);
   const [guestNotice, setGuestNotice] = useState<string | null>(null);
   const [guestGateOpen, setGuestGateOpen] = useState(false);
-  const [stage, setStage] = useState<AppStage>(
-    getAuthToken() || (!getAuthToken() && isGuestMode()) ? "dashboard" : "login",
-  );
+  const [stage, setStage] = useState<AppStage>(getAuthToken() ? "dashboard" : "login");
   const [menuOpen, setMenuOpen] = useState(false);
   const [hasUnread, setHasUnread] = useState(false);
   const [myUserId, setMyUserId] = useState<string | null>(null);
@@ -226,7 +224,6 @@ export function App() {
   }, [stage, myUserId, home?.circle?.id, checkNotifications]);
 
   async function authed() {
-    setGuestMode(false);
     setGuest(false);
     setGuestNotice(null);
     setGuestGateOpen(false);
@@ -235,7 +232,6 @@ export function App() {
   }
 
   function startGuest() {
-    setGuestMode(true);
     setGuest(true);
     setGuestNotice(null);
     setGuestGateOpen(false);
@@ -258,6 +254,14 @@ export function App() {
     setStage("login");
   }
 
+  /** Guest chose to leave browsing and pick sign in / register themselves. */
+  function goToAuth() {
+    setMenuOpen(false);
+    setGuestGateOpen(false);
+    setGuestNotice(null);
+    setStage("login");
+  }
+
   function dismissGuestGate() {
     setGuestGateOpen(false);
     setGuestNotice(null);
@@ -265,7 +269,6 @@ export function App() {
 
   function logout() {
     setAuthToken(null);
-    setGuestMode(false);
     setGuest(false);
     setGuestNotice(null);
     setGuestGateOpen(false);
@@ -399,12 +402,12 @@ export function App() {
                     role="menuitem"
                     onClick={() => {
                       setMenuOpen(false);
-                      if (guest) goToRegister(t("guest.noticeCreateAccount"));
+                      if (guest) goToAuth();
                       else logout();
                     }}
                     disabled={loading}
                   >
-                    {guest ? t("guest.createAccount") : t("nav.logout")}
+                    {guest ? t("guest.signInOrRegister") : t("nav.logout")}
                   </button>
                 </div>
               ) : null}
@@ -432,7 +435,7 @@ export function App() {
           }}
           loading={loading}
           notice={guestNotice}
-          initialMode={guestNotice ? "register" : "login"}
+          initialMode={guestNotice ? "register" : undefined}
           onGuest={startGuest}
           onKeepLooking={
             guest
@@ -498,6 +501,7 @@ export function App() {
           onRefresh={refresh}
           guest={guest}
           onRegisterRequest={requestRegister}
+          onBackToAuth={guest ? goToAuth : undefined}
           onGoCreateJoin={(dateIso) => {
             if (guest) {
               requestRegister(t("guest.noticeCreateCircle"));

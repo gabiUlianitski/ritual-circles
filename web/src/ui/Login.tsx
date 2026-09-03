@@ -6,7 +6,7 @@ import { FormError } from "./FormError";
 
 const USER_NAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
 
-type LoginMode = "login" | "register" | "google-setup";
+type LoginMode = "choose" | "login" | "register" | "google-setup";
 
 export function Login(props: {
   onAuthed: () => Promise<void> | void;
@@ -21,7 +21,7 @@ export function Login(props: {
   initialMode?: "login" | "register";
 }) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<LoginMode>(props.initialMode ?? "login");
+  const [mode, setMode] = useState<LoginMode>(props.initialMode ?? "choose");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -191,6 +191,54 @@ export function Login(props: {
 
   const googleSetupReady = USER_NAME_RE.test(userName.trim()) && firstName.trim().length > 0;
 
+  if (mode === "choose") {
+    return (
+      <div className="card stack login-choose">
+        <div className="h1">{t("login.welcomeTitle")}</div>
+        {props.notice ? <p className="onboarding-empty-title">{props.notice}</p> : null}
+        <p className="muted login-choose-subtitle">{t("login.welcomeSubtitle")}</p>
+
+        <button
+          type="button"
+          className="primary"
+          disabled={props.loading || working}
+          onClick={() => {
+            setError(null);
+            setMode("login");
+          }}
+        >
+          {t("login.title")}
+        </button>
+
+        <button
+          type="button"
+          disabled={props.loading || working}
+          onClick={() => {
+            setError(null);
+            setMode("register");
+          }}
+        >
+          {t("login.registerTitle")}
+        </button>
+
+        {props.onKeepLooking ? (
+          <button
+            type="button"
+            className="onboarding-secondary"
+            disabled={working}
+            onClick={props.onKeepLooking}
+          >
+            {t("guest.keepLooking")}
+          </button>
+        ) : props.onGuest ? (
+          <button type="button" className="onboarding-secondary" disabled={working} onClick={props.onGuest}>
+            {t("guest.lookAround")}
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
   if (mode === "google-setup") {
     return (
       <div className="card stack">
@@ -331,18 +379,20 @@ export function Login(props: {
           setError(null);
         }}
       >
-        {mode === "login" ? t("login.createAccount") : "Already have an account? Sign in"}
+        {mode === "login" ? t("login.createAccount") : t("login.haveAccount")}
       </button>
 
-      {props.onKeepLooking ? (
-        <button type="button" className="onboarding-secondary" disabled={working} onClick={props.onKeepLooking}>
-          {t("guest.keepLooking")}
-        </button>
-      ) : props.onGuest ? (
-        <button type="button" className="onboarding-secondary" disabled={working} onClick={props.onGuest}>
-          {t("guest.lookAround")}
-        </button>
-      ) : null}
+      <button
+        type="button"
+        className="onboarding-secondary"
+        disabled={working}
+        onClick={() => {
+          setError(null);
+          setMode("choose");
+        }}
+      >
+        {t("common.back")}
+      </button>
     </div>
   );
 }

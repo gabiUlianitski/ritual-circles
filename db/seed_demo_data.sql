@@ -5,7 +5,7 @@
 --   psql "$DATABASE_URL" -f db/seed_demo_data.sql
 --
 -- Safe to re-run: removes prior seed rows first (@ritualcircles.dev).
--- Sample login: noa.cohen@ritualcircles.dev  /  123123
+-- Synthetic users cannot log in; they exist only to make public demo circles feel active.
 
 BEGIN;
 
@@ -50,7 +50,7 @@ WHERE email LIKE '%@ritualcircles.dev'
 
 -- ---------------------------------------------------------------------------
 -- 2) Users (24)
--- Password: 123123  (pbkdf2_sha256, same as backend)
+-- Password hashes are cleared below so public demo identities cannot be used to log in.
 -- ---------------------------------------------------------------------------
 INSERT INTO users (
   id, user_name, first_name, last_name, email, password_hash,
@@ -81,6 +81,12 @@ INSERT INTO users (
   ('10000000-0000-4000-8000-000000000016', 'maayan_dahan',   'Maayan', 'Dahan',    'maayan.dahan@ritualcircles.dev',      '$pbkdf2-sha256$29000$xziHsHYOYSzFOMe4956zVg$5lAFhlOme1cLg8QWYUD7WelNjI3eKY2jQA6.jKPHGzk', 'Herzliya',        'Mon', '19:00:00', '[{"slug":"bicycle","level":"beginner"},{"slug":"football","level":"intermediate"}]'::jsonb, 'bicycle'),
   ('10000000-0000-4000-8000-000000000017', 'yuval_shapiro',  'Yuval',  'Shapiro',  'yuval.shapiro@ritualcircles.dev',     '$pbkdf2-sha256$29000$xziHsHYOYSzFOMe4956zVg$5lAFhlOme1cLg8QWYUD7WelNjI3eKY2jQA6.jKPHGzk', 'Beer Sheva',      'Tue', '20:00:00', '[{"slug":"dancing","level":"advanced"},{"slug":"yoga","level":"intermediate"}]'::jsonb, 'dancing'),
   ('10000000-0000-4000-8000-000000000018', 'adi_bar',        'Adi',    'Bar',      'adi.bar@ritualcircles.dev',           '$pbkdf2-sha256$29000$xziHsHYOYSzFOMe4956zVg$5lAFhlOme1cLg8QWYUD7WelNjI3eKY2jQA6.jKPHGzk', 'Netanya',         'Wed', '08:00:00', '[{"slug":"cooking","level":"intermediate"},{"slug":"tennis","level":"advanced"}]'::jsonb, 'cooking');
+
+-- Production-safe demo identities: visible as members, but not usable accounts.
+UPDATE users
+SET password_hash = NULL,
+    onboarding_completed = TRUE
+WHERE email LIKE '%@ritualcircles.dev';
 
 -- ---------------------------------------------------------------------------
 -- 3) Circles (45), sessions (6 each), creator + member attendance

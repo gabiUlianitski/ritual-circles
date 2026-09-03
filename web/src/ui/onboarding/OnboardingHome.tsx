@@ -29,6 +29,8 @@ export function OnboardingHome(props: {
   onCreateCircle: () => void;
   /** Guests never reach steps 2–3 (interests need an account), so no counter. */
   showStep?: boolean;
+  /** Guests only: leave browsing and go back to sign in / register. */
+  onBackToAuth?: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -51,6 +53,11 @@ export function OnboardingHome(props: {
         </button>
       </div>
       <p className="onboarding-subtitle muted">{t("onboarding.welcomeReassurance")}</p>
+      {props.onBackToAuth ? (
+        <button type="button" className="onboarding-back-to-auth" onClick={props.onBackToAuth}>
+          {t("guest.backToSignIn")}
+        </button>
+      ) : null}
     </div>
   );
 }

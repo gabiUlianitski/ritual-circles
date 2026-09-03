@@ -4832,6 +4832,26 @@ button.notif-item:hover,
   font-size: 0.85rem;
 }
 
+.onboarding-back-to-auth {
+  border: 0;
+  background: transparent;
+  color: #7eb8ff;
+  font-size: 0.88rem;
+  padding: 6px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.onboarding-back-to-auth:hover {
+  color: #dce8ff;
+}
+
+.login-choose-subtitle {
+  margin: 0 0 4px;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
 .guest-gate-overlay {
   position: fixed;
   inset: 0;

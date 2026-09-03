@@ -43,6 +43,7 @@ export function Dashboard(props: {
   userFirstName?: string | null;
   guest?: boolean;
   onRegisterRequest?: (notice?: string) => void;
+  onBackToAuth?: () => void;
 }) {
   const { t } = useTranslation();
   const [detailsCircleId, setDetailsCircleId] = useState<string | null>(null);
@@ -127,6 +128,7 @@ export function Dashboard(props: {
         onGoFindCircles={() => props.onGoFindCircles()}
         guest={props.guest}
         onRegisterRequest={props.onRegisterRequest}
+        onBackToAuth={props.onBackToAuth}
       />
     );
   }
