@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { GoogleLogin } from "@react-oauth/google";
 import { api, setAuthToken } from "../api/client";
 import { FormError } from "./FormError";
+import { LandingIllustration } from "./LandingIllustration";
+import { LandingLogo } from "./LandingLogo";
 
 const USER_NAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
 
@@ -193,210 +195,241 @@ export function Login(props: {
 
   if (mode === "choose") {
     return (
-      <div className="card stack login-choose">
-        <div className="h1">{t("login.welcomeTitle")}</div>
-        {props.notice ? <p className="onboarding-empty-title">{props.notice}</p> : null}
-        <p className="muted login-choose-subtitle">{t("login.welcomeSubtitle")}</p>
+      <div className="landing-screen">
+        <div className="landing-screen-inner">
+          <LandingLogo />
+          <LandingIllustration />
+          {props.notice ? <p className="landing-notice">{props.notice}</p> : null}
+          <h1 className="landing-headline">{t("login.headline")}</h1>
+          <p className="landing-subtitle">{t("login.supportingText")}</p>
 
-        <button
-          type="button"
-          className="primary"
-          disabled={props.loading || working}
-          onClick={() => {
-            setError(null);
-            setMode("login");
-          }}
-        >
-          {t("login.title")}
-        </button>
+          <div className="landing-actions">
+            <button
+              type="button"
+              className="landing-btn landing-btn-primary"
+              disabled={props.loading || working}
+              onClick={() => {
+                setError(null);
+                setMode("login");
+              }}
+            >
+              {t("login.signInCta")}
+            </button>
 
-        <button
-          type="button"
-          disabled={props.loading || working}
-          onClick={() => {
-            setError(null);
-            setMode("register");
-          }}
-        >
-          {t("login.registerTitle")}
-        </button>
+            <button
+              type="button"
+              className="landing-btn landing-btn-secondary"
+              disabled={props.loading || working}
+              onClick={() => {
+                setError(null);
+                setMode("register");
+              }}
+            >
+              {t("login.createAccountCta")}
+            </button>
 
-        {props.onKeepLooking ? (
-          <button
-            type="button"
-            className="onboarding-secondary"
-            disabled={working}
-            onClick={props.onKeepLooking}
-          >
-            {t("guest.keepLooking")}
-          </button>
-        ) : props.onGuest ? (
-          <button type="button" className="onboarding-secondary" disabled={working} onClick={props.onGuest}>
-            {t("guest.lookAround")}
-          </button>
-        ) : null}
+            {props.onKeepLooking ? (
+              <button
+                type="button"
+                className="landing-btn-tertiary"
+                disabled={working}
+                onClick={props.onKeepLooking}
+              >
+                {t("guest.justLooking")}
+              </button>
+            ) : props.onGuest ? (
+              <button type="button" className="landing-btn-tertiary" disabled={working} onClick={props.onGuest}>
+                {t("guest.justLooking")}
+              </button>
+            ) : null}
+          </div>
+        </div>
       </div>
     );
   }
 
   if (mode === "google-setup") {
     return (
-      <div className="card stack">
-        <div className="h1">Finish your account</div>
-        <p className="muted" style={{ margin: 0 }}>
-          Signed in with Google as <strong>{googleEmail || email}</strong>. Pick a username — this is how others find
-          you in the app.
-        </p>
-        <input
-          placeholder="Username (unique, e.g. gabi_tennis)"
-          value={userName}
-          onChange={(e) => setUserName(e.target.value.replace(/\s/g, "_"))}
-          autoComplete="username"
-        />
-        <input
-          placeholder="First name"
-          value={firstName}
-          onChange={(e) => setFirstName(e.target.value)}
-          autoComplete="given-name"
-        />
-        <input
-          placeholder="Last name (optional)"
-          value={lastName}
-          onChange={(e) => setLastName(e.target.value)}
-          autoComplete="family-name"
-        />
-        <input placeholder="City (optional)" value={city} onChange={(e) => setCity(e.target.value)} />
-        {error ? <FormError>{error}</FormError> : null}
-        <button
-          className="primary"
-          disabled={props.loading || working || !googleSetupReady}
-          onClick={() => void submit()}
-        >
-          {working ? "Creating account…" : "Create account"}
-        </button>
-        <button
-          type="button"
-          disabled={working}
-          onClick={() => {
-            setMode("login");
-            setGoogleRegToken(null);
-            setError(null);
-          }}
-        >
-          Cancel
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="card stack">
-      <div className="h1">{mode === "login" ? t("login.title") : t("login.registerTitle")}</div>
-      {props.notice ? <p className="onboarding-empty-title">{props.notice}</p> : null}
-      <div className="muted">
-        {mode === "login" ? <>{t("login.subtitle")}</> : null}
-        {mode === "register" ? (
-          <>
-            Your <strong>username</strong> is unique in the app (like a handle). First and last name are what people
-            see in your circle. Or create an account with Google below.
-          </>
-        ) : null}
-      </div>
-
-      {googleEnabled ? (
-        <div className="login-google-block stack">
-          <div className="login-google-btn-wrap">
-            <GoogleLogin
-              onSuccess={(cred) => void handleGoogleCredential(cred.credential)}
-              onError={() => setError("Google sign-in was cancelled or failed.")}
-              text={mode === "register" ? "signup_with" : "signin_with"}
-              shape="rectangular"
-              theme="outline"
-              size="large"
-              width="100%"
-            />
-          </div>
-          <div className="login-divider muted" aria-hidden>
-            <span>or</span>
-          </div>
-        </div>
-      ) : null}
-
-      <input
-        placeholder={mode === "login" ? t("login.emailOrUsername") : t("login.email")}
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
-      <input
-        placeholder={t("login.password")}
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-
-      {mode === "register" ? (
-        <>
+      <div className="landing-screen">
+        <div className="landing-screen-inner landing-form">
+          <LandingLogo />
+          <h1 className="landing-form-title">Finish your account</h1>
+          <p className="landing-form-lead">
+            Signed in with Google as <strong>{googleEmail || email}</strong>. Pick a username — this is how others find
+            you in the app.
+          </p>
           <input
+            className="landing-input"
             placeholder="Username (unique, e.g. gabi_tennis)"
             value={userName}
             onChange={(e) => setUserName(e.target.value.replace(/\s/g, "_"))}
             autoComplete="username"
           />
           <input
+            className="landing-input"
             placeholder="First name"
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
             autoComplete="given-name"
           />
           <input
-            placeholder="Last name"
+            className="landing-input"
+            placeholder="Last name (optional)"
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
             autoComplete="family-name"
           />
-          <input placeholder="City (optional)" value={city} onChange={(e) => setCity(e.target.value)} />
-        </>
-      ) : null}
+          <input
+            className="landing-input"
+            placeholder="City (optional)"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+          />
+          {error ? <FormError>{error}</FormError> : null}
+          <div className="landing-actions">
+            <button
+              className="landing-btn landing-btn-primary"
+              disabled={props.loading || working || !googleSetupReady}
+              onClick={() => void submit()}
+            >
+              {working ? "Creating account…" : t("login.createAccountCta")}
+            </button>
+            <button
+              type="button"
+              className="landing-btn landing-btn-secondary"
+              disabled={working}
+              onClick={() => {
+                setMode("login");
+                setGoogleRegToken(null);
+                setError(null);
+              }}
+            >
+              {t("common.cancel")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-      {error ? <FormError>{error}</FormError> : null}
+  return (
+    <div className="landing-screen">
+      <div className="landing-screen-inner landing-form">
+        <LandingLogo />
+        <h1 className="landing-form-title">{mode === "login" ? t("login.signInCta") : t("login.createAccountCta")}</h1>
+        {props.notice ? <p className="landing-notice">{props.notice}</p> : null}
+        <p className="landing-form-lead">
+          {mode === "login" ? t("login.subtitle") : t("login.registerLead")}
+        </p>
 
-      <button
-        className="primary"
-        disabled={
-          props.loading ||
-          working ||
-          !email.trim() ||
-          !password ||
-          password.length < 6 ||
-          (mode === "register" && !registerReady)
-        }
-        onClick={() => void submit()}
-      >
-        {working ? "Working…" : mode === "login" ? t("login.signIn") : "Create account with email"}
-      </button>
+        {googleEnabled ? (
+          <div className="login-google-block stack">
+            <div className="login-google-btn-wrap">
+              <GoogleLogin
+                onSuccess={(cred) => void handleGoogleCredential(cred.credential)}
+                onError={() => setError("Google sign-in was cancelled or failed.")}
+                text={mode === "register" ? "signup_with" : "signin_with"}
+                shape="rectangular"
+                theme="outline"
+                size="large"
+                width="100%"
+              />
+            </div>
+            <div className="login-divider landing-muted" aria-hidden>
+              <span>or</span>
+            </div>
+          </div>
+        ) : null}
 
-      <button
-        type="button"
-        disabled={working}
-        onClick={() => {
-          setMode((m) => (m === "login" ? "register" : "login"));
-          setError(null);
-        }}
-      >
-        {mode === "login" ? t("login.createAccount") : t("login.haveAccount")}
-      </button>
+        <input
+          className="landing-input"
+          placeholder={mode === "login" ? t("login.emailOrUsername") : t("login.email")}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <input
+          className="landing-input"
+          placeholder={t("login.password")}
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
 
-      <button
-        type="button"
-        className="onboarding-secondary"
-        disabled={working}
-        onClick={() => {
-          setError(null);
-          setMode("choose");
-        }}
-      >
-        {t("common.back")}
-      </button>
+        {mode === "register" ? (
+          <>
+            <input
+              className="landing-input"
+              placeholder="Username (unique, e.g. gabi_tennis)"
+              value={userName}
+              onChange={(e) => setUserName(e.target.value.replace(/\s/g, "_"))}
+              autoComplete="username"
+            />
+            <input
+              className="landing-input"
+              placeholder="First name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              autoComplete="given-name"
+            />
+            <input
+              className="landing-input"
+              placeholder="Last name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              autoComplete="family-name"
+            />
+            <input
+              className="landing-input"
+              placeholder="City (optional)"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+            />
+          </>
+        ) : null}
+
+        {error ? <FormError>{error}</FormError> : null}
+
+        <div className="landing-actions">
+          <button
+            className="landing-btn landing-btn-primary"
+            disabled={
+              props.loading ||
+              working ||
+              !email.trim() ||
+              !password ||
+              password.length < 6 ||
+              (mode === "register" && !registerReady)
+            }
+            onClick={() => void submit()}
+          >
+            {working ? "Working…" : mode === "login" ? t("login.signInCta") : t("login.createAccountCta")}
+          </button>
+
+          <button
+            type="button"
+            className="landing-btn landing-btn-secondary"
+            disabled={working}
+            onClick={() => {
+              setMode((m) => (m === "login" ? "register" : "login"));
+              setError(null);
+            }}
+          >
+            {mode === "login" ? t("login.createAccount") : t("login.haveAccount")}
+          </button>
+
+          <button
+            type="button"
+            className="landing-btn-tertiary"
+            disabled={working}
+            onClick={() => {
+              setError(null);
+              setMode("choose");
+            }}
+          >
+            {t("common.back")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

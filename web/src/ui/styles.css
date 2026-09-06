@@ -1469,46 +1469,33 @@ button.hoby-thread-back:hover {
   gap: 14px;
 }
 
-.discover-browse-modes {
+.discover-browse-row {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   width: 100%;
 }
 
-.discover-browse-mode {
-  flex: 1 1 0;
+.discover-browse-interests {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.discover-filters-inline-toggle {
+  width: auto;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   min-height: 44px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--card-border);
-  background: color-mix(in srgb, var(--card-border) 12%, transparent);
-  color: inherit;
-  font-weight: 650;
-  font-size: 0.92rem;
-  line-height: 1.2;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  padding: 10px 14px;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--card-border) 18%, transparent);
 }
 
-.discover-browse-mode:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--card-border));
-  background: color-mix(in srgb, var(--card-border) 20%, transparent);
-}
-
-.discover-browse-mode.is-active {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: inherit;
-}
-
-.discover-browse-mode:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.discover-filters-inline-toggle:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--card-border) 28%, transparent);
 }
 
 .discover-search-input {
@@ -1558,7 +1545,9 @@ button.hoby-thread-back:hover {
 .discover-filters-body {
   padding: 14px;
   gap: 14px;
-  border-top: 1px solid var(--card-border);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--card-border) 10%, transparent);
 }
 
 .discover-filters-clear {
@@ -4892,6 +4881,257 @@ button.notif-item:hover,
   margin: 0 0 4px;
   font-size: 0.92rem;
   line-height: 1.4;
+}
+
+/* ——— Landing / login screen ——— */
+.app--login {
+  max-width: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  background: #0f172a;
+}
+
+.landing-screen {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 64px 24px 24px;
+  background: radial-gradient(ellipse 120% 80% at 50% 0%, rgba(30, 41, 59, 0.08) 0%, #0f172a 55%);
+}
+
+.landing-screen-inner {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.landing-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  align-self: flex-start;
+  margin-bottom: 32px;
+  height: 48px;
+}
+
+.landing-logo-icon {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.landing-logo-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.landing-logo-text {
+  font-size: 28px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.1;
+}
+
+.landing-illustration {
+  width: 120px;
+  height: 120px;
+  margin-bottom: 24px;
+  flex-shrink: 0;
+}
+
+.landing-illustration svg {
+  width: 100%;
+  height: 100%;
+}
+
+.landing-headline {
+  margin: 0;
+  max-width: 360px;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #ffffff;
+}
+
+.landing-subtitle {
+  margin: 16px 0 0;
+  max-width: 400px;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #cbd5e1;
+  white-space: pre-line;
+}
+
+.landing-notice {
+  margin: 0 0 12px;
+  max-width: 400px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: #93c5fd;
+}
+
+.landing-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 32px;
+}
+
+.landing-btn {
+  width: 100%;
+  min-height: 56px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+}
+
+.landing-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.landing-btn-primary {
+  border: none;
+  background: #3b82f6;
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
+}
+
+.landing-btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.landing-btn-secondary {
+  border: 1px solid #334155;
+  background: transparent;
+  color: #ffffff;
+}
+
+.landing-btn-secondary:hover:not(:disabled) {
+  background: #1e293b;
+}
+
+.landing-btn-tertiary {
+  width: auto;
+  min-height: auto;
+  padding: 8px 4px;
+  margin-top: 4px;
+  border: none;
+  background: transparent;
+  color: #93c5fd;
+  font-size: 15px;
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.landing-btn-tertiary:hover:not(:disabled) {
+  text-decoration: underline;
+  background: transparent;
+}
+
+.landing-form {
+  align-items: stretch;
+  text-align: start;
+}
+
+.landing-form .landing-logo {
+  align-self: flex-start;
+}
+
+.landing-form-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #ffffff;
+}
+
+.landing-form-lead {
+  margin: 8px 0 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #cbd5e1;
+}
+
+.landing-muted {
+  color: #94a3b8;
+}
+
+.landing-input {
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid #334155;
+  background: rgba(15, 23, 42, 0.6);
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.landing-input::placeholder {
+  color: #94a3b8;
+}
+
+.landing-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.landing-form .landing-actions {
+  margin-top: 20px;
+}
+
+.landing-form .login-google-block {
+  margin-bottom: 4px;
+}
+
+@media (min-width: 640px) {
+  .landing-illustration {
+    width: 160px;
+    height: 160px;
+  }
+
+  .landing-headline {
+    font-size: 48px;
+  }
+
+  .landing-subtitle {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 639px) {
+  .landing-logo {
+    align-self: center;
+  }
+
+  .landing-form .landing-logo {
+    align-self: center;
+  }
+}
+
+[dir="rtl"] .landing-logo {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .landing-form {
+  text-align: right;
 }
 
 .guest-gate-overlay {

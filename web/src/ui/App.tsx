@@ -313,14 +313,13 @@ export function App() {
   }
 
   return (
-    <div className="app">
+    <div className={`app${stage === "login" ? " app--login" : ""}`}>
+      {stage !== "login" ? (
       <div className="row app-header-row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div className="h1" style={{ marginBottom: 0 }}>
           {t("nav.appTitle")}
         </div>
         <div className="header-toolbar">
-          {stage !== "login" ? (
-            <>
             {!onboardingMode ? (
             <>
             <button
@@ -412,10 +411,9 @@ export function App() {
                 </div>
               ) : null}
             </div>
-            </>
-          ) : null}
         </div>
       </div>
+      ) : null}
 
       {error ? <FormError>{error}</FormError> : null}
 

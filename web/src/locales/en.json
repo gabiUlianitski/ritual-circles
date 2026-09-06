@@ -33,6 +33,11 @@
   },
   "login": {
     "title": "Sign in",
+    "headline": "Find your people",
+    "supportingText": "You don't have to do things alone.\nJoin small groups built around shared interests.",
+    "signInCta": "Sign In",
+    "createAccountCta": "Create Account",
+    "registerLead": "Pick a username, add your name, and you're in. Or continue with Google below.",
     "subtitle": "Sign in with your email, username, or first name, and the password you used when you joined. Or continue with Google.",
     "email": "Email",
     "emailOrUsername": "Email, username, or first name",
@@ -47,6 +52,7 @@
   },
   "guest": {
     "lookAround": "Look around first",
+    "justLooking": "Just looking around →",
     "keepLooking": "Keep looking",
     "createAccount": "Create account",
     "createAccountToJoin": "Create account to join",

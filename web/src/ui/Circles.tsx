@@ -60,7 +60,7 @@ export function Circles(props: {
   const [catalogDetail, setCatalogDetail] = useState<CircleListItem | null>(null);
   const [joinBusyId, setJoinBusyId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [browsePanel, setBrowsePanel] = useState<"interest" | "filters">("interest");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterHobby, setFilterHobby] = useState("");
   const [filterLevel, setFilterLevel] = useState<DiscoverLevelFilter>("");
   const [filterTime, setFilterTime] = useState<DiscoverTimeFilter>("");
@@ -526,40 +526,33 @@ export function Circles(props: {
               aria-label={t("discoverPage.searchAria")}
             />
 
-            <div className="discover-browse-modes" role="tablist" aria-label={t("discoverPage.browseModesAria")}>
+            <div className="discover-browse-row">
+              <div className="discover-browse-interests">
+                <DiscoverInterestChips
+                  value={interestFilter}
+                  onChange={(v) => setInterestFilter(v as InterestCategoryId)}
+                  disabled={loading}
+                  categories={interestCategories}
+                />
+              </div>
               <button
                 type="button"
-                role="tab"
-                className={`discover-browse-mode${browsePanel === "interest" ? " is-active" : ""}`}
-                aria-selected={browsePanel === "interest"}
+                className="discover-filters-inline-toggle"
+                aria-expanded={filtersOpen}
                 disabled={loading}
-                onClick={() => setBrowsePanel("interest")}
+                onClick={() => setFiltersOpen((open) => !open)}
               >
-                {t("discoverPage.browseInterest")}
-              </button>
-              <button
-                type="button"
-                role="tab"
-                className={`discover-browse-mode${browsePanel === "filters" ? " is-active" : ""}`}
-                aria-selected={browsePanel === "filters"}
-                disabled={loading}
-                onClick={() => setBrowsePanel("filters")}
-              >
-                {t("discoverPage.filters")}
+                <span>{t("discoverPage.filters")}</span>
                 {hasDetailFilters ? (
                   <span className="discover-filters-dot" aria-label={t("discoverPage.filtersActive")} />
                 ) : null}
+                <span className="discover-filters-chevron" aria-hidden>
+                  {filtersOpen ? "▾" : "▸"}
+                </span>
               </button>
             </div>
 
-            {browsePanel === "interest" ? (
-              <DiscoverInterestChips
-                value={interestFilter}
-                onChange={(v) => setInterestFilter(v as InterestCategoryId)}
-                disabled={loading}
-                categories={interestCategories}
-              />
-            ) : (
+            {filtersOpen ? (
               <div className="discover-filters-body stack">
                 <DiscoverFilterChips
                   label={t("discoverPage.filterHobby")}
@@ -610,17 +603,21 @@ export function Circles(props: {
                   onChange={setFilterSize}
                 />
                 {hasDetailFilters ? (
-                  <button type="button" className="discover-filters-clear" onClick={() => {
-                    setFilterHobby("");
-                    setFilterLevel("");
-                    setFilterTime("");
-                    setFilterSize("");
-                  }}>
+                  <button
+                    type="button"
+                    className="discover-filters-clear"
+                    onClick={() => {
+                      setFilterHobby("");
+                      setFilterLevel("");
+                      setFilterTime("");
+                      setFilterSize("");
+                    }}
+                  >
                     {t("discoverPage.clearFilters")}
                   </button>
                 ) : null}
               </div>
-            )}
+            ) : null}
           </div>
 
           {hasActiveFilters ? (
