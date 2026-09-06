@@ -235,6 +235,7 @@
     "nearYouSubtitle": "Circles happening close to your location",
     "browseInterest": "Browse by interest",
     "browseInterestAria": "Browse by interest",
+    "browseModesAria": "Browse by interest or filters",
     "allCircles": "All circles",
     "noCategoryTitle": "No circles in this category",
     "noCategoryMessage": "Try another interest or create your own circle.",

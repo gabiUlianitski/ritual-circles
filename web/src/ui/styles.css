@@ -1469,6 +1469,48 @@ button.hoby-thread-back:hover {
   gap: 14px;
 }
 
+.discover-browse-modes {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.discover-browse-mode {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: color-mix(in srgb, var(--card-border) 12%, transparent);
+  color: inherit;
+  font-weight: 650;
+  font-size: 0.92rem;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.discover-browse-mode:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--card-border));
+  background: color-mix(in srgb, var(--card-border) 20%, transparent);
+}
+
+.discover-browse-mode.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: inherit;
+}
+
+.discover-browse-mode:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .discover-search-input {
   width: 100%;
   padding: 12px 14px;

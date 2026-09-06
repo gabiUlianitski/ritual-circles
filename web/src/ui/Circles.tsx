@@ -26,7 +26,6 @@ import {
   DiscoverCircleCard,
   DiscoverEmptyState,
   DiscoverFilterChips,
-  DiscoverFiltersCollapsible,
   DiscoverInterestChips,
   DiscoverSection,
   DiscoverSectionHint,
@@ -61,7 +60,7 @@ export function Circles(props: {
   const [catalogDetail, setCatalogDetail] = useState<CircleListItem | null>(null);
   const [joinBusyId, setJoinBusyId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [browsePanel, setBrowsePanel] = useState<"interest" | "filters">("interest");
   const [filterHobby, setFilterHobby] = useState("");
   const [filterLevel, setFilterLevel] = useState<DiscoverLevelFilter>("");
   const [filterTime, setFilterTime] = useState<DiscoverTimeFilter>("");
@@ -192,6 +191,8 @@ export function Circles(props: {
   const hasActiveFilters = Boolean(
     searchQuery.trim() || filterHobby || filterLevel || filterTime || filterSize || props.prefilterDateIso,
   );
+
+  const hasDetailFilters = Boolean(filterHobby || filterLevel || filterTime || filterSize);
 
   async function afterCreateOrJoin() {
     setShowForm(false);
@@ -332,14 +333,6 @@ export function Circles(props: {
         joinAction={joinActionFor(c)}
       />
     );
-  }
-
-  function clearFilters() {
-    setSearchQuery("");
-    setFilterHobby("");
-    setFilterLevel("");
-    setFilterTime("");
-    setFilterSize("");
   }
 
   if (showForm) {
@@ -533,62 +526,101 @@ export function Circles(props: {
               aria-label={t("discoverPage.searchAria")}
             />
 
-            <DiscoverFiltersCollapsible
-              expanded={filtersExpanded}
-              onToggle={() => setFiltersExpanded((v) => !v)}
-              hasActiveFilters={hasActiveFilters}
-              onClear={clearFilters}
-              disabled={loading}
-            >
-              <DiscoverFilterChips
-                label={t("discoverPage.filterHobby")}
-                value={filterHobby}
+            <div className="discover-browse-modes" role="tablist" aria-label={t("discoverPage.browseModesAria")}>
+              <button
+                type="button"
+                role="tab"
+                className={`discover-browse-mode${browsePanel === "interest" ? " is-active" : ""}`}
+                aria-selected={browsePanel === "interest"}
                 disabled={loading}
-                options={[
-                  { value: "", label: t("discoverPage.filterAll") },
-                  ...hobies.map((h) => ({
-                    value: h.slug,
-                    label: (h.icon ? `${h.icon} ` : "") + h.displayName,
-                  })),
-                ]}
-                onChange={setFilterHobby}
-              />
-              <DiscoverFilterChips
-                label={t("discoverPage.filterLevel")}
-                value={filterLevel}
+                onClick={() => setBrowsePanel("interest")}
+              >
+                {t("discoverPage.browseInterest")}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                className={`discover-browse-mode${browsePanel === "filters" ? " is-active" : ""}`}
+                aria-selected={browsePanel === "filters"}
                 disabled={loading}
-                options={[
-                  { value: "", label: t("discoverPage.filterAny") },
-                  { value: "beginner", label: t("discoverPage.filterBeginner") },
-                  { value: "intermediate", label: t("discoverPage.filterIntermediate") },
-                  { value: "advanced", label: t("discoverPage.filterAdvanced") },
-                ]}
-                onChange={setFilterLevel}
-              />
-              <DiscoverFilterChips
-                label={t("discoverPage.filterTime")}
-                value={filterTime}
+                onClick={() => setBrowsePanel("filters")}
+              >
+                {t("discoverPage.filters")}
+                {hasDetailFilters ? (
+                  <span className="discover-filters-dot" aria-label={t("discoverPage.filtersActive")} />
+                ) : null}
+              </button>
+            </div>
+
+            {browsePanel === "interest" ? (
+              <DiscoverInterestChips
+                value={interestFilter}
+                onChange={(v) => setInterestFilter(v as InterestCategoryId)}
                 disabled={loading}
-                options={[
-                  { value: "", label: t("discoverPage.filterAny") },
-                  { value: "morning", label: t("discoverPage.filterMorning") },
-                  { value: "evening", label: t("discoverPage.filterEvening") },
-                  { value: "weekend", label: t("discoverPage.filterWeekend") },
-                ]}
-                onChange={setFilterTime}
+                categories={interestCategories}
               />
-              <DiscoverFilterChips
-                label={t("discoverPage.filterSize")}
-                value={filterSize}
-                disabled={loading}
-                options={[
-                  { value: "", label: t("discoverPage.filterAny") },
-                  { value: "small", label: t("discoverPage.filterSizeSmall") },
-                  { value: "growing", label: t("discoverPage.filterSizeGrowing") },
-                ]}
-                onChange={setFilterSize}
-              />
-            </DiscoverFiltersCollapsible>
+            ) : (
+              <div className="discover-filters-body stack">
+                <DiscoverFilterChips
+                  label={t("discoverPage.filterHobby")}
+                  value={filterHobby}
+                  disabled={loading}
+                  options={[
+                    { value: "", label: t("discoverPage.filterAll") },
+                    ...hobies.map((h) => ({
+                      value: h.slug,
+                      label: (h.icon ? `${h.icon} ` : "") + h.displayName,
+                    })),
+                  ]}
+                  onChange={setFilterHobby}
+                />
+                <DiscoverFilterChips
+                  label={t("discoverPage.filterLevel")}
+                  value={filterLevel}
+                  disabled={loading}
+                  options={[
+                    { value: "", label: t("discoverPage.filterAny") },
+                    { value: "beginner", label: t("discoverPage.filterBeginner") },
+                    { value: "intermediate", label: t("discoverPage.filterIntermediate") },
+                    { value: "advanced", label: t("discoverPage.filterAdvanced") },
+                  ]}
+                  onChange={setFilterLevel}
+                />
+                <DiscoverFilterChips
+                  label={t("discoverPage.filterTime")}
+                  value={filterTime}
+                  disabled={loading}
+                  options={[
+                    { value: "", label: t("discoverPage.filterAny") },
+                    { value: "morning", label: t("discoverPage.filterMorning") },
+                    { value: "evening", label: t("discoverPage.filterEvening") },
+                    { value: "weekend", label: t("discoverPage.filterWeekend") },
+                  ]}
+                  onChange={setFilterTime}
+                />
+                <DiscoverFilterChips
+                  label={t("discoverPage.filterSize")}
+                  value={filterSize}
+                  disabled={loading}
+                  options={[
+                    { value: "", label: t("discoverPage.filterAny") },
+                    { value: "small", label: t("discoverPage.filterSizeSmall") },
+                    { value: "growing", label: t("discoverPage.filterSizeGrowing") },
+                  ]}
+                  onChange={setFilterSize}
+                />
+                {hasDetailFilters ? (
+                  <button type="button" className="discover-filters-clear" onClick={() => {
+                    setFilterHobby("");
+                    setFilterLevel("");
+                    setFilterTime("");
+                    setFilterSize("");
+                  }}>
+                    {t("discoverPage.clearFilters")}
+                  </button>
+                ) : null}
+              </div>
+            )}
           </div>
 
           {hasActiveFilters ? (
@@ -635,15 +667,6 @@ export function Circles(props: {
                   </div>
                 </DiscoverSection>
               ) : null}
-
-              <DiscoverSection title={t("discoverPage.browseInterest")}>
-                <DiscoverInterestChips
-                  value={interestFilter}
-                  onChange={(v) => setInterestFilter(v as InterestCategoryId)}
-                  disabled={loading}
-                  categories={interestCategories}
-                />
-              </DiscoverSection>
 
               <DiscoverSection title={t("discoverPage.allCircles")}>
                 {allCircles.length > 0 ? (
