@@ -618,12 +618,12 @@ export function Circles(props: {
                     {recommended.map((c) => renderDiscoverCard(c))}
                   </div>
                 </DiscoverSection>
-              ) : (
+              ) : !props.guest ? (
                 <DiscoverSectionHint
                   title={t("discoverPage.learningPrefsTitle")}
                   message={t("discoverPage.learningPrefsMessage")}
                 />
-              )}
+              ) : null}
 
               {nearYou.length > 0 ? (
                 <DiscoverSection
