@@ -16,6 +16,7 @@ from app.db import close_pool, create_pool
 from app.routers.attendance import router as attendance_router
 from app.routers.auth import router as auth_router
 from app.routers.circle_chat import router as circle_chat_router
+from app.routers.community import router as community_router
 from app.routers.circles import router as circles_router
 from app.routers.hobies import router as hobies_router
 from app.routers.geo import router as geo_router
@@ -132,6 +133,7 @@ def create_app() -> FastAPI:
     app.include_router(home_router)
     app.include_router(me_router)
     app.include_router(hobies_router)
+    app.include_router(community_router)
     app.include_router(circles_router)
     app.include_router(circle_chat_router)
     app.include_router(sessions_router)

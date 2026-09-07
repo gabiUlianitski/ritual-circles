@@ -227,6 +227,31 @@ export type MapsLinkResolveResponse = {
   mapsUrl: string;
 };
 
+export type CommunityStats = {
+  members: number;
+  activeCircles: number;
+  meetupsThisWeek: number;
+};
+
+export type CommunityCirclePreview = {
+  id: string;
+  ritualType: string;
+  recurringTime: string;
+  city?: string | null;
+  countryCode?: string | null;
+  cityName?: string | null;
+  meetingPlace?: string | null;
+  memberCount: number;
+  hobyDisplayName?: string | null;
+  hobyIcon?: string | null;
+  nextSessionAt?: string | null;
+};
+
+export type CommunityPreviewResponse = {
+  stats: CommunityStats;
+  featuredCircles: CommunityCirclePreview[];
+};
+
 /** Public catalog entry from GET /circles (no invite code). */
 export type CircleListItem = {
   id: string;

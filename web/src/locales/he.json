@@ -50,6 +50,36 @@
     "welcomeTitle": "ברוך/ה הבא/ה ל-Ritual Circles",
     "welcomeSubtitle": "התחברות, יצירת חשבון, או רק להסתכל קודם."
   },
+  "welcome": {
+    "headline": "מצא/י את האנשים שלך",
+    "tagline": "מתחילים מתחביב. נשארים בגלל האנשים.",
+    "description": "גלה/י מעגלים קטנים ומקבלים סביב הדברים שאת/ה אוהב/ת.",
+    "signIn": "התחברות",
+    "createAccount": "יצירת חשבון",
+    "lookAroundFirst": "רק להסתכל קודם",
+    "or": "או",
+    "reassurance": "בלי התחייבות. תסתכל/י בקצב שלך.",
+    "proofAria": "מה לצפות",
+    "proofSmallGroups": "קבוצות קטנות",
+    "proofSharedInterests": "תחביבים משותפים",
+    "proofJoinPace": "הצטרפות בקצב שלך"
+  },
+  "landing": {
+    "exploreCircles": "גלה/י מעגלים",
+    "createFreeAccount": "יצירת חשבון חינם",
+    "alreadyMember": "כבר יש לך חשבון? התחברות",
+    "members": "{{count}} חברים",
+    "activeCircles": "{{count}} מעגלים פעילים",
+    "meetupsThisWeek": "{{count}} מפגשים השבוע",
+    "communityPreview": "מעגלים שקורים עכשיו",
+    "membersLabel": "{{count}} חברים",
+    "nextMeetup": "המפגש הבא {{day}}",
+    "trustBeginner": "ידידותי למתחילים",
+    "trustWelcoming": "קהילות מקבלות",
+    "trustSafe": "סביבה בטוחה ומכבדת",
+    "socialProofAria": "פעילות הקהילה",
+    "trustAria": "מה לצפות"
+  },
   "guest": {
     "lookAround": "רק להסתכל קודם",
     "justLooking": "רק מסתכל/ת סביב →",

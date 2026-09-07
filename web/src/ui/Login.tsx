@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { GoogleLogin } from "@react-oauth/google";
 import { api, setAuthToken } from "../api/client";
 import { FormError } from "./FormError";
+import { LandingChoose } from "./LandingChoose";
 import { LandingIllustration } from "./LandingIllustration";
 import { LandingLogo } from "./LandingLogo";
 
@@ -194,57 +195,24 @@ export function Login(props: {
   const googleSetupReady = USER_NAME_RE.test(userName.trim()) && firstName.trim().length > 0;
 
   if (mode === "choose") {
+    const lookAround = props.onKeepLooking ?? props.onGuest;
     return (
-      <div className="landing-screen">
-        <div className="landing-screen-inner">
-          <LandingLogo />
-          <LandingIllustration />
-          {props.notice ? <p className="landing-notice">{props.notice}</p> : null}
-          <h1 className="landing-headline">{t("login.headline")}</h1>
-          <p className="landing-subtitle">{t("login.supportingText")}</p>
-
-          <div className="landing-actions">
-            <button
-              type="button"
-              className="landing-btn landing-btn-primary"
-              disabled={props.loading || working}
-              onClick={() => {
-                setError(null);
-                setMode("login");
-              }}
-            >
-              {t("login.signInCta")}
-            </button>
-
-            <button
-              type="button"
-              className="landing-btn landing-btn-secondary"
-              disabled={props.loading || working}
-              onClick={() => {
-                setError(null);
-                setMode("register");
-              }}
-            >
-              {t("login.createAccountCta")}
-            </button>
-
-            {props.onKeepLooking ? (
-              <button
-                type="button"
-                className="landing-btn-tertiary"
-                disabled={working}
-                onClick={props.onKeepLooking}
-              >
-                {t("guest.justLooking")}
-              </button>
-            ) : props.onGuest ? (
-              <button type="button" className="landing-btn-tertiary" disabled={working} onClick={props.onGuest}>
-                {t("guest.justLooking")}
-              </button>
-            ) : null}
-          </div>
-        </div>
-      </div>
+      <LandingChoose
+        notice={props.notice}
+        disabled={props.loading || working}
+        lookAroundDisabled={!lookAround}
+        onSignIn={() => {
+          setError(null);
+          setMode("login");
+        }}
+        onCreateAccount={() => {
+          setError(null);
+          setMode("register");
+        }}
+        onLookAround={() => {
+          if (lookAround) lookAround();
+        }}
+      />
     );
   }
 

@@ -50,6 +50,36 @@
     "welcomeTitle": "Welcome to Ritual Circles",
     "welcomeSubtitle": "Sign in, create an account, or look around first."
   },
+  "welcome": {
+    "headline": "Find your people",
+    "tagline": "Start with a hobby. Stay for the people.",
+    "description": "Discover small, welcoming circles built around the things you enjoy.",
+    "signIn": "Sign in",
+    "createAccount": "Create account",
+    "lookAroundFirst": "Look around first",
+    "or": "or",
+    "reassurance": "No commitment. Explore at your own pace.",
+    "proofAria": "What to expect",
+    "proofSmallGroups": "Small groups",
+    "proofSharedInterests": "Shared interests",
+    "proofJoinPace": "Join at your pace"
+  },
+  "landing": {
+    "exploreCircles": "Explore Circles",
+    "createFreeAccount": "Create Free Account",
+    "alreadyMember": "Already a member? Sign In",
+    "members": "{{count}} Members",
+    "activeCircles": "{{count}} Active Circles",
+    "meetupsThisWeek": "{{count}} Meetups This Week",
+    "communityPreview": "Circles happening now",
+    "membersLabel": "{{count}} members",
+    "nextMeetup": "Next meetup {{day}}",
+    "trustBeginner": "Beginner friendly",
+    "trustWelcoming": "Welcoming communities",
+    "trustSafe": "Safe and respectful environment",
+    "socialProofAria": "Community activity",
+    "trustAria": "What to expect"
+  },
   "guest": {
     "lookAround": "Look around first",
     "justLooking": "Just looking around →",

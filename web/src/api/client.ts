@@ -29,6 +29,7 @@ import type {
   UserMeResponse,
   UserUpdateRequest,
   VenueSuggestionsResponse,
+  CommunityPreviewResponse,
 } from "./types";
 
 const TOKEN_KEY = "auth_token";
@@ -209,4 +210,6 @@ export const api = {
     request<Hoby>("PATCH", `/hobies/${encodeURIComponent(slug)}`, payload),
   spellSuggestHobies: (payload: { slug?: string | null; displayName?: string | null }) =>
     request<HobySpellSuggestResponse>("POST", "/hobies/spell-suggest", payload),
+
+  getCommunityPreview: () => request<CommunityPreviewResponse>("GET", "/community/preview"),
 };

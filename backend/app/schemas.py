@@ -282,6 +282,31 @@ class CircleListItemResponse(BaseModel):
     messagesToday: int = 0
 
 
+class CommunityStatsResponse(BaseModel):
+    members: int = 0
+    activeCircles: int = 0
+    meetupsThisWeek: int = 0
+
+
+class CommunityCirclePreview(BaseModel):
+    id: str
+    ritualType: str
+    recurringTime: str
+    city: str | None = None
+    countryCode: str | None = None
+    cityName: str | None = None
+    meetingPlace: str | None = None
+    memberCount: int = 0
+    hobyDisplayName: str | None = None
+    hobyIcon: str | None = None
+    nextSessionAt: datetime | None = None
+
+
+class CommunityPreviewResponse(BaseModel):
+    stats: CommunityStatsResponse
+    featuredCircles: list[CommunityCirclePreview]
+
+
 class CircleCreateRequest(BaseModel):
     ritualType: str
     ritualLevel: str | int | None = None
