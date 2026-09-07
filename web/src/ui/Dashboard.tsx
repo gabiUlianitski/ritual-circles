@@ -39,11 +39,12 @@ export function Dashboard(props: {
   home: HomeResponse;
   onRefresh: () => Promise<void> | void;
   onGoCreateJoin: (prefillDateIso?: string) => void;
-  onGoFindCircles: (prefillDateIso?: string) => void;
+  onGoFindCircles: (prefillDateIso?: string, hobbySlug?: string) => void;
   userFirstName?: string | null;
   guest?: boolean;
   onRegisterRequest?: (notice?: string) => void;
   onBackToAuth?: () => void;
+  guestWelcomeHeaderMenu?: React.ReactNode;
 }) {
   const { t } = useTranslation();
   const [detailsCircleId, setDetailsCircleId] = useState<string | null>(null);
@@ -125,10 +126,11 @@ export function Dashboard(props: {
         home={props.home}
         onRefresh={props.onRefresh}
         onGoCreateJoin={() => props.onGoCreateJoin()}
-        onGoFindCircles={() => props.onGoFindCircles()}
+        onGoFindCircles={(hobbySlug) => props.onGoFindCircles(undefined, hobbySlug)}
         guest={props.guest}
         onRegisterRequest={props.onRegisterRequest}
         onBackToAuth={props.onBackToAuth}
+        guestWelcomeHeaderMenu={props.guestWelcomeHeaderMenu}
       />
     );
   }

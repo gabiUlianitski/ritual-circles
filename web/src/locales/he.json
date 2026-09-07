@@ -64,6 +64,20 @@
     "proofSharedInterests": "תחביבים משותפים",
     "proofJoinPace": "הצטרפות בקצב שלך"
   },
+  "guestExplore": {
+    "headline": "גלה/י מעגלים",
+    "tagline": "ראה/י מה אנשים עושים בקרבת מקום.",
+    "description": "עיין/י במעגלים קטנים ומקבלים סביב תחביבים משותפים. הסתכל/י קודם והצטרפ/י כשאת/ה מוכן/ה.",
+    "seeCircles": "ראה/י מעגלים בקרבתך",
+    "startCircle": "התחל/י מעגל",
+    "closingLine": "מתחילים מתחביב. החברויות מגיעות מעצמן.",
+    "backToSignIn": "חזרה למסך ההתחברות",
+    "proofAria": "מה לצפות",
+    "proofSmallGroups": "קבוצות קטנות",
+    "proofSharedInterests": "תחביבים משותפים",
+    "proofJoinPace": "הצטרפות בקצב שלך",
+    "hobbiesAria": "תחביבים שאנשים נפגשים סביבם"
+  },
   "landing": {
     "exploreCircles": "גלה/י מעגלים",
     "createFreeAccount": "יצירת חשבון חינם",

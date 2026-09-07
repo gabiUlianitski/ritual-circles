@@ -43,6 +43,8 @@ export function Circles(props: {
   visitKey?: number;
   /** When set, show circles matching this calendar day (from Home empty-day action). */
   prefilterDateIso?: string | null;
+  /** When set, pre-select this hobby in discover filters (from guest explore chips). */
+  prefilterHobbySlug?: string | null;
   /** Guest = browsing without an account: read-only, join/create ask to register. */
   guest?: boolean;
   onRegisterRequest?: (notice?: string) => void;
@@ -99,6 +101,10 @@ export function Circles(props: {
   useEffect(() => {
     void load();
   }, [load, props.visitKey, i18n.language]);
+
+  useEffect(() => {
+    setFilterHobby(props.prefilterHobbySlug ?? "");
+  }, [props.prefilterHobbySlug, props.visitKey]);
 
   useEffect(() => {
     const onVisible = () => {

@@ -64,6 +64,20 @@
     "proofSharedInterests": "Shared interests",
     "proofJoinPace": "Join at your pace"
   },
+  "guestExplore": {
+    "headline": "Explore circles",
+    "tagline": "See what people are doing nearby.",
+    "description": "Browse small, welcoming circles built around shared interests. Look around first and join when you are ready.",
+    "seeCircles": "See circles near you",
+    "startCircle": "Start a circle",
+    "closingLine": "Start with a hobby. The friendships come naturally.",
+    "backToSignIn": "Back to sign in",
+    "proofAria": "What to expect",
+    "proofSmallGroups": "Small groups",
+    "proofSharedInterests": "Shared interests",
+    "proofJoinPace": "Join at your pace",
+    "hobbiesAria": "Hobbies people meet around"
+  },
   "landing": {
     "exploreCircles": "Explore Circles",
     "createFreeAccount": "Create Free Account",

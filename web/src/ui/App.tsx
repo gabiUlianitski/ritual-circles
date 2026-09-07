@@ -15,6 +15,7 @@ import { Profile } from "./Profile";
 import { Hobies } from "./Hobies";
 import { Circles } from "./Circles";
 import { GuestRegisterPrompt } from "./GuestRegisterPrompt";
+import { WelcomePageMenu } from "./welcome/WelcomePageMenu";
 
 type AppStage = "login" | "dashboard" | "createJoin" | "profile" | "hobies" | "circles" | "notifications";
 
@@ -79,6 +80,7 @@ export function App() {
   const [circlesDeepLink, setCirclesDeepLink] = useState<CirclesDeepLink | null>(null);
   const [circlesVisitKey, setCirclesVisitKey] = useState(0);
   const [discoverDateFilter, setDiscoverDateFilter] = useState<string | null>(null);
+  const [discoverHobbyFilter, setDiscoverHobbyFilter] = useState<string | null>(null);
   const [createMeetDate, setCreateMeetDate] = useState<string | null>(null);
   const [returnStageAfterNotif, setReturnStageAfterNotif] = useState<AppStage>("dashboard");
   const menuRef = useRef<HTMLDivElement>(null);
@@ -92,6 +94,10 @@ export function App() {
       meLoaded: guest || myUserId != null,
       onboardingCompleted,
     });
+
+  const guestWelcomeActive = Boolean(
+    guest && stage === "dashboard" && home != null && onboardingMode,
+  );
 
   const checkNotifications = useCallback(
     async (userId: string | null, homeCircleId: string | null | undefined) => {
@@ -313,8 +319,8 @@ export function App() {
   }
 
   return (
-    <div className={`app${stage === "login" ? " app--login" : ""}`}>
-      {stage !== "login" ? (
+    <div className={`app${stage === "login" || guestWelcomeActive ? " app--login" : ""}`}>
+      {stage !== "login" && !guestWelcomeActive ? (
       <div className="row app-header-row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div className="h1" style={{ marginBottom: 0 }}>
           {t("nav.appTitle")}
@@ -466,6 +472,7 @@ export function App() {
         <Circles
           onBack={() => {
             setDiscoverDateFilter(null);
+            setDiscoverHobbyFilter(null);
             setCirclesDeepLink(null);
             navigate("dashboard");
           }}
@@ -474,6 +481,7 @@ export function App() {
           onDeepLinkConsumed={() => setCirclesDeepLink(null)}
           visitKey={circlesVisitKey}
           prefilterDateIso={discoverDateFilter}
+          prefilterHobbySlug={discoverHobbyFilter}
           guest={guest}
           onRegisterRequest={requestRegister}
         />
@@ -500,6 +508,18 @@ export function App() {
           guest={guest}
           onRegisterRequest={requestRegister}
           onBackToAuth={guest ? goToAuth : undefined}
+          guestWelcomeHeaderMenu={
+            guestWelcomeActive ? (
+              <WelcomePageMenu
+                menuOpen={menuOpen}
+                onToggle={() => setMenuOpen((o) => !o)}
+                onSignInOrRegister={goToAuth}
+                disabled={loading}
+                menuRef={menuRef}
+                buttonRef={menuButtonRef}
+              />
+            ) : undefined
+          }
           onGoCreateJoin={(dateIso) => {
             if (guest) {
               requestRegister(t("guest.noticeCreateCircle"));
@@ -508,8 +528,9 @@ export function App() {
             setCreateMeetDate(dateIso ?? null);
             navigate("createJoin");
           }}
-          onGoFindCircles={(dateIso) => {
+          onGoFindCircles={(dateIso, hobbySlug) => {
             setDiscoverDateFilter(dateIso ?? null);
+            setDiscoverHobbyFilter(hobbySlug ?? null);
             setCirclesVisitKey((k) => k + 1);
             navigate("circles");
           }}

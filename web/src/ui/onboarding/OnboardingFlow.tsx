@@ -13,6 +13,7 @@ import {
 import { InterestsSelection } from "./InterestsSelection";
 import { OnboardingHome } from "./OnboardingHome";
 import { RecommendedCircles } from "./RecommendedCircles";
+import { GuestExploreWelcome } from "../welcome/GuestExploreWelcome";
 
 /** Lowest catalogue level for a hobby, so a new member can join circles. */
 function entryLevelForHoby(hobies: Hoby[], slug: string): string | number {
@@ -26,10 +27,11 @@ export function OnboardingFlow(props: {
   home: HomeResponse;
   onRefresh: () => Promise<void> | void;
   onGoCreateJoin: () => void;
-  onGoFindCircles?: () => void;
+  onGoFindCircles?: (hobbySlug?: string) => void;
   guest?: boolean;
   onRegisterRequest?: (notice?: string) => void;
   onBackToAuth?: () => void;
+  guestWelcomeHeaderMenu?: React.ReactNode;
 }) {
   const { t } = useTranslation();
   const [step, setStep] = useState<OnboardingStep>(() => (props.guest ? "welcome" : getOnboardingStep()));
@@ -94,12 +96,23 @@ export function OnboardingFlow(props: {
     );
   }
 
+  if (props.guest) {
+    return (
+      <GuestExploreWelcome
+        headerMenu={props.guestWelcomeHeaderMenu}
+        onFindCircles={() => props.onGoFindCircles?.()}
+        onBrowseHobby={(slug) => props.onGoFindCircles?.(slug)}
+        onCreateCircle={startCreate}
+        onBackToAuth={props.onBackToAuth}
+      />
+    );
+  }
+
   return (
     <OnboardingHome
-      onFindCircles={props.guest ? () => props.onGoFindCircles?.() : () => goTo("interests")}
+      onFindCircles={() => goTo("interests")}
       onCreateCircle={startCreate}
-      showStep={!props.guest}
-      onBackToAuth={props.guest ? props.onBackToAuth : undefined}
+      showStep
     />
   );
 }
