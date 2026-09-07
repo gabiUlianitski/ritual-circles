@@ -62,7 +62,11 @@
     "proofAria": "What to expect",
     "proofSmallGroups": "Small groups",
     "proofSharedInterests": "Shared interests",
-    "proofJoinPace": "Join at your pace"
+    "proofJoinPace": "Join at your pace",
+    "trustAria": "What Ritual Circles offers",
+    "trustWelcoming": "Welcoming circles",
+    "trustSharedInterests": "Shared interests",
+    "trustMeetInPerson": "Meet in real life"
   },
   "guestExplore": {
     "headline": "Explore circles",
@@ -76,7 +80,14 @@
     "proofSmallGroups": "Small groups",
     "proofSharedInterests": "Shared interests",
     "proofJoinPace": "Join at your pace",
-    "hobbiesAria": "Hobbies people meet around"
+    "hobbiesAria": "Hobbies people meet around",
+    "hobbiesLabel": "Popular interests",
+    "trustAria": "What to expect",
+    "trustNewCircles": "New circles every week",
+    "trustSmallGroups": "Small groups",
+    "trustNoPressure": "No pressure to participate",
+    "hobbyNotFound": "We could not find that hobby.",
+    "seeCirclesForHobby": "See circles for {{hobby}}"
   },
   "landing": {
     "exploreCircles": "Explore Circles",

@@ -27,7 +27,8 @@ export function OnboardingFlow(props: {
   home: HomeResponse;
   onRefresh: () => Promise<void> | void;
   onGoCreateJoin: () => void;
-  onGoFindCircles?: (hobbySlug?: string) => void;
+  onGoFindCircles?: () => void;
+  onBrowseHobby?: (hobbySlug: string) => void;
   guest?: boolean;
   onRegisterRequest?: (notice?: string) => void;
   onBackToAuth?: () => void;
@@ -101,7 +102,7 @@ export function OnboardingFlow(props: {
       <GuestExploreWelcome
         headerMenu={props.guestWelcomeHeaderMenu}
         onFindCircles={() => props.onGoFindCircles?.()}
-        onBrowseHobby={(slug) => props.onGoFindCircles?.(slug)}
+        onBrowseHobby={(slug) => props.onBrowseHobby?.(slug)}
         onCreateCircle={startCreate}
         onBackToAuth={props.onBackToAuth}
       />

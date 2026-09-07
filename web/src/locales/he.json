@@ -62,7 +62,11 @@
     "proofAria": "מה לצפות",
     "proofSmallGroups": "קבוצות קטנות",
     "proofSharedInterests": "תחביבים משותפים",
-    "proofJoinPace": "הצטרפות בקצב שלך"
+    "proofJoinPace": "הצטרפות בקצב שלך",
+    "trustAria": "מה Ritual Circles מציע",
+    "trustWelcoming": "מעגלים מקבלים",
+    "trustSharedInterests": "תחביבים משותפים",
+    "trustMeetInPerson": "מפגשים בחיים האמיתיים"
   },
   "guestExplore": {
     "headline": "גלה/י מעגלים",
@@ -76,7 +80,14 @@
     "proofSmallGroups": "קבוצות קטנות",
     "proofSharedInterests": "תחביבים משותפים",
     "proofJoinPace": "הצטרפות בקצב שלך",
-    "hobbiesAria": "תחביבים שאנשים נפגשים סביבם"
+    "hobbiesAria": "תחביבים שאנשים נפגשים סביבם",
+    "hobbiesLabel": "תחביבים פופולריים",
+    "trustAria": "מה לצפות",
+    "trustNewCircles": "מעגלים חדשים כל שבוע",
+    "trustSmallGroups": "קבוצות קטנות",
+    "trustNoPressure": "בלי לחץ להשתתף",
+    "hobbyNotFound": "לא מצאנו את התחביב הזה.",
+    "seeCirclesForHobby": "ראה/י מעגלים ל{{hobby}}"
   },
   "landing": {
     "exploreCircles": "גלה/י מעגלים",

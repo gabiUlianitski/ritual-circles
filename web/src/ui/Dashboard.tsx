@@ -40,6 +40,7 @@ export function Dashboard(props: {
   onRefresh: () => Promise<void> | void;
   onGoCreateJoin: (prefillDateIso?: string) => void;
   onGoFindCircles: (prefillDateIso?: string, hobbySlug?: string) => void;
+  onBrowseHobby?: (hobbySlug: string) => void;
   userFirstName?: string | null;
   guest?: boolean;
   onRegisterRequest?: (notice?: string) => void;
@@ -126,7 +127,8 @@ export function Dashboard(props: {
         home={props.home}
         onRefresh={props.onRefresh}
         onGoCreateJoin={() => props.onGoCreateJoin()}
-        onGoFindCircles={(hobbySlug) => props.onGoFindCircles(undefined, hobbySlug)}
+        onGoFindCircles={() => props.onGoFindCircles()}
+        onBrowseHobby={props.onBrowseHobby}
         guest={props.guest}
         onRegisterRequest={props.onRegisterRequest}
         onBackToAuth={props.onBackToAuth}

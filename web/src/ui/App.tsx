@@ -15,9 +15,18 @@ import { Profile } from "./Profile";
 import { Hobies } from "./Hobies";
 import { Circles } from "./Circles";
 import { GuestRegisterPrompt } from "./GuestRegisterPrompt";
+import { GuestHobbyDetail } from "./welcome/GuestHobbyDetail";
 import { WelcomePageMenu } from "./welcome/WelcomePageMenu";
 
-type AppStage = "login" | "dashboard" | "createJoin" | "profile" | "hobies" | "circles" | "notifications";
+type AppStage =
+  | "login"
+  | "dashboard"
+  | "createJoin"
+  | "profile"
+  | "hobies"
+  | "hobbyDetail"
+  | "circles"
+  | "notifications";
 
 /** Guests have no account, so Home is empty without calling the API. */
 const GUEST_HOME: HomeResponse = {
@@ -81,6 +90,7 @@ export function App() {
   const [circlesVisitKey, setCirclesVisitKey] = useState(0);
   const [discoverDateFilter, setDiscoverDateFilter] = useState<string | null>(null);
   const [discoverHobbyFilter, setDiscoverHobbyFilter] = useState<string | null>(null);
+  const [guestHobbySlug, setGuestHobbySlug] = useState<string | null>(null);
   const [createMeetDate, setCreateMeetDate] = useState<string | null>(null);
   const [returnStageAfterNotif, setReturnStageAfterNotif] = useState<AppStage>("dashboard");
   const menuRef = useRef<HTMLDivElement>(null);
@@ -455,6 +465,23 @@ export function App() {
         <Profile onBack={() => navigate("dashboard")} onLogout={logout} />
       ) : stage === "hobies" ? (
         <Hobies onBack={() => navigate("dashboard")} />
+      ) : stage === "hobbyDetail" && guestHobbySlug ? (
+        <GuestHobbyDetail
+          slug={guestHobbySlug}
+          onBack={() => {
+            setGuestHobbySlug(null);
+            navigate("dashboard");
+          }}
+          onSeeCircles={
+            guest
+              ? (slug) => {
+                  setDiscoverHobbyFilter(slug);
+                  setCirclesVisitKey((k) => k + 1);
+                  navigate("circles");
+                }
+              : undefined
+          }
+        />
       ) : stage === "notifications" ? (
         <Notifications
           myUserId={myUserId}
@@ -534,6 +561,14 @@ export function App() {
             setCirclesVisitKey((k) => k + 1);
             navigate("circles");
           }}
+          onBrowseHobby={
+            guest
+              ? (slug) => {
+                  setGuestHobbySlug(slug);
+                  navigate("hobbyDetail");
+                }
+              : undefined
+          }
           userFirstName={userFirstName}
         />
       )}

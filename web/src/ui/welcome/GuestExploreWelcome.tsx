@@ -1,12 +1,19 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import "../welcome.css";
-import {
-  WelcomeCommunityVisual,
-  WelcomePageShell,
-  WelcomeProofList,
-} from "./WelcomeParts";
 import { WelcomeHobbyChips } from "./WelcomeHobbyChips";
+import {
+  CircleCluster,
+  FeatureRow,
+  PrimaryButton,
+  SecondaryButton,
+  WelcomeActions,
+  WelcomeBackLink,
+  WelcomeDescription,
+  WelcomeHeadline,
+  WelcomePageShell,
+  WelcomeReassurance,
+  WelcomeTagline,
+} from "./WelcomeUIKit";
 
 export function GuestExploreWelcome(props: {
   headerMenu?: React.ReactNode;
@@ -20,35 +27,37 @@ export function GuestExploreWelcome(props: {
 
   return (
     <WelcomePageShell headerEnd={props.headerMenu} surfaceAriaLabelledBy="guest-explore-title">
-      <WelcomeCommunityVisual />
+      <div className="welcome-guest-explore">
+        <CircleCluster />
 
-      <h1 id="guest-explore-title" className="welcome-title">{t("guestExplore.headline")}</h1>
+        <WelcomeHeadline id="guest-explore-title">{t("guestExplore.headline")}</WelcomeHeadline>
 
-      <p className="welcome-tagline">{t("guestExplore.tagline")}</p>
+        <WelcomeTagline>{t("guestExplore.tagline")}</WelcomeTagline>
 
-      <p className="welcome-description">{t("guestExplore.description")}</p>
+        <WelcomeDescription>{t("guestExplore.description")}</WelcomeDescription>
 
-      <WelcomeHobbyChips disabled={props.disabled} onSelect={props.onBrowseHobby} />
+        <WelcomeHobbyChips disabled={props.disabled} onSelect={props.onBrowseHobby} />
 
-      <WelcomeProofList labelPrefix="guestExplore" />
+        <WelcomeActions>
+          <PrimaryButton disabled={props.disabled} onClick={props.onFindCircles}>
+            {t("guestExplore.seeCircles")}
+          </PrimaryButton>
 
-      <div className="welcome-actions">
-        <button type="button" className="welcome-btn welcome-btn--primary" disabled={props.disabled} onClick={props.onFindCircles}>
-          {t("guestExplore.seeCircles")}
-        </button>
+          <SecondaryButton disabled={props.disabled} onClick={props.onCreateCircle}>
+            {t("guestExplore.startCircle")}
+          </SecondaryButton>
+        </WelcomeActions>
 
-        <button type="button" className="welcome-btn welcome-btn--secondary" disabled={props.disabled} onClick={props.onCreateCircle}>
-          {t("guestExplore.startCircle")}
-        </button>
+        <FeatureRow variant="guestExplore" />
+
+        <WelcomeReassurance emphasis>{t("guestExplore.closingLine")}</WelcomeReassurance>
+
+        {props.onBackToAuth ? (
+          <WelcomeBackLink onClick={props.onBackToAuth}>
+            {t("guestExplore.backToSignIn")}
+          </WelcomeBackLink>
+        ) : null}
       </div>
-
-      <p className="welcome-reassurance">{t("guestExplore.closingLine")}</p>
-
-      {props.onBackToAuth ? (
-        <button type="button" className="welcome-back-link" onClick={props.onBackToAuth}>
-          {t("guestExplore.backToSignIn")}
-        </button>
-      ) : null}
     </WelcomePageShell>
   );
 }
