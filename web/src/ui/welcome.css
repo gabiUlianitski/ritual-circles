@@ -389,6 +389,7 @@
   align-items: center;
   justify-content: center;
   min-height: 0;
+  overflow-y: auto;
   padding-top: 18px;
   padding-bottom: 20px;
 }
@@ -1303,6 +1304,167 @@
 .welcome-guest-action:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.welcome-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.welcome-field-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.welcome-form .city-autocomplete-wrap input {
+  width: 100%;
+  height: 52px;
+  min-height: 52px;
+  padding: 0 16px;
+  border-radius: var(--welcome-radius-button);
+  border: 1px solid var(--welcome-border-strong);
+  background: rgba(8, 14, 27, 0.28);
+  color: var(--welcome-text-primary);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  box-sizing: border-box;
+}
+
+.welcome-form .city-autocomplete-wrap input::placeholder {
+  color: var(--welcome-text-muted);
+  font-weight: 500;
+}
+
+.welcome-form .city-autocomplete-wrap input:focus {
+  outline: 2px solid var(--welcome-primary-focus);
+  outline-offset: 2px;
+  border-color: var(--welcome-primary);
+}
+
+.welcome-form .city-autocomplete-list {
+  top: auto;
+  bottom: calc(100% + 4px);
+  margin: 0;
+  background: var(--welcome-surface-solid);
+  border: 1px solid var(--welcome-border-strong);
+  border-radius: var(--welcome-radius-button);
+  box-shadow: var(--welcome-shadow-surface);
+}
+
+.welcome-form .city-autocomplete-list button {
+  width: 100%;
+  height: auto;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--welcome-text-primary);
+  font-size: 15px;
+  font-weight: 500;
+  text-align: start;
+  box-shadow: none;
+}
+
+.welcome-form .city-autocomplete-list .muted {
+  color: var(--welcome-text-muted);
+}
+
+.welcome-field-caption {
+  margin: 0;
+  padding: 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: start;
+  color: var(--welcome-text-secondary);
+}
+
+.welcome-field-caption span {
+  font-weight: 500;
+  color: var(--welcome-text-muted);
+}
+
+.welcome-field {
+  width: 100%;
+  height: 52px;
+  min-height: 52px;
+  padding: 0 16px;
+  border-radius: var(--welcome-radius-button);
+  border: 1px solid var(--welcome-border-strong);
+  background: rgba(8, 14, 27, 0.28);
+  color: var(--welcome-text-primary);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  box-sizing: border-box;
+}
+
+.welcome-field::placeholder {
+  color: var(--welcome-text-muted);
+  font-weight: 500;
+}
+
+.welcome-field:focus {
+  outline: 2px solid var(--welcome-primary-focus);
+  outline-offset: 2px;
+  border-color: var(--welcome-primary);
+}
+
+.welcome-form .error {
+  margin: 0;
+  padding: 0;
+  text-align: center;
+}
+
+.welcome-google {
+  position: relative;
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.welcome-google-face {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 0;
+  pointer-events: none;
+}
+
+.welcome-google-mark {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+.welcome-google-hit {
+  position: absolute;
+  inset: 6px 0;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.welcome-google-hit iframe {
+  pointer-events: none !important;
+}
+
+.welcome-form + .welcome-actions {
+  margin-top: 14px;
+}
+
+@media (max-width: 359px) {
+  .welcome-field {
+    height: 48px;
+    min-height: 48px;
+    font-size: 15px;
+  }
 }
 
 .welcome-reassurance {

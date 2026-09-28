@@ -11,6 +11,8 @@ export function CityAutocompleteField(props: {
   onSelect: (item: CitySuggestItem) => void;
   disabled?: boolean;
   label?: string;
+  /** Parent already shows the label. */
+  hideLabel?: boolean;
   id?: string;
   /** Hide helper lines under the field (e.g. create-circle step). */
   compact?: boolean;
@@ -43,6 +45,14 @@ export function CityAutocompleteField(props: {
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
+    const needle = q.toLowerCase();
+    setSuggestions((prev) =>
+      prev.filter(
+        (row) =>
+          row.shortName.toLowerCase().includes(needle) ||
+          row.displayName.toLowerCase().includes(needle),
+      ),
+    );
     const t = window.setTimeout(() => {
       void (async () => {
         try {
@@ -63,7 +73,7 @@ export function CityAutocompleteField(props: {
           if (seq === fetchSeqRef.current && !ac.signal.aborted) setLoading(false);
         }
       })();
-    }, 400);
+    }, 120);
     return () => {
       window.clearTimeout(t);
       ac.abort();
@@ -86,9 +96,11 @@ export function CityAutocompleteField(props: {
 
   return (
     <div className="city-autocomplete-wrap stack" style={{ gap: 6 }}>
-      <label htmlFor={inputId} className="muted" style={{ fontSize: "0.85em", fontWeight: 650 }}>
-        {props.label ?? "City"}
-      </label>
+      {props.hideLabel ? null : (
+        <label htmlFor={inputId} className="muted" style={{ fontSize: "0.85em", fontWeight: 650 }}>
+          {props.label ?? "City"}
+        </label>
+      )}
       <div className="city-autocomplete-input-wrap">
         <input
           id={inputId}
@@ -132,11 +144,7 @@ export function CityAutocompleteField(props: {
         />
         {showList ? (
           <ul id={listId} className="popover-list city-autocomplete-list" role="listbox">
-            {loading ? (
-              <li className="city-autocomplete-hint muted" role="status">
-                Searching cities…
-              </li>
-            ) : suggestions.length ? (
+            {suggestions.length ? (
               suggestions.map((s, i) => (
                 <li key={`${s.displayName}-${i}`} role="presentation">
                   <button
@@ -159,9 +167,11 @@ export function CityAutocompleteField(props: {
               ))
             ) : (
               <li className="city-autocomplete-hint muted" role="status">
-                {searchError
-                  ? "Couldn’t search cities — check your connection and try again"
-                  : "No cities found — try another spelling"}
+                {loading
+                  ? "Searching cities…"
+                  : searchError
+                    ? "Couldn’t search cities — check your connection and try again"
+                    : "No cities found — try another spelling"}
               </li>
             )}
           </ul>

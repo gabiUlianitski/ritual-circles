@@ -9,6 +9,35 @@ from fastapi import HTTPException
 USER_NAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,32}$")
 
 
+def user_name_base_from_email(email: str) -> str:
+    local = email.strip().lower().split("@", 1)[0]
+    cleaned = re.sub(r"[^a-z0-9_]", "_", local).strip("_")
+    cleaned = re.sub(r"_+", "_", cleaned)
+    if len(cleaned) < 3:
+        cleaned = f"{cleaned}user" if cleaned else "user"
+    return cleaned[:32]
+
+
+async def allocate_user_name_from_email(conn: asyncpg.Connection, email: str) -> str:
+    base = user_name_base_from_email(email)
+    candidate = base
+    for n in range(2, 100):
+        taken = await conn.fetchval(
+            """
+            SELECT EXISTS (
+              SELECT 1 FROM users
+              WHERE lower(trim(user_name)) = lower(trim($1))
+            )
+            """,
+            candidate,
+        )
+        if not taken:
+            return candidate
+        suffix = f"_{n}"
+        candidate = f"{base[: 32 - len(suffix)]}{suffix}"
+    raise HTTPException(status_code=409, detail="could not assign a user name")
+
+
 def validate_user_name(raw: str) -> str:
     s = raw.strip()
     if not USER_NAME_RE.match(s):

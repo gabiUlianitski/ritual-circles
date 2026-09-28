@@ -1,13 +1,89 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { GoogleLogin } from "@react-oauth/google";
 import { api, setAuthToken } from "../api/client";
+import type { CitySuggestItem } from "../api/types";
+import { CityAutocompleteField } from "./CityAutocompleteField";
 import { FormError } from "./FormError";
 import { LandingChoose } from "./LandingChoose";
-import { LandingIllustration } from "./LandingIllustration";
-import { LandingLogo } from "./LandingLogo";
+import {
+  CircleCluster,
+  FeatureRow,
+  PrimaryButton,
+  SecondaryButton,
+  WelcomeActions,
+  WelcomeDescription,
+  WelcomeDivider,
+  WelcomeHeadline,
+  WelcomePageShell,
+  WelcomeReassurance,
+  WelcomeTextAction,
+} from "./welcome/WelcomeUIKit";
 
-const USER_NAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
+function FieldBlock(props: { id: string; label: string; optional?: string; children: React.ReactNode }) {
+  return (
+    <div className="welcome-field-block">
+      <label className="welcome-field-caption" htmlFor={props.id}>
+        {props.label}
+        {props.optional ? <span> ({props.optional})</span> : null}
+      </label>
+      {props.children}
+    </div>
+  );
+}
+
+function GoogleMark() {
+  return (
+    <svg className="welcome-google-mark" viewBox="0 0 18 18" aria-hidden="true">
+      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.02-3.7H.96v2.33A9 9 0 0 0 9 18z" />
+      <path fill="#FBBC05" d="M3.98 10.72A5.41 5.41 0 0 1 3.7 9c0-.6.1-1.18.28-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.05l3.02-2.33z" />
+      <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.02 2.33C4.68 5.16 6.66 3.58 9 3.58z" />
+    </svg>
+  );
+}
+
+function GoogleWelcomeButton(props: {
+  label: string;
+  disabled?: boolean;
+  onSuccess: (idToken: string | undefined) => void;
+  onError: () => void;
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(320);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = () => setWidth(Math.max(200, Math.floor(el.clientWidth)));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div className="welcome-google" ref={wrapRef}>
+      <span className="welcome-btn welcome-btn--secondary welcome-google-face">
+        <GoogleMark />
+        {props.label}
+      </span>
+      {props.disabled ? null : (
+        <div className="welcome-google-hit">
+          <GoogleLogin
+            onSuccess={(cred) => props.onSuccess(cred.credential)}
+            onError={props.onError}
+            text="continue_with"
+            shape="rectangular"
+            theme="outline"
+            size="large"
+            width={String(width)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 type LoginMode = "choose" | "login" | "register" | "google-setup";
 
@@ -28,10 +104,10 @@ export function Login(props: {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const [userName, setUserName] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [city, setCity] = useState("");
+  const [cityQuery, setCityQuery] = useState("");
+  const [citySelected, setCitySelected] = useState("");
 
   const [googleRegToken, setGoogleRegToken] = useState<string | null>(null);
   const [googleEmail, setGoogleEmail] = useState("");
@@ -55,17 +131,13 @@ export function Login(props: {
     })();
   }, [props.googleClientId]);
 
-  useEffect(() => {
-    if (mode !== "google-setup" || userName.trim()) return;
-    const base = googleEmail.split("@")[0]?.replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 32);
-    if (base && base.length >= 3) setUserName(base.toLowerCase());
-  }, [mode, googleEmail, userName]);
+  function pickCity(item: CitySuggestItem) {
+    const name = item.shortName.trim() || item.displayName.trim();
+    setCityQuery(name);
+    setCitySelected(name);
+  }
 
   function validateRegister(): string | null {
-    const un = userName.trim();
-    if (!USER_NAME_RE.test(un)) {
-      return "Username must be 3–32 characters: letters, numbers, and underscore only.";
-    }
     if (!firstName.trim()) return "Please enter your first name.";
     if (password.length < 6) return "Choose a password of at least 6 characters.";
     const em = email.trim();
@@ -74,10 +146,6 @@ export function Login(props: {
   }
 
   function validateGoogleSetup(): string | null {
-    const un = userName.trim();
-    if (!USER_NAME_RE.test(un)) {
-      return "Username must be 3–32 characters: letters, numbers, and underscore only.";
-    }
     if (!firstName.trim()) return "Please enter your first name.";
     if (!googleRegToken) return "Google sign-in expired — try again.";
     return null;
@@ -129,10 +197,9 @@ export function Login(props: {
     try {
       const { token } = await api.googleAuthComplete({
         registrationToken: googleRegToken!,
-        user_name: userName.trim().toLowerCase(),
         first_name: firstName.trim(),
         last_name: lastName.trim() ? lastName.trim() : null,
-        city: city.trim() ? city.trim() : null,
+        city: (citySelected || cityQuery).trim() || null,
         availability_day: "Mon",
         availability_time: "18:00:00",
       });
@@ -158,7 +225,7 @@ export function Login(props: {
           return;
         }
         const ident = email.trim();
-        if (!ident) {
+        if (!ident || !ident.includes("@")) {
           setError(t("login.needEmailOrUsername"));
           return;
         }
@@ -173,10 +240,9 @@ export function Login(props: {
         const { token } = await api.register({
           email: email.trim(),
           password,
-          user_name: userName.trim().toLowerCase(),
           first_name: firstName.trim(),
           last_name: lastName.trim(),
-          city: city.trim() ? city.trim() : null,
+          city: (citySelected || cityQuery).trim() || null,
           availability_day: "Mon",
           availability_time: "18:00:00",
         });
@@ -189,10 +255,9 @@ export function Login(props: {
     }
   }
 
-  const registerReady =
-    USER_NAME_RE.test(userName.trim()) && firstName.trim().length > 0 && password.length >= 6;
+  const registerReady = firstName.trim().length > 0 && password.length >= 6 && email.trim().includes("@");
 
-  const googleSetupReady = USER_NAME_RE.test(userName.trim()) && firstName.trim().length > 0;
+  const googleSetupReady = firstName.trim().length > 0;
 
   if (mode === "choose") {
     const lookAround = props.onKeepLooking ?? props.onGuest;
@@ -218,186 +283,213 @@ export function Login(props: {
 
   if (mode === "google-setup") {
     return (
-      <div className="landing-screen">
-        <div className="landing-screen-inner landing-form">
-          <LandingLogo />
-          <h1 className="landing-form-title">Finish your account</h1>
-          <p className="landing-form-lead">
-            Signed in with Google as <strong>{googleEmail || email}</strong>. Pick a username — this is how others find
-            you in the app.
-          </p>
-          <input
-            className="landing-input"
-            placeholder="Username (unique, e.g. gabi_tennis)"
-            value={userName}
-            onChange={(e) => setUserName(e.target.value.replace(/\s/g, "_"))}
-            autoComplete="username"
-          />
-          <input
-            className="landing-input"
-            placeholder="First name"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            autoComplete="given-name"
-          />
-          <input
-            className="landing-input"
-            placeholder="Last name (optional)"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            autoComplete="family-name"
-          />
-          <input
-            className="landing-input"
-            placeholder="City (optional)"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-          />
-          {error ? <FormError>{error}</FormError> : null}
-          <div className="landing-actions">
-            <button
-              className="landing-btn landing-btn-primary"
-              disabled={props.loading || working || !googleSetupReady}
-              onClick={() => void submit()}
-            >
-              {working ? "Creating account…" : t("login.createAccountCta")}
-            </button>
-            <button
-              type="button"
-              className="landing-btn landing-btn-secondary"
-              disabled={working}
-              onClick={() => {
-                setMode("login");
-                setGoogleRegToken(null);
-                setError(null);
-              }}
-            >
-              {t("common.cancel")}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="landing-screen">
-      <div className="landing-screen-inner landing-form">
-        <LandingLogo />
-        <h1 className="landing-form-title">{mode === "login" ? t("login.signInCta") : t("login.createAccountCta")}</h1>
-        {props.notice ? <p className="landing-notice">{props.notice}</p> : null}
-        <p className="landing-form-lead">
-          {mode === "login" ? t("login.subtitle") : t("login.registerLead")}
-        </p>
-
-        {googleEnabled ? (
-          <div className="login-google-block stack">
-            <div className="login-google-btn-wrap">
-              <GoogleLogin
-                onSuccess={(cred) => void handleGoogleCredential(cred.credential)}
-                onError={() => setError("Google sign-in was cancelled or failed.")}
-                text={mode === "register" ? "signup_with" : "signin_with"}
-                shape="rectangular"
-                theme="outline"
-                size="large"
-                width="100%"
-              />
-            </div>
-            <div className="login-divider landing-muted" aria-hidden>
-              <span>or</span>
-            </div>
-          </div>
-        ) : null}
-
-        <input
-          className="landing-input"
-          placeholder={mode === "login" ? t("login.emailOrUsername") : t("login.email")}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <input
-          className="landing-input"
-          placeholder={t("login.password")}
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-
-        {mode === "register" ? (
-          <>
+      <WelcomePageShell surfaceAriaLabelledBy="google-setup-title">
+        <CircleCluster />
+        <WelcomeHeadline id="google-setup-title">Finish your account</WelcomeHeadline>
+        <WelcomeDescription>
+          Signed in with Google as {googleEmail || email}. Add your name to finish. You'll sign in with this email.
+        </WelcomeDescription>
+        <div className="welcome-form">
+          <FieldBlock id="google-first-name" label={t("login.firstName")}>
             <input
-              className="landing-input"
-              placeholder="Username (unique, e.g. gabi_tennis)"
-              value={userName}
-              onChange={(e) => setUserName(e.target.value.replace(/\s/g, "_"))}
-              autoComplete="username"
-            />
-            <input
-              className="landing-input"
-              placeholder="First name"
+              id="google-first-name"
+              className="welcome-field"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               autoComplete="given-name"
             />
+          </FieldBlock>
+          <FieldBlock id="google-last-name" label={t("login.lastName")} optional={t("login.optional")}>
             <input
-              className="landing-input"
-              placeholder="Last name"
+              id="google-last-name"
+              className="welcome-field"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               autoComplete="family-name"
             />
+          </FieldBlock>
+          <FieldBlock id="google-city" label={t("login.city")} optional={t("login.optional")}>
+            <CityAutocompleteField
+              id="google-city"
+              hideLabel
+              compact
+              value={cityQuery}
+              selectedDisplay={citySelected}
+              onValueChange={(q) => {
+                setCityQuery(q);
+                setCitySelected("");
+              }}
+              onSelect={(item) => pickCity(item)}
+            />
+          </FieldBlock>
+          {error ? <FormError>{error}</FormError> : null}
+        </div>
+        <WelcomeActions>
+          <PrimaryButton
+            disabled={props.loading || working || !googleSetupReady}
+            onClick={() => void submit()}
+          >
+            {working ? t("common.working") : t("welcome.createAccount")}
+          </PrimaryButton>
+          <SecondaryButton
+            disabled={working}
+            onClick={() => {
+              setMode("login");
+              setGoogleRegToken(null);
+              setError(null);
+            }}
+          >
+            {t("common.cancel")}
+          </SecondaryButton>
+        </WelcomeActions>
+        <FeatureRow variant="welcome" />
+        <WelcomeReassurance>{t("welcome.reassurance")}</WelcomeReassurance>
+      </WelcomePageShell>
+    );
+  }
+
+  const titleId = mode === "login" ? "sign-in-title" : "create-account-title";
+  const title = mode === "login" ? t("welcome.signIn") : t("welcome.createAccount");
+  const lead = mode === "login" ? t("login.subtitle") : t("login.registerLead");
+
+  return (
+    <WelcomePageShell surfaceAriaLabelledBy={titleId}>
+      <CircleCluster />
+      {props.notice ? <p className="welcome-notice">{props.notice}</p> : null}
+      <WelcomeHeadline id={titleId}>{title}</WelcomeHeadline>
+      <WelcomeDescription>{lead}</WelcomeDescription>
+
+      <div className="welcome-form">
+        {mode === "login" ? (
+          <>
             <input
-              className="landing-input"
-              placeholder="City (optional)"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
+              className="welcome-field"
+              placeholder={t("login.email")}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+            />
+            <input
+              className="welcome-field"
+              placeholder={t("login.password")}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
             />
           </>
         ) : null}
 
+        {mode === "register" ? (
+          <>
+            <FieldBlock id="register-email" label={t("login.email")}>
+              <input
+                id="register-email"
+                className="welcome-field"
+                placeholder={t("login.email")}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </FieldBlock>
+            <FieldBlock id="register-password" label={t("login.password")}>
+              <input
+                id="register-password"
+                className="welcome-field"
+                placeholder={t("login.password")}
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+            </FieldBlock>
+            <FieldBlock id="register-first-name" label={t("login.firstName")}>
+              <input
+                id="register-first-name"
+                className="welcome-field"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                autoComplete="given-name"
+              />
+            </FieldBlock>
+            <FieldBlock id="register-last-name" label={t("login.lastName")} optional={t("login.optional")}>
+              <input
+                id="register-last-name"
+                className="welcome-field"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                autoComplete="family-name"
+              />
+            </FieldBlock>
+            <FieldBlock id="register-city" label={t("login.city")} optional={t("login.optional")}>
+              <CityAutocompleteField
+                id="register-city"
+                hideLabel
+                compact
+                value={cityQuery}
+                selectedDisplay={citySelected}
+                onValueChange={(q) => {
+                  setCityQuery(q);
+                  setCitySelected("");
+                }}
+                onSelect={(item) => pickCity(item)}
+              />
+            </FieldBlock>
+          </>
+        ) : null}
+
         {error ? <FormError>{error}</FormError> : null}
-
-        <div className="landing-actions">
-          <button
-            className="landing-btn landing-btn-primary"
-            disabled={
-              props.loading ||
-              working ||
-              !email.trim() ||
-              !password ||
-              password.length < 6 ||
-              (mode === "register" && !registerReady)
-            }
-            onClick={() => void submit()}
-          >
-            {working ? "Working…" : mode === "login" ? t("login.signInCta") : t("login.createAccountCta")}
-          </button>
-
-          <button
-            type="button"
-            className="landing-btn landing-btn-secondary"
-            disabled={working}
-            onClick={() => {
-              setMode((m) => (m === "login" ? "register" : "login"));
-              setError(null);
-            }}
-          >
-            {mode === "login" ? t("login.createAccount") : t("login.haveAccount")}
-          </button>
-
-          <button
-            type="button"
-            className="landing-btn-tertiary"
-            disabled={working}
-            onClick={() => {
-              setError(null);
-              setMode("choose");
-            }}
-          >
-            {t("common.back")}
-          </button>
-        </div>
       </div>
-    </div>
+
+      <WelcomeActions>
+        <PrimaryButton
+          disabled={
+            props.loading ||
+            working ||
+            !email.trim() ||
+            !password ||
+            password.length < 6 ||
+            (mode === "register" && !registerReady)
+          }
+          onClick={() => void submit()}
+        >
+          {working ? t("common.working") : title}
+        </PrimaryButton>
+
+        <SecondaryButton
+          disabled={working}
+          onClick={() => {
+            setMode((m) => (m === "login" ? "register" : "login"));
+            setError(null);
+          }}
+        >
+          {mode === "login" ? t("welcome.createAccount") : t("welcome.signIn")}
+        </SecondaryButton>
+
+        {googleEnabled ? (
+          <GoogleWelcomeButton
+            label={t("login.continueWithGoogle")}
+            disabled={props.loading || working}
+            onSuccess={(idToken) => void handleGoogleCredential(idToken)}
+            onError={() => setError("Google sign-in was cancelled or failed.")}
+          />
+        ) : null}
+
+        <WelcomeDivider label={t("welcome.or")} />
+
+        <WelcomeTextAction
+          disabled={working}
+          onClick={() => {
+            setError(null);
+            setMode("choose");
+          }}
+        >
+          {t("common.back")}
+        </WelcomeTextAction>
+      </WelcomeActions>
+
+      <FeatureRow variant="welcome" />
+      <WelcomeReassurance>{t("welcome.reassurance")}</WelcomeReassurance>
+    </WelcomePageShell>
   );
 }

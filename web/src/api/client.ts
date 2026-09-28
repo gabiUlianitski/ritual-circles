@@ -101,7 +101,7 @@ export const api = {
   register: (payload: {
     email: string;
     password: string;
-    user_name: string;
+    user_name?: string;
     first_name: string;
     last_name: string;
     city?: string | null;
@@ -113,7 +113,7 @@ export const api = {
   googleAuth: (payload: { idToken: string }) => request<GoogleAuthResponse>("POST", "/auth/google", payload),
   googleAuthComplete: (payload: {
     registrationToken: string;
-    user_name: string;
+    user_name?: string;
     first_name: string;
     last_name?: string | null;
     city?: string | null;

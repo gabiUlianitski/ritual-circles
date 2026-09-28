@@ -1134,6 +1134,50 @@ async def _photon_city_suggest(
     return _filter_rank_city_suggestions(merged, query=q, limit=lim)
 
 
+def _city_suggest_search_query(query: str, country_code: str | None) -> str:
+    q = query.strip()
+    q_key = _normalize_city_match(q)
+    cc = (country_code or "").strip().upper()
+    if cc == "IL":
+        alias = _IL_CITY_QUERY_ALIASES.get(q_key)
+        if alias:
+            return alias
+    completion = _GLOBAL_CITY_QUERY_COMPLETIONS.get(q_key)
+    if completion:
+        return completion
+    return q
+
+
+_photon_suggest_client: httpx.AsyncClient | None = None
+
+
+def _photon_suggest_client_get() -> httpx.AsyncClient:
+    global _photon_suggest_client
+    if _photon_suggest_client is None or _photon_suggest_client.is_closed:
+        _photon_suggest_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(2.5, connect=1.2),
+            verify=load_httpx_verify_ssl(),
+            trust_env=True,
+            headers={"User-Agent": _user_agent(), "Accept": "application/json"},
+        )
+    return _photon_suggest_client
+
+
+async def _photon_city_suggest_fast(
+    *,
+    query: str,
+    country_code: str | None,
+    limit: int,
+) -> list[dict[str, Any]]:
+    client = _photon_suggest_client_get()
+    return await _photon_city_search_once(
+        query=query,
+        country_code=country_code,
+        limit=limit,
+        client=client,
+    )
+
+
 async def nominatim_city_suggest(
     *,
     query: str,
@@ -1141,7 +1185,10 @@ async def nominatim_city_suggest(
     nominatim_base: str | None = None,
     limit: int = 10,
 ) -> list[dict[str, Any]]:
-    """Forward geocode search for city / settlement autocomplete (Nominatim + Photon fallback)."""
+    """Forward geocode search for city / settlement autocomplete.
+
+    Photon answers first (one short request). Nominatim runs only when Photon has nothing.
+    """
     q = query.strip()
     if len(q) < 1:
         return []
@@ -1159,24 +1206,33 @@ async def nominatim_city_suggest(
         "Accept-Language": "en,he",
     }
     verify = load_httpx_verify_ssl()
-    timeout = httpx.Timeout(22.0)
+    timeout = httpx.Timeout(3.5, connect=1.5)
+    search_q = _city_suggest_search_query(q, cc)
     merged: list[dict[str, Any]] = []
+    try:
+        merged = await _photon_city_suggest_fast(query=search_q, country_code=cc, limit=lim)
+    except Exception as e:
+        logger.warning("photon_city_suggest_merge_error", extra={"error": str(e)})
+    merged = _filter_rank_city_suggestions(merged, query=q, limit=lim)
+    if merged:
+        _city_suggest_cache_set(cache_key, merged)
+        return merged[:lim]
+
     seen_names: set[str] = set()
     rate_limited = False
     try:
         async with httpx.AsyncClient(timeout=timeout, verify=verify, trust_env=True, headers=headers) as client:
-            for q_try, cc_try in _city_suggest_query_variants(q, cc):
-                await _nominatim_throttle()
-                batch, status = await _nominatim_city_search_once(
-                    query=q_try,
-                    country_code=cc_try,
-                    base=base,
-                    limit=lim,
-                    client=client,
-                )
-                if status == 429:
-                    rate_limited = True
-                    break
+            await _nominatim_throttle()
+            batch, status = await _nominatim_city_search_once(
+                query=search_q,
+                country_code=cc,
+                base=base,
+                limit=lim,
+                client=client,
+            )
+            if status == 429:
+                rate_limited = True
+            else:
                 for row in batch:
                     dn = str(row.get("displayName") or "")
                     if not dn or dn in seen_names:
@@ -1186,13 +1242,6 @@ async def nominatim_city_suggest(
     except httpx.RequestError as e:
         logger.warning("nominatim_city_suggest_client_error", extra={"error": str(e)})
 
-    photon_rows: list[dict[str, Any]] = []
-    try:
-        photon_rows = await _photon_city_suggest(query=q, country_code=cc, limit=lim * 2)
-    except Exception as e:
-        logger.warning("photon_city_suggest_merge_error", extra={"error": str(e)})
-
-    merged = _merge_city_suggest_batches(merged, photon_rows)
     merged = _filter_rank_city_suggestions(merged, query=q, limit=lim)
 
     if not merged and rate_limited:

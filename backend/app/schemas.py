@@ -12,7 +12,7 @@ class AuthStartRequest(BaseModel):
     # Minimal V1 auth: email + password
     email: str
     password: str
-    user_name: str
+    user_name: str | None = None
     first_name: str
     last_name: str
     availability_day: str
@@ -48,7 +48,7 @@ class GoogleAuthResponse(BaseModel):
 
 class GoogleAuthCompleteRequest(BaseModel):
     registrationToken: str = Field(..., min_length=10)
-    user_name: str
+    user_name: str | None = None
     first_name: str
     last_name: str | None = None
     city: str | None = None

@@ -13,7 +13,7 @@ from app.auth.jwt import (
     decode_google_registration_token,
 )
 from app.auth.passwords import hash_password, verify_password
-from app.user_fields import assert_user_name_available, validate_user_name
+from app.user_fields import allocate_user_name_from_email, assert_user_name_available, validate_user_name
 
 
 def _parse_time(s: str) -> time:
@@ -31,7 +31,7 @@ async def register_with_email_password(
     *,
     email: str,
     password: str,
-    user_name: str,
+    user_name: str | None,
     first_name: str,
     last_name: str,
     availability_day: str,
@@ -44,7 +44,11 @@ async def register_with_email_password(
     if len(password) < 6:
         raise HTTPException(status_code=400, detail="password too short")
 
-    uname = validate_user_name(user_name)
+    uname = (
+        validate_user_name(user_name)
+        if user_name and user_name.strip()
+        else await allocate_user_name_from_email(conn, email_norm)
+    )
     fn = first_name.strip()
     ln = last_name.strip()
     if not fn:
@@ -88,42 +92,18 @@ async def register_with_email_password(
 
 
 async def login_with_email_password(conn: asyncpg.Connection, *, email: str, password: str) -> str:
-    ident = email.strip()
-    if not ident:
+    ident = email.strip().lower()
+    if not ident or "@" not in ident:
         raise HTTPException(status_code=401, detail="invalid credentials")
 
-    ident_l = ident.lower()
-    row = None
-    if "@" in ident:
-        row = await conn.fetchrow(
-            """
-            SELECT id, password_hash
-            FROM users
-            WHERE LOWER(email) = $1
-            """,
-            ident_l,
-        )
-    else:
-        row = await conn.fetchrow(
-            """
-            SELECT id, password_hash
-            FROM users
-            WHERE LOWER(TRIM(user_name)) = $1
-            """,
-            ident_l,
-        )
-        if not row:
-            matches = await conn.fetch(
-                """
-                SELECT id, password_hash
-                FROM users
-                WHERE LOWER(TRIM(first_name)) = $1
-                  AND password_hash IS NOT NULL
-                """,
-                ident_l,
-            )
-            if len(matches) == 1:
-                row = matches[0]
+    row = await conn.fetchrow(
+        """
+        SELECT id, password_hash
+        FROM users
+        WHERE LOWER(email) = $1
+        """,
+        ident,
+    )
 
     if not row or not row["password_hash"]:
         raise HTTPException(status_code=401, detail="invalid credentials")
@@ -198,7 +178,7 @@ async def complete_google_registration(
     conn: asyncpg.Connection,
     *,
     registration_token: str,
-    user_name: str,
+    user_name: str | None,
     first_name: str,
     last_name: str | None,
     availability_day: str,
@@ -222,8 +202,13 @@ async def complete_google_registration(
     if await conn.fetchrow("SELECT id FROM users WHERE LOWER(email) = $1", email):
         raise HTTPException(status_code=409, detail="email already registered")
 
-    uname = validate_user_name(user_name)
-    await assert_user_name_available(conn, uname)
+    uname = (
+        validate_user_name(user_name)
+        if user_name and user_name.strip()
+        else await allocate_user_name_from_email(conn, email)
+    )
+    if user_name and user_name.strip():
+        await assert_user_name_available(conn, uname)
 
     try:
         at = _parse_time(availability_time)

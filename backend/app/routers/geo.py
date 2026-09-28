@@ -41,7 +41,6 @@ async def city_suggest(
         max_length=2,
         description="Optional ISO 3166-1 alpha-2 bias (omit for worldwide search)",
     ),
-    _: CurrentUser = Depends(get_current_user),
 ) -> list[CitySuggestItem]:
     cc: str | None = None
     if country is not None and country.strip():

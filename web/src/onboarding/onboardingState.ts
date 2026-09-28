@@ -5,22 +5,12 @@ export type OnboardingStep = "welcome" | "interests" | "recommended";
 const STEP_KEY = "onboarding_step";
 const CHECKLIST_DISMISSED_KEY = "onboarding_checklist_dismissed";
 
-/** No circles, no sessions — empty home. */
-export function isNewUser(home: HomeResponse): boolean {
-  const circles = home.myCircles ?? [];
-  const sessions = home.calendarSessions ?? [];
-  return circles.length === 0 && sessions.length === 0 && home.circle == null;
-}
-
-/** Full 3-step welcome: guests always; signed-in users only until first login. */
+/** Welcome steps are for guests browsing without an account. A signed-in user opens Home. */
 export function shouldShowWelcomeTutorial(
-  home: HomeResponse,
+  _home: HomeResponse,
   opts: { guest?: boolean; meLoaded: boolean; onboardingCompleted?: boolean },
 ): boolean {
-  if (opts.guest) return true;
-  if (!opts.meLoaded) return false;
-  if (opts.onboardingCompleted) return false;
-  return isNewUser(home);
+  return Boolean(opts.guest);
 }
 
 export function getOnboardingStep(): OnboardingStep {
