@@ -1423,26 +1423,6 @@
   text-align: center;
 }
 
-.welcome-google {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  margin-bottom: 12px;
-}
-
-.welcome-google > div {
-  width: 100% !important;
-}
-
-.welcome-google iframe {
-  width: 100% !important;
-}
-
-.welcome-google.is-disabled {
-  opacity: 0.55;
-  pointer-events: none;
-}
-
 .welcome-form + .welcome-actions {
   margin-top: 14px;
 }

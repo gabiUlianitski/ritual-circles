@@ -44,3 +44,32 @@ def verify_google_id_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Google email is not verified")
 
     return data
+
+
+def verify_google_access_token(token: str) -> dict:
+    if not google_client_id():
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured on the server")
+
+    try:
+        r = httpx.get(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=15.0,
+        )
+        r.raise_for_status()
+        data = r.json()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Invalid or expired Google sign-in") from e
+
+    sub = str(data.get("sub") or "").strip()
+    email = str(data.get("email") or "").strip().lower()
+    if not sub or not email or "@" not in email:
+        raise HTTPException(status_code=401, detail="Google account is missing email")
+
+    verified = data.get("email_verified")
+    if verified in (False, "false", "0"):
+        raise HTTPException(status_code=401, detail="Google email is not verified")
+
+    return data

@@ -61,7 +61,7 @@ async def auth_google(
     payload: GoogleAuthRequest,
     conn: asyncpg.Connection = Depends(conn_dep),
 ) -> GoogleAuthResponse:
-    result = await authenticate_with_google(conn, id_token=payload.idToken)
+    result = await authenticate_with_google(conn, access_token=payload.accessToken)
     return GoogleAuthResponse(**result)
 
 

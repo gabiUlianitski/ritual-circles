@@ -110,7 +110,7 @@ export const api = {
   }) => request<{ token: string }>("POST", "/auth/start", payload),
   login: (payload: { email: string; password: string }) => request<{ token: string }>("POST", "/auth/verify", payload),
   getAuthConfig: () => request<AuthConfigResponse>("GET", "/auth/config"),
-  googleAuth: (payload: { idToken: string }) => request<GoogleAuthResponse>("POST", "/auth/google", payload),
+  googleAuth: (payload: { accessToken: string }) => request<GoogleAuthResponse>("POST", "/auth/google", payload),
   googleAuthComplete: (payload: {
     registrationToken: string;
     user_name?: string;

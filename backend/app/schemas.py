@@ -34,7 +34,7 @@ class AuthConfigResponse(BaseModel):
 
 
 class GoogleAuthRequest(BaseModel):
-    idToken: str = Field(..., min_length=10)
+    accessToken: str = Field(..., min_length=10)
 
 
 class GoogleAuthResponse(BaseModel):

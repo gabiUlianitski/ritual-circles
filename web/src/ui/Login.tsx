@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { GoogleLogin } from "@react-oauth/google";
+import { useGoogleLogin } from "@react-oauth/google";
 import { api, setAuthToken } from "../api/client";
 import type { CitySuggestItem } from "../api/types";
 import { CityAutocompleteField } from "./CityAutocompleteField";
@@ -33,35 +33,26 @@ function FieldBlock(props: { id: string; label: string; optional?: string; child
 }
 
 function GoogleWelcomeButton(props: {
+  label: string;
   disabled?: boolean;
-  onSuccess: (idToken: string | undefined) => void;
+  onSuccess: (accessToken: string | undefined) => void;
   onError: () => void;
 }) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(320);
-
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const measure = () => setWidth(Math.max(200, Math.floor(el.clientWidth)));
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  const login = useGoogleLogin({
+    scope: "openid email profile",
+    onSuccess: (res) => props.onSuccess(res.access_token),
+    onError: () => props.onError(),
+  });
 
   return (
-    <div className={`welcome-google${props.disabled ? " is-disabled" : ""}`} ref={wrapRef}>
-      <GoogleLogin
-        onSuccess={(cred) => props.onSuccess(cred.credential)}
-        onError={props.onError}
-        text="continue_with"
-        shape="rectangular"
-        theme="outline"
-        size="large"
-        width={String(width)}
-      />
-    </div>
+    <button
+      type="button"
+      className="welcome-btn welcome-btn--secondary"
+      disabled={props.disabled}
+      onClick={() => login()}
+    >
+      {props.label}
+    </button>
   );
 }
 
@@ -136,15 +127,15 @@ export function Login(props: {
     await props.onAuthed();
   }
 
-  async function handleGoogleCredential(idToken: string | undefined) {
-    if (!idToken) {
+  async function handleGoogleCredential(accessToken: string | undefined) {
+    if (!accessToken) {
       setError("Google sign-in did not return a token. Try again.");
       return;
     }
     setWorking(true);
     setError(null);
     try {
-      const res = await api.googleAuth({ idToken });
+      const res = await api.googleAuth({ accessToken });
       if (res.status === "authenticated" && res.token) {
         await finishAuth(res.token);
         return;
@@ -448,8 +439,9 @@ export function Login(props: {
 
         {googleEnabled ? (
           <GoogleWelcomeButton
+            label={t("login.continueWithGoogle")}
             disabled={props.loading || working}
-            onSuccess={(idToken) => void handleGoogleCredential(idToken)}
+            onSuccess={(accessToken) => void handleGoogleCredential(accessToken)}
             onError={() => setError("Google sign-in was cancelled or failed.")}
           />
         ) : null}

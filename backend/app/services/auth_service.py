@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 import asyncpg
 from fastapi import HTTPException
 
-from app.auth.google_token import verify_google_id_token
+from app.auth.google_token import verify_google_access_token
 from app.auth.jwt import (
     create_google_registration_token,
     create_token,
@@ -131,9 +131,9 @@ def _names_from_google_claims(claims: dict) -> tuple[str, str]:
 async def authenticate_with_google(
     conn: asyncpg.Connection,
     *,
-    id_token: str,
+    access_token: str,
 ) -> dict[str, object]:
-    claims = verify_google_id_token(id_token)
+    claims = verify_google_access_token(access_token)
     google_sub = str(claims["sub"]).strip()
     email = str(claims["email"]).strip().lower()
     first_name, last_name = _names_from_google_claims(claims)
