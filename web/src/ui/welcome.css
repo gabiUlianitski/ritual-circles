@@ -1424,35 +1424,23 @@
 }
 
 .welcome-google {
-  position: relative;
+  display: flex;
+  justify-content: center;
   width: 100%;
   margin-bottom: 12px;
 }
 
-.welcome-google-face {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 0;
+.welcome-google > div {
+  width: 100% !important;
+}
+
+.welcome-google iframe {
+  width: 100% !important;
+}
+
+.welcome-google.is-disabled {
+  opacity: 0.55;
   pointer-events: none;
-}
-
-.welcome-google-mark {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-}
-
-.welcome-google-hit {
-  position: absolute;
-  inset: 6px 0;
-  overflow: hidden;
-  opacity: 0;
-}
-
-.welcome-google-hit iframe {
-  pointer-events: none !important;
 }
 
 .welcome-form + .welcome-actions {
