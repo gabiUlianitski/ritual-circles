@@ -175,6 +175,9 @@
       "security": "Security"
     },
     "personalIntro": "What your circle can see. Tap fields to edit, then save.",
+    "deleteAccount": "Delete account",
+    "deleteAccountWorking": "Deleting account…",
+    "deleteAccountPrompt": "Delete your account? All of your data will be lost. This cannot be undone.",
     "sections": {
       "personalDetails": "Personal details",
       "work": "Work",

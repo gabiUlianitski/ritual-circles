@@ -1,5 +1,5 @@
 import asyncpg
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
 from app.schemas import (
     DeviceTokenRequest,
@@ -13,7 +13,7 @@ from app.services.auth_service import change_password
 from app.user_hobbies import parse_hoby_level_key, user_hobies_from_row
 from app.user_availability_windows import availability_windows_from_row
 from app.user_languages import user_languages_from_row
-from app.services.users_service import get_user, update_device_token, upsert_user
+from app.services.users_service import delete_account, get_user, update_device_token, upsert_user
 
 router = APIRouter(prefix="", tags=["me"])
 
@@ -89,6 +89,15 @@ async def post_change_password(
         new_password=payload.newPassword,
     )
     return {"ok": True}
+
+
+@router.delete("/me", status_code=204)
+async def delete_me(
+    conn: asyncpg.Connection = Depends(conn_dep),
+    user: CurrentUser = Depends(get_current_user),
+) -> Response:
+    await delete_account(conn, user_id=user.id)
+    return Response(status_code=204)
 
 
 @router.post("/me/device-token")

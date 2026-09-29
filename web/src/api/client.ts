@@ -127,6 +127,7 @@ export const api = {
   patchMe: (payload: UserUpdateRequest) => request<UserMeResponse>("PATCH", "/me", payload),
   changePassword: (payload: { currentPassword: string; newPassword: string }) =>
     request<{ ok: boolean }>("POST", "/me/password", payload),
+  deleteMe: () => request<void>("DELETE", "/me"),
 
   listCircles: () => request<CircleListItem[]>("GET", "/circles"),
   venueSuggestions: (

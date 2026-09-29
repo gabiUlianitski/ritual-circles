@@ -305,3 +305,34 @@ async def update_device_token(conn: asyncpg.Connection, *, user_id: UUID, payloa
     )
     if updated.endswith("0"):
         raise HTTPException(status_code=404, detail="user not found")
+
+
+async def delete_account(conn: asyncpg.Connection, *, user_id: UUID) -> None:
+    """Remove the user. Circles they created alone are deleted. Shared circles stay, with another member as owner."""
+    async with conn.transaction():
+        circles = await conn.fetch("SELECT id FROM circles WHERE created_by = $1", user_id)
+        for circle in circles:
+            other = await conn.fetchval(
+                """
+                SELECT a."userId"
+                FROM attendance a
+                JOIN sessions s ON s.id = a."sessionId"
+                WHERE s."circleId" = $1
+                  AND s."dateTime" >= NOW()
+                  AND a."userId" <> $2
+                LIMIT 1
+                """,
+                circle["id"],
+                user_id,
+            )
+            if other:
+                await conn.execute(
+                    "UPDATE circles SET created_by = $2 WHERE id = $1",
+                    circle["id"],
+                    other,
+                )
+            else:
+                await conn.execute("DELETE FROM circles WHERE id = $1", circle["id"])
+        deleted = await conn.execute("DELETE FROM users WHERE id = $1", user_id)
+        if deleted.endswith("0"):
+            raise HTTPException(status_code=404, detail="user not found")

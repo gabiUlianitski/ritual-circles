@@ -175,6 +175,9 @@
       "security": "אבטחה"
     },
     "personalIntro": "מה שהמעגל שלך רואה. ערוך/י שדות ושמור/י.",
+    "deleteAccount": "מחיקת חשבון",
+    "deleteAccountWorking": "מוחק/ת את החשבון…",
+    "deleteAccountPrompt": "למחוק את החשבון? כל הנתונים שלך יימחקו. אי אפשר לבטל את זה.",
     "sections": {
       "personalDetails": "פרטים אישיים",
       "work": "עבודה",

@@ -34,6 +34,7 @@ export function Profile(props: { onBack: () => void; onLogout: () => void }) {
   const [confirmPw, setConfirmPw] = useState("");
   const [pwWorking, setPwWorking] = useState(false);
   const [pwMsg, setPwMsg] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function load() {
     setError(null);
@@ -114,6 +115,19 @@ export function Profile(props: { onBack: () => void; onLogout: () => void }) {
       setPwMsg(String(e));
     } finally {
       setPwWorking(false);
+    }
+  }
+
+  async function deleteAccount() {
+    if (!window.confirm(t("profile.deleteAccountPrompt"))) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await api.deleteMe();
+      props.onLogout();
+    } catch (e) {
+      setError(String(e));
+      setDeleting(false);
     }
   }
 
@@ -290,8 +304,16 @@ export function Profile(props: { onBack: () => void; onLogout: () => void }) {
                 </div>
               ) : null}
 
-              <button type="button" className="danger" disabled={working || pwWorking} onClick={props.onLogout}>
+              <button type="button" className="danger" disabled={working || pwWorking || deleting} onClick={props.onLogout}>
                 Logout
+              </button>
+              <button
+                type="button"
+                className="danger"
+                disabled={working || pwWorking || deleting}
+                onClick={() => void deleteAccount()}
+              >
+                {deleting ? t("profile.deleteAccountWorking") : t("profile.deleteAccount")}
               </button>
             </div>
           ) : null}
