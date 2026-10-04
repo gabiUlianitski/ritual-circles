@@ -44,7 +44,7 @@ def _cors_headers(request: Request) -> dict[str, str]:
         return {}
     return {
         "Access-Control-Allow-Origin": origin,
-        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "*",
     }
 
@@ -108,7 +108,7 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=_allowed_cors_origins(),
         allow_credentials=False,
-        allow_methods=["GET", "POST", "PUT", "PATCH", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
 

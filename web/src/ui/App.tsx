@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, getAuthToken, setAuthToken } from "../api/client";
+import { resetDevUserId } from "../api/devUserId";
 import type { HomeResponse } from "../api/types";
 import i18n from "../i18n";
 import { hasAnyNotifications } from "../notificationsFeed";
@@ -285,6 +286,7 @@ export function App() {
 
   function logout() {
     setAuthToken(null);
+    resetDevUserId();
     setGuest(false);
     setGuestNotice(null);
     setGuestGateOpen(false);

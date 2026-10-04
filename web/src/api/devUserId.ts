@@ -9,3 +9,12 @@ export function getOrCreateDevUserId(): string {
   return id;
 }
 
+export function resetDevUserId(): void {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    // ignore
+  }
+}
+
+
