@@ -71,8 +71,11 @@
     "proofJoinPace": "הצטרפות בקצב שלך",
     "trustAria": "מה Ritual Circles מציע",
     "trustWelcoming": "מעגלים מקבלים",
+    "trustWelcomingDesc": "קבוצות קטנות שישמחו שבאת.",
     "trustSharedInterests": "תחביבים משותפים",
-    "trustMeetInPerson": "מפגשים בחיים האמיתיים"
+    "trustSharedInterestsDesc": "פוגשים אנשים שאוהבים את מה שאת/ה אוהב/ת.",
+    "trustMeetInPerson": "מפגשים בחיים האמיתיים",
+    "trustMeetInPersonDesc": "באותה שעה כל שבוע, פנים אל פנים."
   },
   "guestExplore": {
     "headline": "גלה/י מעגלים",
@@ -90,8 +93,11 @@
     "hobbiesLabel": "תחביבים פופולריים",
     "trustAria": "מה לצפות",
     "trustNewCircles": "מעגלים חדשים כל שבוע",
+    "trustNewCirclesDesc": "קבוצות חדשות נפתחות כל הזמן.",
     "trustSmallGroups": "קבוצות קטנות",
+    "trustSmallGroupsDesc": "שלושה עד שישה אנשים, כך שכולם נשמעים.",
     "trustNoPressure": "בלי לחץ להשתתף",
+    "trustNoPressureDesc": "אפשר להסתכל ולהצטרף כשמוכנים.",
     "hobbyNotFound": "לא מצאנו את התחביב הזה.",
     "seeCirclesForHobby": "ראה/י מעגלים ל{{hobby}}"
   },

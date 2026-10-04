@@ -71,8 +71,11 @@
     "proofJoinPace": "Join at your pace",
     "trustAria": "What Ritual Circles offers",
     "trustWelcoming": "Welcoming circles",
+    "trustWelcomingDesc": "Small groups that are glad you came.",
     "trustSharedInterests": "Shared interests",
-    "trustMeetInPerson": "Meet in real life"
+    "trustSharedInterestsDesc": "Meet people who love what you love.",
+    "trustMeetInPerson": "Meet in real life",
+    "trustMeetInPersonDesc": "Same time every week, face to face."
   },
   "guestExplore": {
     "headline": "Explore circles",
@@ -90,8 +93,11 @@
     "hobbiesLabel": "Popular interests",
     "trustAria": "What to expect",
     "trustNewCircles": "New circles every week",
+    "trustNewCirclesDesc": "Fresh groups are starting all the time.",
     "trustSmallGroups": "Small groups",
+    "trustSmallGroupsDesc": "Three to six people, so everyone is heard.",
     "trustNoPressure": "No pressure to participate",
+    "trustNoPressureDesc": "Look around and join when you are ready.",
     "hobbyNotFound": "We could not find that hobby.",
     "seeCirclesForHobby": "See circles for {{hobby}}"
   },

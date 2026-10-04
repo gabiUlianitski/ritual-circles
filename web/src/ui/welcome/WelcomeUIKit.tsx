@@ -165,90 +165,80 @@ export function WelcomeDivider(props: { label: string }) {
   );
 }
 
-function ProofIconSmallGroups() {
+function FeatureIconWelcoming() {
   return (
-    <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <circle cx="5.5" cy="6" r="2.2" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="10.5" cy="6" r="2.2" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="8" cy="11" r="2.2" stroke="currentColor" strokeWidth="1.8" />
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M12 21.2l-1.3-1.2C6 15.8 3 13.1 3 9.6 3 6.9 5.1 4.8 7.8 4.8c1.5 0 3 .7 4.2 1.9 1.2-1.2 2.7-1.9 4.2-1.9 2.7 0 4.8 2.1 4.8 4.8 0 3.5-3 6.2-7.7 10.4L12 21.2z" />
     </svg>
   );
 }
 
-function ProofIconSharedInterests() {
+function FeatureIconSharedInterests() {
   return (
-    <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <circle cx="6.2" cy="8" r="2.6" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="9.8" cy="8" r="2.6" stroke="currentColor" strokeWidth="1.8" />
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="8.5" cy="12" r="6.5" />
+      <circle cx="15.5" cy="12" r="6.5" opacity="0.55" />
     </svg>
   );
 }
 
-function ProofIconJoinPace() {
+function FeatureIconMeetInPerson() {
   return (
-    <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <circle cx="4" cy="9.5" r="1.2" fill="currentColor" opacity="0.45" />
-      <circle cx="8" cy="7.5" r="1.2" fill="currentColor" opacity="0.75" />
-      <circle cx="12" cy="5.5" r="1.2" stroke="currentColor" strokeWidth="1.5" fill="none" />
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <path
-        d="M4.8 9.1C5.8 8.4 7 7.8 8 7.3C9.2 6.7 10.4 6.2 11.3 5.9"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        opacity="0.5"
+        fillRule="evenodd"
+        d="M12 2.5c-3.9 0-7 3-7 6.9 0 4.8 5.6 11 6.3 11.7a1 1 0 0 0 1.4 0c.7-.7 6.3-6.9 6.3-11.7 0-3.9-3.1-6.9-7-6.9zm0 9.6a2.7 2.7 0 1 1 0-5.4 2.7 2.7 0 0 1 0 5.4z"
       />
     </svg>
   );
 }
 
-function TrustIconWelcoming() {
+function FeatureIconNewCircles() {
   return (
-    <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.6" />
-      <circle cx="8" cy="8" r="2" fill="currentColor" opacity="0.55" />
-    </svg>
-  );
-}
-
-function TrustIconMeetInPerson() {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <path
-        d="M8 2.5C6.2 2.5 4.8 3.9 4.8 5.7C4.8 7.8 8 11.5 8 11.5C8 11.5 11.2 7.8 11.2 5.7C11.2 3.9 9.8 2.5 8 2.5Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
+        fillRule="evenodd"
+        d="M8 2.5a1 1 0 0 1 1 1V5h6V3.5a1 1 0 1 1 2 0V5h1.5A2.5 2.5 0 0 1 21 7.5v11a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18.5v-11A2.5 2.5 0 0 1 5.5 5H7V3.5a1 1 0 0 1 1-1zM5 10v8.5c0 .3.2.5.5.5h13c.3 0 .5-.2.5-.5V10H5z"
       />
-      <circle cx="8" cy="5.6" r="1.3" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="12" cy="14.5" r="2.2" />
     </svg>
   );
 }
 
-function TrustIconNewCircles() {
+function FeatureIconSmallGroups() {
   return (
-    <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect x="3" y="4" width="10" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M3 7H13" stroke="currentColor" strokeWidth="1.5" />
-      <circle cx="5.5" cy="9.8" r="0.9" fill="currentColor" />
-      <circle cx="8" cy="9.8" r="0.9" fill="currentColor" opacity="0.55" />
-      <circle cx="10.5" cy="9.8" r="0.9" stroke="currentColor" strokeWidth="1.2" fill="none" />
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="12" cy="7.5" r="3.2" />
+      <path d="M6 19.5c0-3.3 2.7-6 6-6s6 2.7 6 6v.5H6v-.5z" />
+      <circle cx="5" cy="9.5" r="2.3" opacity="0.6" />
+      <path d="M1.5 18.5c0-2.4 1.6-4.4 3.8-4.9A7.5 7.5 0 0 0 4.5 17v1.5h-3z" opacity="0.6" />
+      <circle cx="19" cy="9.5" r="2.3" opacity="0.6" />
+      <path d="M22.5 18.5c0-2.4-1.6-4.4-3.8-4.9.5 1 .8 2.2.8 3.4v1.5h3z" opacity="0.6" />
+    </svg>
+  );
+}
+
+function FeatureIconNoPressure() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M20.5 3.5C11 3.5 4.5 8.6 4.5 15.6c0 1.3.3 2.6.8 3.7L3.3 21.3a1 1 0 0 0 1.4 1.4l2-2c1.1.5 2.3.8 3.7.8 7 0 11.1-6.6 11.1-17a1 1 0 0 0-1-1zM8.7 17.3a1 1 0 0 1-1.4-1.4l5-5a1 1 0 0 1 1.4 1.4l-5 5z" />
     </svg>
   );
 }
 
 const WELCOME_FEATURE_ITEMS = [
-  { key: "trustWelcoming", Icon: TrustIconWelcoming },
-  { key: "trustSharedInterests", Icon: ProofIconSharedInterests },
-  { key: "trustMeetInPerson", Icon: TrustIconMeetInPerson },
+  { key: "trustWelcoming", Icon: FeatureIconWelcoming },
+  { key: "trustSharedInterests", Icon: FeatureIconSharedInterests },
+  { key: "trustMeetInPerson", Icon: FeatureIconMeetInPerson },
 ] as const;
 
 const GUEST_FEATURE_ITEMS = [
-  { key: "trustNewCircles", Icon: TrustIconNewCircles },
-  { key: "trustSmallGroups", Icon: ProofIconSmallGroups },
-  { key: "trustNoPressure", Icon: ProofIconJoinPace },
+  { key: "trustNewCircles", Icon: FeatureIconNewCircles },
+  { key: "trustSmallGroups", Icon: FeatureIconSmallGroups },
+  { key: "trustNoPressure", Icon: FeatureIconNoPressure },
 ] as const;
 
-/** Compact reassurance row below actions — shared icon containers and muted labels. */
+/** Three equal reassurance cards below the actions: icon, title, short description. */
 export function FeatureRow(props: { variant: "welcome" | "guestExplore" }) {
   const { t } = useTranslation();
   const items = props.variant === "welcome" ? WELCOME_FEATURE_ITEMS : GUEST_FEATURE_ITEMS;
@@ -257,10 +247,11 @@ export function FeatureRow(props: { variant: "welcome" | "guestExplore" }) {
     <ul className="welcome-trust-list" aria-label={t(`${props.variant}.trustAria`)}>
       {items.map(({ key, Icon }) => (
         <li key={key} className="welcome-trust-item">
-          <span className="welcome-proof-icon" aria-hidden="true">
+          <span className="welcome-trust-icon" aria-hidden="true">
             <Icon />
           </span>
           <span className="welcome-trust-label">{t(`${props.variant}.${key}`)}</span>
+          <span className="welcome-trust-desc">{t(`${props.variant}.${key}Desc`)}</span>
         </li>
       ))}
     </ul>
