@@ -158,7 +158,13 @@
     "hideFullCalendar": "הסתר יומן מלא",
     "oneSpotLeft": "(+מקום אחד פנוי)",
     "spotsLeft": "(+{{count}} מקומות פנויים)",
-    "peopleIn": "{{count}} משתתפים"
+    "peopleIn": "{{count}} משתתפים",
+    "oneMemberJoined": "חבר/ה אחד/ת הצטרפ/ה",
+    "membersJoined": "{{count}} חברים הצטרפו",
+    "oneSpotAvailable": "מקום אחד פנוי",
+    "spotsAvailable": "{{count}} מקומות פנויים",
+    "oneMember": "חבר/ה אחד/ת",
+    "membersCount": "{{count}} חברים"
   },
   "groupSize": {
     "exactly": "בדיוק {{count}} אנשים",

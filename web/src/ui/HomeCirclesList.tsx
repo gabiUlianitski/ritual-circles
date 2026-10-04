@@ -1,8 +1,10 @@
 import React, { useState } from "react";
-import type { AttendanceStatus, HomeCircleItem } from "../api/types";
+import { useTranslation } from "react-i18next";
+import type { AttendanceStatus, HomeCalendarSession, HomeCircleItem } from "../api/types";
 import { api } from "../api/client";
 import { markCircleLeftBySelf } from "../notificationInbox";
 import { circleHobyTitle } from "./circleDisplay";
+import { formatSessionDateTimeHero } from "./homeDashboardUtils";
 import { FormError } from "./FormError";
 
 export function HomeCirclesList(props: {
@@ -21,7 +23,10 @@ export function HomeCirclesList(props: {
   /** Show leave/drop on expanded row (created = drop, joined = leave). */
   showLeaveAction?: boolean;
   leaveActionLabel?: string;
+  /** Calendar rows, used only to show member counts already loaded for Home. */
+  sessions?: HomeCalendarSession[];
 }) {
+  const { t } = useTranslation();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -88,11 +93,22 @@ export function HomeCirclesList(props: {
   return (
     <section className="home-circles-list stack" aria-label={ariaLabel}>
       {props.hideHeading ? null : <div style={{ fontWeight: 650 }}>{ariaLabel}</div>}
-      <div className="stack" style={{ gap: 8 }}>
+      <div className="home-circles-cards stack">
         {props.items.map((item) => {
           const open = expandedId === item.circle.id;
           const title = circleHobyTitle(item.circle);
           const busy = workingId === item.circle.id;
+          const related = (props.sessions ?? []).filter((s) => s.circleId === item.circle.id);
+          const matched =
+            (item.nextSession && related.find((s) => s.session.id === item.nextSession?.id)) || related[0];
+          const memberCount = matched?.memberCount;
+          const memberLine =
+            memberCount == null
+              ? null
+              : memberCount === 1
+                ? t("home.oneMember")
+                : t("home.membersCount", { count: memberCount });
+          const when = item.nextSession ? formatSessionDateTimeHero(item.nextSession.dateTime) : null;
           return (
             <div key={item.circle.id} className={`home-circle-compact${open ? " home-circle-compact--open" : ""}`}>
               <button
@@ -101,10 +117,17 @@ export function HomeCirclesList(props: {
                 aria-expanded={open}
                 onClick={() => setExpandedId((id) => (id === item.circle.id ? null : item.circle.id))}
               >
-                <span className="home-circle-compact-icon" aria-hidden>
-                  {item.circle.hobyIcon ?? "○"}
+                <span className="home-hobby-badge home-hobby-badge--sm" aria-hidden>
+                  {item.circle.hobyIcon ?? ""}
                 </span>
-                <span className="home-circle-compact-title grow">{title}</span>
+                <span className="home-circle-compact-copy grow">
+                  <span className="home-circle-compact-title">{title}</span>
+                  {memberLine || when ? (
+                    <span className="home-circle-compact-meta">
+                      {[memberLine, when].filter(Boolean).join(" • ")}
+                    </span>
+                  ) : null}
+                </span>
                 {item.pendingConfirmation ? (
                   <span className="home-pending-dot" title="Confirm attendance" aria-label="Needs confirmation" />
                 ) : null}

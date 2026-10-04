@@ -331,7 +331,7 @@ export function App() {
   }
 
   return (
-    <div className={`app${stage === "login" || guestWelcomeActive ? " app--login" : ""}`}>
+    <div className={`app${stage === "login" || guestWelcomeActive ? " app--login" : ""}${stage === "dashboard" && !guestWelcomeActive ? " app--home" : ""}`}>
       {stage !== "login" && !guestWelcomeActive ? (
       <div className="row app-header-row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div className="h1" style={{ marginBottom: 0 }}>

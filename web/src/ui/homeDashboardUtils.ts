@@ -48,14 +48,28 @@ export function formatSessionDateTime(iso: string): string {
   return `${day} · ${time}`;
 }
 
-/** Hero card time line — e.g. Tue, Jun 16 · 18:00 */
+/** Hero card time line — e.g. Fri Oct 9 • 20:00 */
 export function formatSessionDateTimeHero(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   const locale = dateLocale();
   const day = d.toLocaleDateString(locale, { weekday: "short", month: "short", day: "numeric" });
   const time = d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12: false });
-  return `${day} · ${time}`;
+  return `${day} • ${time}`;
+}
+
+/** Compact social line, e.g. "2 members joined • 4 spots available". */
+export function formatJoinedLine(
+  memberCount: number,
+  maxSize: number,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+  const joined = Math.max(0, memberCount);
+  const spots = Math.max(0, maxSize - joined);
+  const members = joined === 1 ? t("home.oneMemberJoined") : t("home.membersJoined", { count: joined });
+  if (spots <= 0) return members;
+  const spotsText = spots === 1 ? t("home.oneSpotAvailable") : t("home.spotsAvailable", { count: spots });
+  return `${members} • ${spotsText}`;
 }
 
 export function activityTypeClass(ritualType: string): string {

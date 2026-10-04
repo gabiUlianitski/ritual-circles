@@ -4,12 +4,12 @@ import type { AttendanceStatus, HomeCalendarSession } from "../api/types";
 import { api } from "../api/client";
 import { BidiText } from "./BidiText";
 import {
+  formatJoinedLine,
   formatSessionDateTimeHero,
   getUpcomingSessions,
   isSessionPending,
   sessionTitle,
 } from "./homeDashboardUtils";
-import { CircleParticipationDisplay } from "./CircleParticipationDisplay";
 import { FormError } from "./FormError";
 
 export function HomeNextActivityCard(props: {
@@ -66,55 +66,46 @@ export function HomeNextActivityCard(props: {
   }
 
   return (
-    <section className="home-hero card stack" aria-label="Next activity">
-      <button
-        type="button"
-        className="home-hero-body"
-        onClick={() => props.onOpenCircle(next.circleId)}
-      >
-        <div className="home-hero-top">
-          {next.hobyIcon ? (
-            <span className="home-hero-icon" aria-hidden>
-              {next.hobyIcon}
-            </span>
-          ) : null}
-          <div className="home-hero-copy">
-            <BidiText as="h2" className="home-hero-title">
+    <section className="home-hero card" aria-label="Next activity">
+      <div className="home-hero-row">
+        <button
+          type="button"
+          className="home-hero-body"
+          onClick={() => props.onOpenCircle(next.circleId)}
+        >
+          <span className="home-hobby-badge" aria-hidden>
+            {next.hobyIcon ?? ""}
+          </span>
+          <span className="home-hero-copy">
+            <BidiText as="span" className="home-hero-title">
               {title}
             </BidiText>
-            <p className="home-hero-time">{formatSessionDateTimeHero(next.session.dateTime)}</p>
-          </div>
-          {pending ? (
-            <span className="home-status-badge home-status-badge--pending">{t("home.pending")}</span>
-          ) : (
-            <span className="home-status-badge home-status-badge--confirmed">{t("home.confirmed")}</span>
-          )}
-        </div>
-        <CircleParticipationDisplay
-          memberCount={memberCount}
-          maxSize={maxSize}
-          showAvatars
-          className="home-hero-social"
-        />
-      </button>
+            <span className="home-hero-time">{formatSessionDateTimeHero(next.session.dateTime)}</span>
+            <span className="home-hero-meta">{formatJoinedLine(memberCount, maxSize, t)}</span>
+          </span>
+          <span className={`home-status-badge ${pending ? "home-status-badge--pending" : "home-status-badge--confirmed"}`}>
+            {pending ? t("home.pending") : t("home.confirmed")}
+          </span>
+        </button>
 
-      <div className="home-hero-actions">
-        <button
-          type="button"
-          className="primary home-hero-primary"
-          disabled={working || imComing}
-          onClick={() => void setAttendance("attending")}
-        >
-          {working && !imComing ? t("common.saving") : t("home.imIn")}
-        </button>
-        <button
-          type="button"
-          className="home-btn-text"
-          disabled={working || (!imComing && pending)}
-          onClick={() => void setAttendance("not_attending")}
-        >
-          {working && imComing ? t("common.saving") : t("home.notNow")}
-        </button>
+        <div className="home-hero-actions">
+          <button
+            type="button"
+            className="primary home-hero-primary"
+            disabled={working || imComing}
+            onClick={() => void setAttendance("attending")}
+          >
+            {working && !imComing ? t("common.saving") : t("home.imIn")}
+          </button>
+          <button
+            type="button"
+            className="home-hero-secondary"
+            disabled={working || (!imComing && pending)}
+            onClick={() => void setAttendance("not_attending")}
+          >
+            {working && imComing ? t("common.saving") : t("home.notNow")}
+          </button>
+        </div>
       </div>
       {error ? <FormError>{error}</FormError> : null}
     </section>

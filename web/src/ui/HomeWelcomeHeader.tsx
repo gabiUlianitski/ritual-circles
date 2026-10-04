@@ -29,7 +29,7 @@ export function HomeWelcomeHeader(props: { sessions: HomeCalendarSession[]; firs
   const context = welcomeContextLine(props.sessions, t);
 
   return (
-    <header className="home-welcome stack" style={{ gap: 4 }}>
+    <header className="home-welcome">
       <h1 className="home-welcome-greeting">{greeting}</h1>
       <p className="home-welcome-context muted">{context}</p>
     </header>

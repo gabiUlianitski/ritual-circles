@@ -201,6 +201,7 @@ export function Dashboard(props: {
         <h2 className="home-section-title">{t("emptyStates.myCirclesTitle")}</h2>
         <HomeCirclesList
           items={myCircles}
+          sessions={calendarSessions}
           onRefresh={props.onRefresh}
           onOpenCircle={openCircle}
           hideHeading

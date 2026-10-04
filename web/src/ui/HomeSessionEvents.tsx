@@ -6,11 +6,11 @@ import { BidiText } from "./BidiText";
 import {
   activityTypeClass,
   formatDayLabel,
+  formatJoinedLine,
   formatSessionDateTimeHero,
   isSessionPending,
   sessionTitle,
 } from "./homeDashboardUtils";
-import { CircleParticipationDisplay } from "./CircleParticipationDisplay";
 import { FormError } from "./FormError";
 
 export function HomeSessionEvents(props: {
@@ -64,19 +64,13 @@ export function HomeSessionEvents(props: {
               onClick={() => props.onOpenCircle?.(item.circleId)}
             >
               <div className="home-session-event-main">
-                {item.hobyIcon ? (
-                  <span className="home-session-event-icon" aria-hidden>
-                    {item.hobyIcon}
-                  </span>
-                ) : null}
+                <span className="home-hobby-badge home-hobby-badge--sm" aria-hidden>
+                  {item.hobyIcon ?? ""}
+                </span>
                 <div className="home-session-event-copy">
                   <BidiText className="home-session-event-title">{title}</BidiText>
                   <div className="home-session-event-time">{formatSessionDateTimeHero(item.session.dateTime)}</div>
-                  <CircleParticipationDisplay
-                    memberCount={memberCount}
-                    maxSize={maxSize}
-                    className="home-session-event-participation"
-                  />
+                  <div className="home-session-event-joining">{formatJoinedLine(memberCount, maxSize, t)}</div>
                 </div>
               </div>
             </button>
@@ -99,7 +93,7 @@ export function HomeSessionEvents(props: {
                 </button>
                 <button
                   type="button"
-                  className="home-btn-text"
+                  className="home-hero-secondary"
                   disabled={busy || (!imComing && pending)}
                   onClick={() => void setSessionAttendance(item.session.id, "not_attending")}
                 >

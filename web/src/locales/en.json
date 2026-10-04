@@ -158,7 +158,13 @@
     "hideFullCalendar": "Hide full calendar",
     "oneSpotLeft": "(+1 spot left)",
     "spotsLeft": "(+{{count}} spots left)",
-    "peopleIn": "{{count}} people are in"
+    "peopleIn": "{{count}} people are in",
+    "oneMemberJoined": "1 member joined",
+    "membersJoined": "{{count}} members joined",
+    "oneSpotAvailable": "1 spot available",
+    "spotsAvailable": "{{count}} spots available",
+    "oneMember": "1 member",
+    "membersCount": "{{count}} members"
   },
   "groupSize": {
     "exactly": "Exactly {{count}} people",
