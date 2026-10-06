@@ -60,6 +60,11 @@ class UserHobyPreference(BaseModel):
     slug: str
     subtype: str | None = None
     level: str | int | None = None
+    """Type keys chosen from this hobby. Category stays on the hobby and is not a user choice."""
+    types: list[str] = []
+    category: str | None = None
+    """beginner | intermediate | advanced | expert. Not the catalogue level key."""
+    experienceLevel: str | None = None
 
 
 class UserLanguageItem(BaseModel):
@@ -505,11 +510,18 @@ class HobyResponse(BaseModel):
     slug: str
     displayName: str
     shortDescription: str | None = None
+    """English catalogue name. Present even when displayName is localized."""
+    canonicalDisplayName: str | None = None
+    canonicalShortDescription: str | None = None
+    heDisplayName: str | None = None
+    heShortDescription: str | None = None
     icon: str | None = None
     levels: Any | None = None
     types: Any | None = None
+    """Stable id: sports | arts | games | learning | social."""
     interestCategory: str | None = None
     groupSize: GroupSizeSpec | None = None
+    archived: bool = False
 
 
 class HobyCreateRequest(BaseModel):
@@ -525,11 +537,46 @@ class HobyCreateRequest(BaseModel):
 class HobyUpdateRequest(BaseModel):
     displayName: str | None = None
     shortDescription: str | None = None
+    heDisplayName: str | None = None
+    heShortDescription: str | None = None
     icon: str | None = None
     levels: Any | None = None
     types: Any | None = None
     interestCategory: str | None = None
     groupSize: GroupSizeSpec | None = None
+
+
+HobyRegenField = Literal["description", "icon", "category", "types", "levels", "groupSize"]
+
+
+class HobyBulkRequest(BaseModel):
+    action: Literal["delete", "archive", "regenerate"]
+    slugs: list[str] = Field(default_factory=list)
+
+
+class HobyBulkResponse(BaseModel):
+    deleted: list[str] = Field(default_factory=list)
+    archived: list[str] = Field(default_factory=list)
+    regenerated: list[str] = Field(default_factory=list)
+    blocked: list[str] = Field(default_factory=list)
+    failed: list[str] = Field(default_factory=list)
+
+
+class HobyRegenerateRequest(BaseModel):
+    fields: list[HobyRegenField] = Field(default_factory=list)
+    onlyMissing: bool = False
+
+
+class HobyRegeneratePreview(BaseModel):
+    """Generated values for review. Nothing is saved until the client patches the hobby."""
+
+    shortDescription: str | None = None
+    icon: str | None = None
+    interestCategory: str | None = None
+    levels: Any | None = None
+    types: Any | None = None
+    groupSize: GroupSizeSpec | None = None
+    fields: list[str] = Field(default_factory=list)
 
 
 class HobyPrecheckRequest(BaseModel):
@@ -576,4 +623,16 @@ class CircleMessageResponse(BaseModel):
     authorName: str
     body: str
     createdAt: datetime
+
+
+class DiscoveryRequest(BaseModel):
+    displayName: str = Field(..., min_length=1, max_length=80)
+    category: str | None = None
+    lang: str | None = None
+
+
+class DiscoveryResponse(BaseModel):
+    title: str
+    body: str
+    imagePrompt: str
 

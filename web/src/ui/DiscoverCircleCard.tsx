@@ -236,6 +236,8 @@ export function DiscoverEmptyState(props: {
   message?: string;
   actionLabel?: string;
   onAction?: () => void;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: () => void;
 }) {
   return (
     <div className="discover-empty stack">
@@ -244,6 +246,11 @@ export function DiscoverEmptyState(props: {
       {props.actionLabel && props.onAction ? (
         <button type="button" className="primary discover-empty-action" onClick={props.onAction}>
           {props.actionLabel}
+        </button>
+      ) : null}
+      {props.secondaryActionLabel && props.onSecondaryAction ? (
+        <button type="button" className="discover-empty-action" onClick={props.onSecondaryAction}>
+          {props.secondaryActionLabel}
         </button>
       ) : null}
     </div>

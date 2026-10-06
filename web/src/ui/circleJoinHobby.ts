@@ -46,7 +46,7 @@ export function userHasJoinableHobbyForCircle(
   for (const h of userHobies) {
     if ((h.slug ?? "").trim().toLowerCase() !== slug) continue;
     if (needLevel && !levelKeyIsSet(h.level)) continue;
-    if (needUserSubtype && !(h.subtype?.trim())) continue;
+    if (needUserSubtype && !(h.subtype?.trim() || h.types?.length)) continue;
     return true;
   }
   return false;
@@ -68,7 +68,7 @@ export function joinHobbyBlockedHint(
   if (!sameSlug.length) {
     return t ? t("discoverPage.joinHintAddHobby") : "Add this hobby to your profile with a type and level, then come back to join.";
   }
-  if (needUserSubtype && sameSlug.every((h) => !(h.subtype?.trim()))) {
+  if (needUserSubtype && sameSlug.every((h) => !(h.subtype?.trim() || h.types?.length))) {
     return t ? t("discoverPage.joinHintChooseType") : "Choose a type for this hobby on your profile (Profile → Hobbies).";
   }
   if (needLevel && sameSlug.every((h) => !levelKeyIsSet(h.level))) {

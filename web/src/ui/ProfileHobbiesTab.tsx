@@ -1,641 +1,375 @@
 import React, { useEffect, useMemo, useState } from "react";
-
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
-
 import type { Hoby, UserHobyPreference, UserMeResponse } from "../api/types";
-
 import { FormError } from "./FormError";
-
-import { hobbyTypeLevelCanSave, HobbyTypeLevelFields, initialLevelForEntry } from "./HobbyTypeLevelFields";
-
-import { levelKeyIsSet, parseHobyLevelKey } from "./hobyLevelKey";
-
-import { userHobyEntryKey, userHobyEntryLabel } from "./userHobbyDisplay";
-
-
+import { parseHobyTypesNested } from "./hobyMetadata";
+import { LandingIllustration } from "./LandingIllustration";
+import { selectedTypeKeys } from "./userHobbyDisplay";
 
 function hobbiesFromMe(me: UserMeResponse): UserHobyPreference[] {
-
   if (me.userHobies?.length) return me.userHobies;
-
   if (me.preferred_hoby_slug?.trim()) {
-
     return [
-
       {
-
         slug: me.preferred_hoby_slug,
-
         subtype: me.preferred_hoby_subtype ?? null,
-
         level: me.preferred_hoby_level ?? null,
-
       },
-
     ];
-
   }
-
   return [];
-
 }
 
+function interestName(h: Hoby | undefined, entry: UserHobyPreference): string {
+  return h?.displayName?.trim() || entry.slug;
+}
 
+/** One card per hobby. Older rows that stored a single subtype are folded in. */
+function groupByHobby(entries: UserHobyPreference[]): UserHobyPreference[] {
+  const grouped = new Map<string, UserHobyPreference>();
+  for (const entry of entries) {
+    const key = entry.slug.trim().toLowerCase();
+    const types = selectedTypeKeys(entry);
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, { ...entry, types });
+      continue;
+    }
+    const merged = [...selectedTypeKeys(existing)];
+    for (const typeKey of types) {
+      if (!merged.some((item) => item.toLowerCase() === typeKey.toLowerCase())) merged.push(typeKey);
+    }
+    existing.types = merged;
+    existing.subtype = merged[0] ?? existing.subtype ?? null;
+    if (entry.experienceLevel) existing.experienceLevel = entry.experienceLevel;
+  }
+  return [...grouped.values()];
+}
+
+const LEVEL_MARK: Record<string, string> = {
+  beginner: "🌱",
+  intermediate: "🚀",
+  advanced: "⭐",
+  expert: "🏆",
+};
+
+function typeParts(hoby: Hoby | undefined, key: string): { key: string; icon: string; label: string } {
+  const rows = parseHobyTypesNested(hoby?.types);
+  const match = rows.find(
+    (row) => row.key.toLowerCase() === key.toLowerCase() || (row.label ?? "").trim().toLowerCase() === key.toLowerCase(),
+  );
+  const label =
+    match?.label?.trim() ||
+    key.replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return { key, icon: match?.icon?.trim() ?? "", label };
+}
+
+function experienceId(raw: string | null | undefined): string | null {
+  const id = (raw ?? "").trim().toLowerCase();
+  return LEVEL_MARK[id] ? id : null;
+}
 
 export function ProfileHobbiesTab(props: {
-
   me: UserMeResponse;
-
   onSaved: () => void | Promise<void>;
-
   onInfo: (msg: string | null) => void;
-
   onError: (msg: string | null) => void;
-
+  onOpenHobby?: (slug: string) => void;
 }) {
-
+  const { t } = useTranslation();
   const [hobies, setHobies] = useState<Hoby[]>([]);
-
   const [loading, setLoading] = useState(true);
-
   const [working, setWorking] = useState(false);
-
   const [error, setError] = useState<string | null>(null);
-
   const [saved, setSaved] = useState<UserHobyPreference[]>(() => hobbiesFromMe(props.me));
-
-
-
-  const [hobySlug, setHobySlug] = useState("");
-
-  const [hobySubtype, setHobySubtype] = useState("");
-
-  const [hobyLevel, setHobyLevel] = useState("");
-
-
-
-  const [editingKey, setEditingKey] = useState<string | null>(null);
-
-  const [editSubtype, setEditSubtype] = useState("");
-
-  const [editLevel, setEditLevel] = useState("");
-
-
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
-
     setSaved(hobbiesFromMe(props.me));
-
   }, [props.me]);
 
-
-
   useEffect(() => {
-
     let cancelled = false;
-
-    void (async () => {
-
-      setLoading(true);
-
-      setError(null);
-
-      try {
-
-        const list = await api.getHobies();
-
+    api
+      .getHobiesSaved()
+      .then((list) => {
         if (!cancelled) setHobies(Array.isArray(list) ? list : []);
-
-      } catch (e) {
-
+      })
+      .catch((e) => {
         if (!cancelled) setError(String(e));
-
-      } finally {
-
+      })
+      .finally(() => {
         if (!cancelled) setLoading(false);
-
-      }
-
-    })();
-
+      });
     return () => {
-
       cancelled = true;
-
     };
-
   }, []);
 
+  const bySlug = useMemo(() => new Map(hobies.map((hoby) => [hoby.slug.trim().toLowerCase(), hoby])), [hobies]);
+  const interests = useMemo(() => groupByHobby(saved), [saved]);
 
-
-  const hobyBySlug = useMemo(() => {
-
-    const m = new Map<string, Hoby>();
-
-    for (const h of hobies) m.set(h.slug, h);
-
-    return m;
-
-  }, [hobies]);
-
-
-
-  const selectedHoby = useMemo(() => hobies.find((h) => h.slug === hobySlug) ?? null, [hobies, hobySlug]);
-
-  const editingEntry = useMemo(
-
-    () => (editingKey ? saved.find((s) => userHobyEntryKey(s) === editingKey) ?? null : null),
-
-    [editingKey, saved],
-
-  );
-
-  const editingCatalogue = useMemo(
-
-    () => (editingEntry ? hobyBySlug.get(editingEntry.slug) : undefined),
-
-    [editingEntry, hobyBySlug],
-
-  );
-
-
-
-  async function persist(next: UserHobyPreference[], message: string) {
-
+  async function persist(next: UserHobyPreference[], message: string): Promise<boolean> {
     setWorking(true);
-
     setError(null);
-
     props.onError(null);
-
     props.onInfo(null);
-
     try {
-
       await api.patchMe({ userHobies: next });
-
       setSaved(next);
-
       props.onInfo(message);
-
       await props.onSaved();
-
+      return true;
     } catch (e) {
-
       const msg = String(e);
-
       setError(msg);
-
       props.onError(msg);
-
+      return false;
     } finally {
-
       setWorking(false);
-
     }
-
   }
 
-
-
-  function buildDraftEntry(slug: string, subtype: string, level: string): UserHobyPreference | null {
-
-    if (!slug.trim()) return null;
-
-    return {
-
-      slug: slug.trim(),
-
-      subtype: subtype.trim() || null,
-
-      level: parseHobyLevelKey(level),
-
-    };
-
-  }
-
-
-
-  async function addHobby() {
-
-    const draft = buildDraftEntry(hobySlug, hobySubtype, hobyLevel);
-
-    if (!draft) {
-
-      setError("Choose a hobby first.");
-
+  async function addInterest(hoby: Hoby, typeKeys: string[], experienceLevel: string) {
+    if (interests.some((entry) => entry.slug.trim().toLowerCase() === hoby.slug.trim().toLowerCase())) {
+      setError(t("profileHobbies.duplicate"));
       return;
-
     }
-
-    const key = userHobyEntryKey(draft);
-
-    if (saved.some((s) => userHobyEntryKey(s) === key)) {
-
-      setError("You already saved this hobby with the same type and level.");
-
-      return;
-
-    }
-
-    await persist([...saved, draft], "Hobby added.");
-
-    setHobySlug("");
-
-    setHobySubtype("");
-
-    setHobyLevel("");
-
-  }
-
-
-
-  async function removeHobby(entry: UserHobyPreference) {
-
-    const key = userHobyEntryKey(entry);
-
-    if (editingKey === key) {
-
-      setEditingKey(null);
-
-      setEditSubtype("");
-
-      setEditLevel("");
-
-    }
-
-    await persist(
-
-      saved.filter((s) => userHobyEntryKey(s) !== key),
-
-      "Hobby removed.",
-
+    const ok = await persist(
+      [
+        ...saved,
+        { slug: hoby.slug, subtype: typeKeys[0] ?? null, types: typeKeys, level: null, experienceLevel },
+      ],
+      t("profileHobbies.added"),
     );
-
+    if (ok) setAdding(false);
   }
 
-
-
-  function startEdit(entry: UserHobyPreference) {
-
-    setEditingKey(userHobyEntryKey(entry));
-
-    setEditSubtype(entry.subtype?.trim() ?? "");
-
-    setEditLevel(initialLevelForEntry(entry.level));
-
-    setHobySlug("");
-
-    setHobySubtype("");
-
-    setHobyLevel("");
-
-    setError(null);
-
-  }
-
-
-
-  function cancelEdit() {
-
-    setEditingKey(null);
-
-    setEditSubtype("");
-
-    setEditLevel("");
-
-  }
-
-
-
-  async function saveEdit() {
-
-    if (!editingEntry || !editingKey) return;
-
-    const draft = buildDraftEntry(editingEntry.slug, editSubtype, editLevel);
-
-    if (!draft) return;
-
-    const newKey = userHobyEntryKey(draft);
-
-    if (newKey !== editingKey && saved.some((s) => userHobyEntryKey(s) === newKey)) {
-
-      setError("You already saved this hobby with the same type and level.");
-
-      return;
-
-    }
-
-    const next = saved.map((s) => (userHobyEntryKey(s) === editingKey ? draft : s));
-
-    await persist(next, "Hobby updated.");
-
-    cancelEdit();
-
-  }
-
-
-
-  const canAdd = hobbyTypeLevelCanSave(selectedHoby ?? undefined, hobySubtype, hobyLevel) && Boolean(hobySlug.trim());
-
-  const canSaveEdit = hobbyTypeLevelCanSave(editingCatalogue, editSubtype, editLevel);
-
-
-
-  if (loading) return <div className="muted">Loading hobbies…</div>;
-
-
+  if (loading) return <div className="muted">{t("common.loading")}</div>;
 
   return (
-
-    <div className="stack" style={{ gap: 14 }}>
-
-      <p className="muted" style={{ margin: 0, fontSize: "0.92em" }}>
-
-        Add hobbies you enjoy and your level. Tap <strong>Edit</strong> on a hobby to change its type or level.
-
-      </p>
-
-
-
-      {error ? <FormError>{error}</FormError> : null}
-
-
-
-      <div className="stack" style={{ gap: 8 }}>
-
-        <div className="muted" style={{ fontSize: "0.85em", fontWeight: 650 }}>
-
-          My hobbies
-
+    <div className="stack profile-hobbies">
+      <div className="profile-hobbies-head">
+        <div>
+          <h2>{t("profileHobbies.yourInterests")}</h2>
+          <p>{t("profileHobbies.yourInterestsSubtitle")}</p>
         </div>
-
-        {saved.length ? (
-
-          <div className="hoby-icon-bag">
-
-            {saved.map((entry) => {
-
-              const h = hobyBySlug.get(entry.slug);
-
-              const initial = (h?.displayName.trim().slice(0, 1) || entry.slug.slice(0, 1) || "?").toUpperCase();
-
-              const title = userHobyEntryLabel(h, entry);
-
-              const key = userHobyEntryKey(entry);
-
-              const isEditing = editingKey === key;
-
-              const needsLevel = !levelKeyIsSet(entry.level);
-
-              return (
-
-                <div key={key} className={`hoby-icon-tile-wrap${isEditing ? " hoby-icon-tile-wrap-editing" : ""}`}>
-
-                  <div className="hoby-icon-tile hoby-icon-tile-static" title={title}>
-
-                    {h?.icon ? (
-
-                      <span className="hoby-icon-tile-emoji" aria-hidden>
-
-                        {h.icon}
-
-                      </span>
-
-                    ) : (
-
-                      <span className="hoby-icon-tile-fallback" aria-hidden>
-
-                        {initial}
-
-                      </span>
-
-                    )}
-
-                    <span className="hoby-icon-tile-name">{h?.displayName ?? entry.slug}</span>
-
-                    {needsLevel ? <span className="hoby-icon-tile-hint">Set level</span> : null}
-
-                  </div>
-
-                  <button
-
-                    type="button"
-
-                    className="hoby-icon-tile-edit"
-
-                    aria-label={`Edit ${title}`}
-
-                    disabled={working}
-
-                    onClick={() => (isEditing ? cancelEdit() : startEdit(entry))}
-
-                  >
-
-                    {isEditing ? "Close" : "Edit"}
-
-                  </button>
-
-                  <button
-
-                    type="button"
-
-                    className="hoby-icon-tile-remove"
-
-                    aria-label={`Remove ${title}`}
-
-                    disabled={working}
-
-                    onClick={() => void removeHobby(entry)}
-
-                  >
-
-                    ×
-
-                  </button>
-
-                </div>
-
-              );
-
-            })}
-
-          </div>
-
-        ) : (
-
-          <div className="muted" style={{ fontSize: "0.92em" }}>
-
-            No hobbies saved yet. Add one below.
-
-          </div>
-
-        )}
-
-
-
-        {editingEntry ? (
-
-          <div className="hoby-edit-panel stack" style={{ gap: 10 }}>
-
-            <div style={{ fontWeight: 650 }}>
-
-              Edit {hobyBySlug.get(editingEntry.slug)?.displayName ?? editingEntry.slug}
-
-            </div>
-
-            <HobbyTypeLevelFields
-
-              catalogue={editingCatalogue}
-
-              subtype={editSubtype}
-
-              level={editLevel}
-
-              onSubtypeChange={setEditSubtype}
-
-              onLevelChange={setEditLevel}
-
-              disabled={working}
-
-            />
-
-            <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-
-              <button
-
-                type="button"
-
-                className="primary"
-
-                style={{ width: "auto" }}
-
-                disabled={working || !canSaveEdit}
-
-                onClick={() => void saveEdit()}
-
-              >
-
-                {working ? "Saving…" : "Save changes"}
-
-              </button>
-
-              <button type="button" style={{ width: "auto" }} disabled={working} onClick={cancelEdit}>
-
-                Cancel
-
-              </button>
-
-            </div>
-
-          </div>
-
-        ) : null}
-
-      </div>
-
-
-
-      <div
-
-        className="stack"
-
-        style={{ gap: 10, paddingTop: 4, borderTop: saved.length ? "1px solid var(--card-border)" : undefined }}
-
-      >
-
-        <div style={{ fontWeight: 650 }}>Add a hobby</div>
-
-
-
-        <div className="stack" style={{ gap: 6 }}>
-
-          <label className="muted" style={{ fontSize: "0.85em" }}>
-
-            Hobby
-
-          </label>
-
-          {hobies.length ? (
-
-            <select
-
-              value={hobySlug}
-
-              onChange={(e) => {
-
-                setHobySlug(e.target.value);
-
-                setHobySubtype("");
-
-                setHobyLevel("");
-
-                cancelEdit();
-
-              }}
-
-              disabled={working}
-
-            >
-
-              <option value="">— Choose —</option>
-
-              {hobies.map((h) => (
-
-                <option key={h.id} value={h.slug}>
-
-                  {(h.icon ? `${h.icon} ` : "") + h.displayName}
-
-                </option>
-
-              ))}
-
-            </select>
-
-          ) : (
-
-            <div className="muted">No hobbies in the catalogue yet.</div>
-
-          )}
-
-        </div>
-
-
-
-        {hobySlug ? (
-
-          <HobbyTypeLevelFields
-
-            catalogue={selectedHoby ?? undefined}
-
-            subtype={hobySubtype}
-
-            level={hobyLevel}
-
-            onSubtypeChange={setHobySubtype}
-
-            onLevelChange={setHobyLevel}
-
-            disabled={working}
-
-          />
-
-        ) : null}
-
-
-
-        <button type="button" className="primary" disabled={working || !canAdd} onClick={() => void addHobby()}>
-
-          {working ? "Saving…" : "Add hobby"}
-
+        <button type="button" className="primary profile-hobbies-add" disabled={working} onClick={() => setAdding(true)}>
+          {t("profileHobbies.addInterest")}
         </button>
-
       </div>
 
+      <p className="profile-interest-count">{t("profileHobbies.interestsCount", { count: interests.length })}</p>
+
+      {error && !adding ? <FormError>{error}</FormError> : null}
+
+      {interests.length ? (
+        <div className="profile-interest-grid">
+          {interests.map((entry) => {
+            const hoby = bySlug.get(entry.slug.trim().toLowerCase());
+            const chosen = selectedTypeKeys(entry).map((key) => typeParts(hoby, key));
+            const level = experienceId(entry.experienceLevel);
+            return (
+              <button
+                key={entry.slug}
+                type="button"
+                className="profile-interest-card"
+                onClick={() => props.onOpenHobby?.(entry.slug)}
+              >
+                <span className="profile-interest-icon" aria-hidden>
+                  {hoby?.icon?.trim() || "✦"}
+                </span>
+                <span className="profile-interest-name">{interestName(hoby, entry)}</span>
+                {chosen.length ? (
+                  <span className="profile-interest-types-block">
+                    <span className="profile-interest-types-label">{t("profileHobbies.typesLabel")}</span>
+                    <span className="profile-interest-types-line">
+                      {chosen.map((item, index) => (
+                        <span key={item.key}>
+                          {index > 0 ? <span aria-hidden> • </span> : null}
+                          {item.icon ? <span aria-hidden>{`${item.icon} `}</span> : null}
+                          {item.label}
+                        </span>
+                      ))}
+                    </span>
+                  </span>
+                ) : null}
+                {level ? (
+                  <span className="profile-interest-level">
+                    <span aria-hidden>{LEVEL_MARK[level]}</span>
+                    {t(`profileHobbies.experienceLevels.${level}.name`)}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+          <button type="button" className="profile-interest-card profile-interest-card--add" onClick={() => setAdding(true)}>
+            <span className="profile-interest-icon profile-interest-icon--plus" aria-hidden>
+              +
+            </span>
+            <span className="profile-interest-name">{t("profileHobbies.addInterestCard")}</span>
+            <span className="profile-interest-meta">{t("profileHobbies.addInterestHint")}</span>
+          </button>
+        </div>
+      ) : (
+        <div className="profile-interests-empty">
+          <LandingIllustration />
+          <h3>{t("profileHobbies.emptyTitle")}</h3>
+          <p>{t("profileHobbies.emptyBody")}</p>
+          <button type="button" className="primary" onClick={() => setAdding(true)}>
+            {t("profileHobbies.addFirst")}
+          </button>
+        </div>
+      )}
+
+      {adding ? (
+        <AddInterestDialog
+          hobies={hobies.filter(
+            (hoby) => !interests.some((entry) => entry.slug.trim().toLowerCase() === hoby.slug.trim().toLowerCase()),
+          )}
+          working={working}
+          error={error}
+          onCancel={() => {
+            setError(null);
+            setAdding(false);
+          }}
+          onSubmit={addInterest}
+        />
+      ) : null}
     </div>
-
   );
-
 }
 
+const EXPERIENCE_IDS = ["beginner", "intermediate", "advanced", "expert"] as const;
 
+function AddInterestDialog(props: {
+  hobies: Hoby[];
+  working: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onSubmit: (hoby: Hoby, typeKeys: string[], experienceLevel: string) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [query, setQuery] = useState("");
+  const [picked, setPicked] = useState<Hoby | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [experience, setExperience] = useState<string | null>(null);
+
+  const matches = props.hobies.filter((hoby) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return [hoby.displayName, hoby.canonicalDisplayName, hoby.heDisplayName, hoby.slug].some((part) =>
+      (part ?? "").toLowerCase().includes(q),
+    );
+  });
+  const typeRows = parseHobyTypesNested(picked?.types);
+
+  function toggle(key: string) {
+    setSelected((current) =>
+      current.some((item) => item.toLowerCase() === key.toLowerCase())
+        ? current.filter((item) => item.toLowerCase() !== key.toLowerCase())
+        : [...current, key],
+    );
+  }
+
+  return (
+    <div className="hoby-cat-modal" role="dialog" aria-modal="true" aria-labelledby="interest-add-title">
+      <div className="hoby-cat-modal-card profile-interest-dialog">
+        <h2 id="interest-add-title">{picked ? picked.displayName : t("profileHobbies.chooseHobby")}</h2>
+        {picked ? <p>{t("profileHobbies.chooseTypes")}</p> : null}
+        {!picked ? (
+          <>
+            <label className="hoby-cat-field">
+              <span>{t("profileHobbies.searchHobby")}</span>
+              <input autoFocus value={query} placeholder={t("profileHobbies.searchHobby")} onChange={(e) => setQuery(e.target.value)} />
+            </label>
+            <div className="hobby-type-list">
+              {matches.slice(0, 12).map((hoby) => (
+                <button
+                  key={hoby.slug}
+                  type="button"
+                  className="hobby-type-option"
+                  onClick={() => {
+                    setPicked(hoby);
+                    setSelected([]);
+                  }}
+                >
+                  <span aria-hidden>{hoby.icon?.trim() || "✦"}</span>
+                  <span>{hoby.displayName}</span>
+                </button>
+              ))}
+              {!matches.length ? <p className="muted">{t("profileHobbies.noHobbyMatch")}</p> : null}
+            </div>
+          </>
+        ) : (
+          <div className="hobby-type-list">
+            {typeRows.length ? (
+              typeRows.map((row) => {
+                const on = selected.some((key) => key.toLowerCase() === row.key.toLowerCase());
+                return (
+                  <label key={row.key} className={`hobby-type-check${on ? " is-selected" : ""}`}>
+                    <input type="checkbox" checked={on} onChange={() => toggle(row.key)} />
+                    <span>
+                      {row.icon?.trim() ? `${row.icon.trim()} ` : ""}
+                      {row.label?.trim() || row.key}
+                    </span>
+                  </label>
+                );
+              })
+            ) : (
+              <p className="muted">{t("profileHobbies.noTypes")}</p>
+            )}
+          </div>
+        )}
+        {picked ? (
+          <div className="profile-interest-level-pick" role="group" aria-label={t("profileHobbies.experienceTitle")}>
+            <p>{t("profileHobbies.experienceTitle")}</p>
+            <div className="profile-interest-level-picks">
+              {EXPERIENCE_IDS.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={experience === id ? "is-selected" : ""}
+                  aria-pressed={experience === id}
+                  onClick={() => setExperience(id)}
+                >
+                  <span aria-hidden>{LEVEL_MARK[id]}</span>
+                  {t(`profileHobbies.experienceLevels.${id}.name`)}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {props.error ? <FormError>{props.error}</FormError> : null}
+        <div className="profile-interest-dialog-actions">
+          {picked ? (
+            <button
+              type="button"
+              className="primary"
+              disabled={props.working || !experience || (typeRows.length > 0 && selected.length === 0)}
+              onClick={() => void props.onSubmit(picked, selected, experience ?? "")}
+            >
+              {t("profileHobbies.addInterest")}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            disabled={props.working}
+            onClick={() => {
+              if (picked) {
+                setPicked(null);
+                setSelected([]);
+                setExperience(null);
+                return;
+              }
+              props.onCancel();
+            }}
+          >
+            {picked ? t("common.back") : t("profileHobbies.cancel")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -7,11 +7,10 @@ import { CircleScheduledTab } from "./CircleScheduledTab";
 import { dedupeMembers } from "./circleMembers";
 import { markCircleLeftBySelf } from "../notificationInbox";
 import { FormError } from "./FormError";
-import {
-  CircleDetailsSummary,
-} from "./CircleDetailsSummary";
+import { CircleDetailsSummary, CircleDetailsWhyJoin } from "./CircleDetailsSummary";
 import { CircleDetailsMembersSection } from "./CircleDetailsMembersSection";
-import { circleParticipationState } from "./circleParticipation";
+import { CircleMomentumNote, CircleProgressCard } from "./CircleProgressCard";
+import { formatSessionDateTimeHero } from "./homeDashboardUtils";
 
 type DetailsTab = "details" | "scheduled";
 type DetailsTabInput = DetailsTab | "chat";
@@ -58,6 +57,7 @@ export function CircleDetails(props: {
   circleId: string;
   onBack: () => void;
   initialTab?: DetailsTabInput;
+  initialDraft?: string;
   onLeftCircle?: () => void | Promise<void>;
 }) {
   const { t, i18n } = useTranslation();
@@ -71,16 +71,14 @@ export function CircleDetails(props: {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [scheduledEditTrigger, setScheduledEditTrigger] = useState(0);
   const [copyHint, setCopyHint] = useState<string | null>(null);
-  const [chatOpen, setChatOpen] = useState(true);
+  const [chatFocus, setChatFocus] = useState(props.initialTab === "chat");
   const optionsRef = useRef<HTMLDivElement>(null);
-  const chatSectionRef = useRef<HTMLElement>(null);
-  const scrollToChatOnLoad = props.initialTab === "chat";
 
   useEffect(() => {
     setTab(normalizeTab(props.initialTab));
     setSelectedMemberId(null);
     setOptionsOpen(false);
-    setChatOpen(props.initialTab === "chat");
+    setChatFocus(props.initialTab === "chat");
   }, [props.circleId, props.initialTab]);
 
   useEffect(() => {
@@ -124,21 +122,15 @@ export function CircleDetails(props: {
   const isCreator = Boolean(data?.isCreator);
   const creatorUserId = data?.creatorUserId ?? null;
   const activeTab: DetailsTab = isCreator ? tab : "details";
-  const chatIsFull = circleParticipationState(members.length, circle?.maxSize ?? 6).isFull;
   const nextSessionAt = data?.nextSessionRoster?.dateTime ?? null;
+
+  function openChat() {
+    setChatFocus(true);
+  }
 
   useEffect(() => {
     if (!isCreator && tab !== "details") setTab("details");
   }, [isCreator, tab]);
-
-  useEffect(() => {
-    if (!scrollToChatOnLoad || activeTab !== "details" || !circle) return;
-    setChatOpen(true);
-    const id = window.requestAnimationFrame(() => {
-      chatSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-    return () => window.cancelAnimationFrame(id);
-  }, [scrollToChatOnLoad, activeTab, circle]);
 
   async function leaveOrDrop() {
     setOptionsOpen(false);
@@ -242,14 +234,72 @@ export function CircleDetails(props: {
           />
         ) : (
           <>
-            {circle ? (
+            {circle && chatFocus && activeTab === "details" ? (
+              <>
+                <button
+                  type="button"
+                  className="circle-details-back"
+                  onClick={() => {
+                    setChatFocus(false);
+                    setSelectedMemberId(null);
+                  }}
+                >
+                  {t("circleChat.backToCircle")}
+                </button>
+                {selectedMemberId ? (
+                  <CircleDetailsMembersSection
+                    members={members}
+                    circle={circle}
+                    hobiesCatalog={hobies}
+                    myUserId={myUserId}
+                    creatorUserId={creatorUserId}
+                    maxSize={circle.maxSize}
+                    selectedMemberId={selectedMemberId}
+                    onSelectMember={setSelectedMemberId}
+                  />
+                ) : null}
+                <CircleChat
+                  circleId={props.circleId}
+                  embedded
+                  aboutEmbedded
+                  memberCount={members.length}
+                  maxSize={circle.maxSize}
+                  nextSessionAt={nextSessionAt}
+                  members={members}
+                  creatorUserId={creatorUserId}
+                  onOpenMember={setSelectedMemberId}
+                  onViewMeeting={() => setChatFocus(false)}
+                  onShareInvite={() => void copyInviteCode()}
+                  onEditSchedule={() => {
+                    setChatFocus(false);
+                    modifyCircle();
+                  }}
+                  initialDraft={props.initialDraft}
+                />
+              </>
+            ) : circle ? (
               <>
                 <CircleDetailsSummary
                   circle={circle}
                   hobiesCatalog={hobies}
                   memberCount={members.length}
                   maxSize={circle.maxSize}
+                  hasNextSession={Boolean(nextSessionAt)}
                 />
+                <CircleProgressCard
+                  joined={members.length}
+                  capacity={circle.maxSize}
+                  hasNextSession={Boolean(nextSessionAt)}
+                />
+                <CircleMomentumNote
+                  joined={members.length}
+                  capacity={circle.maxSize}
+                  hasNextSession={Boolean(nextSessionAt)}
+                  viewerIsMember
+                />
+                <button type="button" className="circle-details-primary" onClick={isCreator ? modifyCircle : openChat}>
+                  {isCreator ? t("circleDetails.manageCircle") : t("circleDetails.openChat")}
+                </button>
                 <CircleDetailsMembersSection
                   members={members}
                   circle={circle}
@@ -260,37 +310,30 @@ export function CircleDetails(props: {
                   selectedMemberId={selectedMemberId}
                   onSelectMember={setSelectedMemberId}
                 />
-                <section ref={chatSectionRef} className="circle-details-chat-section stack" aria-label={t("circleDetails.chatAria")}>
-                  <button
-                    type="button"
-                    className={`circle-details-chat-toggle${chatOpen ? " circle-details-chat-toggle--open" : ""}`}
-                    aria-expanded={chatOpen}
-                    onClick={() => setChatOpen((open) => !open)}
-                  >
+                <section className="circle-details-chat-section stack" aria-label={t("circleDetails.chatAria")}>
+                  <div className="circle-details-chat-toggle">
                     <span className="circle-details-chat-toggle-copy">
                       <span className="circle-details-chat-prompt-lead">{t("circleDetails.chatTitle")}</span>
-                      <span className="circle-details-chat-prompt-sub muted">
-                        {t("circleDetails.chatSubtitle")}
+                      <span className="circle-details-chat-prompt-sub">
+                        {members.length === 1
+                          ? t("circleDetails.onePersonInCircle")
+                          : t("circleDetails.peopleInCircle", { count: members.length })}
                       </span>
-                      {chatIsFull ? (
-                        <span className="circle-details-chat-confirmed">{t("circleDetails.meetupConfirmed")}</span>
+                      {nextSessionAt ? (
+                        <span className="circle-details-chat-prompt-sub">
+                          {t("circleDetails.nextMeetupLine", { when: formatSessionDateTimeHero(nextSessionAt) })}
+                        </span>
                       ) : null}
+                      <span className="circle-details-chat-prompt-sub muted">{t("circleDetails.chatSubtitle")}</span>
                     </span>
-                    <span className="circle-details-chat-toggle-icon" aria-hidden>
-                      {chatOpen ? "▾" : "▸"}
-                    </span>
-                  </button>
-                  {chatOpen ? (
-                    <CircleChat
-                      circleId={props.circleId}
-                      embedded
-                      aboutEmbedded
-                      memberCount={members.length}
-                      maxSize={circle.maxSize}
-                      nextSessionAt={nextSessionAt}
-                    />
-                  ) : null}
+                    <div className="circle-details-chat-actions">
+                      <button type="button" className="circle-details-primary" onClick={openChat}>
+                        {t("circleDetails.openChat")}
+                      </button>
+                    </div>
+                  </div>
                 </section>
+                <CircleDetailsWhyJoin circle={circle} hobiesCatalog={hobies} />
               </>
             ) : (
               <div className="muted">{t("common.loading")}</div>

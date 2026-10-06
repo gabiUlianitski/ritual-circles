@@ -74,6 +74,9 @@ CREATE TABLE IF NOT EXISTS hobies (
   levels_json JSONB NULL,
   types_json JSONB NULL,
   interest_category TEXT NULL,
+  group_size_json JSONB NULL,
+  i18n_json JSONB NULL,
+  archived_at TIMESTAMPTZ NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

@@ -4,12 +4,15 @@ import { FormError } from "./FormError";
 import { CreateCircleWizard } from "./CreateCircleWizard";
 
 export function CreateJoinCircle(props: {
-  onDone: () => Promise<void> | void;
+  onDone: (joinedCircleId?: string) => Promise<void> | void;
   onBack: () => void;
   /** When opening from Circles → join flow */
   initialTab?: "create" | "join";
   /** Pre-fill the When step date (YYYY-MM-DD) */
   initialMeetDate?: string;
+  initialHobbySlug?: string;
+  initialHobbySubtype?: string | null;
+  initialHobbyLevel?: string | null;
 }) {
   const [tab, setTab] = useState<"create" | "join">(() => props.initialTab ?? "create");
   const [inviteCode, setInviteCode] = useState("");
@@ -20,8 +23,8 @@ export function CreateJoinCircle(props: {
     setWorking(true);
     setError(null);
     try {
-      await api.joinCircle(inviteCode.trim());
-      await props.onDone();
+      const res = await api.joinCircle(inviteCode.trim());
+      await props.onDone(res.circle.id);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -57,6 +60,9 @@ export function CreateJoinCircle(props: {
           error={error}
           setError={setError}
           initialMeetDate={props.initialMeetDate}
+          initialHobbySlug={props.initialHobbySlug}
+          initialHobbySubtype={props.initialHobbySubtype}
+          initialHobbyLevel={props.initialHobbyLevel}
         />
       ) : (
         <>

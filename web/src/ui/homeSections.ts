@@ -1,0 +1,126 @@
+import type { CircleListItem, HomeCalendarSession, Hoby, UserHobyPreference } from "../api/types";
+import { circleMomentum, momentumRank, type CircleMomentum } from "./CircleProgressCard";
+import { getRecommendedCircles } from "./circleDiscover";
+import { isCircleJoinable } from "./circleParticipation";
+import { getUpcomingSessions, isSessionPending } from "./homeDashboardUtils";
+
+const HAPPENING_LIMIT = 8;
+const INTEREST_LIMIT = 10;
+const HERO_CHIP_LIMIT = 5;
+const UPCOMING_LIMIT = 3;
+
+export type HomeUpcoming =
+  | { kind: "session"; item: HomeCalendarSession; needsAnswer: boolean }
+  | { kind: "readyToSchedule"; circle: CircleListItem };
+
+export type HomeInterest = { hoby: Hoby; circleCount: number };
+
+export type HomeFeed = {
+  /** Shown in the hero; the rest go to the Upcoming Activity section. */
+  upcoming: HomeUpcoming[];
+  /** Personal matches when the user has hobbies; otherwise the fullest joinable circles. */
+  recommended: CircleListItem[];
+  interests: HomeInterest[];
+  heroChips: HomeInterest[];
+  happening: CircleListItem[];
+  groupsForming: number;
+};
+
+/** Counts below this read as "empty"; show a warm status instead. */
+export const MIN_VISIBLE_COUNT = 5;
+
+/** i18n key for a warm social label used instead of a small participant count. */
+export function socialStatusKey(input: { members: number; confirmed?: boolean }): string {
+  if (input.confirmed) return "homeFeed.socialConfirmed";
+  if (input.members >= 3) return "homeFeed.socialReady";
+  return "homeFeed.socialJoining";
+}
+
+export function circleStatus(c: CircleListItem): CircleMomentum {
+  return circleMomentum(c.memberCount, c.maxSize, Boolean(c.nextSessionAt));
+}
+
+function fillOf(c: CircleListItem): number {
+  return c.memberCount / Math.max(1, c.maxSize);
+}
+
+function slugKey(s: string | null | undefined): string {
+  return (s ?? "").trim().toLowerCase();
+}
+
+function byMomentum(a: CircleListItem, b: CircleListItem): number {
+  return (
+    momentumRank(circleStatus(a)) - momentumRank(circleStatus(b)) ||
+    fillOf(b) - fillOf(a) ||
+    b.memberCount - a.memberCount
+  );
+}
+
+export function buildHomeFeed(input: {
+  catalog: CircleListItem[];
+  sessions: HomeCalendarSession[];
+  hobbies: UserHobyPreference[];
+  hobyCatalog: Hoby[];
+  city: string | null;
+  /** When false, the hobby catalogue has not loaded yet, so circle recommendations stay visible. */
+  onlyCompleteHobbies?: boolean;
+}): HomeFeed {
+  const { catalog, hobbies, hobyCatalog, city } = input;
+
+  const memberReady = catalog
+    .filter((c) => c.isYours && circleStatus(c) === "readyToSchedule")
+    .sort((a, b) => fillOf(b) - fillOf(a));
+
+  const upcoming: HomeUpcoming[] = [
+    ...getUpcomingSessions(input.sessions).map(
+      (item): HomeUpcoming => ({ kind: "session", item, needsAnswer: isSessionPending(item) }),
+    ),
+    ...memberReady.map((circle): HomeUpcoming => ({ kind: "readyToSchedule", circle })),
+  ].slice(0, 1 + UPCOMING_LIMIT);
+
+  const completeSlugs = new Set(hobyCatalog.map((h) => slugKey(h.slug)));
+  const listed =
+    input.onlyCompleteHobbies === false
+      ? catalog
+      : catalog.filter((c) => c.isYours || completeSlugs.has(slugKey(c.ritualType)));
+  const joinable = listed.filter((c) => !c.isYours && isCircleJoinable(c.memberCount, c.maxSize));
+
+  const countBySlug = new Map<string, number>();
+  for (const c of catalog) {
+    const k = slugKey(c.ritualType);
+    countBySlug.set(k, (countBySlug.get(k) ?? 0) + 1);
+  }
+  const userSlugs = new Set(hobbies.map((h) => slugKey(h.slug)));
+  const interests: HomeInterest[] = hobyCatalog
+    .filter((h) => h.slug && h.displayName)
+    .map((hoby) => ({ hoby, circleCount: countBySlug.get(slugKey(hoby.slug)) ?? 0 }))
+    .sort(
+      (a, b) =>
+        Number(userSlugs.has(slugKey(b.hoby.slug))) - Number(userSlugs.has(slugKey(a.hoby.slug))) ||
+        b.circleCount - a.circleCount ||
+        a.hoby.displayName.localeCompare(b.hoby.displayName),
+    );
+
+  const personal = getRecommendedCircles(joinable, hobbies, city, 6);
+  const others = listed.filter((c) => !c.isYours);
+  const fallbackPool = joinable.length > 0 ? joinable : others;
+  const recommended =
+    personal.length > 0 ? personal : [...fallbackPool].sort(byMomentum).slice(0, 6);
+
+  const happening = joinable
+    .filter((c) => {
+      const s = circleStatus(c);
+      return s === "readyToSchedule" || s === "almostReady" || s === "growing";
+    })
+    .sort(byMomentum)
+    .slice(0, HAPPENING_LIMIT);
+
+  return {
+    upcoming,
+    recommended,
+    interests: interests.slice(0, INTEREST_LIMIT),
+    heroChips: interests.slice(0, HERO_CHIP_LIMIT),
+    happening,
+    groupsForming: joinable.length,
+  };
+}

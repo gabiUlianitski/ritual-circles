@@ -16,8 +16,11 @@ import type {
   CitySuggestItem,
   LanguageItem,
   Hoby,
+  HobyBulkResponse,
   HobyCreateRequest,
   HobyPrecheckResponse,
+  HobyRegeneratePreview,
+  HobyRegenField,
   HobySpellSuggestResponse,
   HobyUpdateRequest,
   HomeResponse,
@@ -30,6 +33,7 @@ import type {
   UserUpdateRequest,
   VenueSuggestionsResponse,
   CommunityPreviewResponse,
+  DiscoveryResponse,
 } from "./types";
 
 const TOKEN_KEY = "auth_token";
@@ -183,6 +187,24 @@ export const api = {
 
   getHobies: async () =>
     localizeHobies(await request<Hoby[]>("GET", "/hobies"), getAppLanguageCode()),
+  /** Catalogue rows people already saved, including incomplete ones. Archived stay out. */
+  getHobiesSaved: async () => {
+    const list = localizeHobies(
+      await request<Hoby[]>("GET", "/hobies?includeIncomplete=1"),
+      getAppLanguageCode(),
+    );
+    return list.filter((hoby) => !hoby.archived);
+  },
+  /** English source fields for catalogue editing. Skips client-side localization. */
+  getHobiesCanonical: () => request<Hoby[]>("GET", "/hobies?canonical=1&includeIncomplete=1"),
+  regenerateHoby: (slug: string, payload: { fields: HobyRegenField[]; onlyMissing?: boolean }) =>
+    request<HobyRegeneratePreview>("POST", `/hobies/${encodeURIComponent(slug)}/regenerate`, payload),
+  hobyUsage: (slug: string) => request<{ circleCount: number }>("GET", `/hobies/${encodeURIComponent(slug)}/usage`),
+  deleteHoby: (slug: string) => request<void>("DELETE", `/hobies/${encodeURIComponent(slug)}`),
+  archiveHoby: (slug: string) => request<Hoby>("POST", `/hobies/${encodeURIComponent(slug)}/archive`),
+  restoreHoby: (slug: string) => request<Hoby>("POST", `/hobies/${encodeURIComponent(slug)}/restore`),
+  bulkHobies: (payload: { action: "delete" | "archive" | "regenerate"; slugs: string[] }) =>
+    request<HobyBulkResponse>("POST", "/hobies/bulk", payload),
   precheckNewHoby: (payload: { displayName: string }) =>
     request<HobyPrecheckResponse>("POST", "/hobies/precheck", payload),
   getCountries: () => request<CountryItem[]>("GET", "/geo/countries"),
@@ -213,4 +235,6 @@ export const api = {
     request<HobySpellSuggestResponse>("POST", "/hobies/spell-suggest", payload),
 
   getCommunityPreview: () => request<CommunityPreviewResponse>("GET", "/community/preview"),
+  todaysDiscovery: (payload: { displayName: string; category?: string; lang?: string }) =>
+    request<DiscoveryResponse>("POST", "/discoveries/today", payload),
 };

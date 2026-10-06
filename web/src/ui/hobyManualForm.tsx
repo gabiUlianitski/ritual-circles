@@ -4,6 +4,7 @@ export type HobyManualRow = {
   id: string;
   label: string;
   description: string;
+  icon?: string;
 };
 
 function newId(): string {
@@ -18,13 +19,15 @@ export function emptyManualRow(): HobyManualRow {
 
 /** Build `types` for POST /hobies — keys are assigned server-side from labels. */
 export function rowsToTypesPayload(rows: HobyManualRow[]): unknown | undefined {
-  const out: Array<{ label: string; description?: string }> = [];
+  const out: Array<{ label: string; description?: string; icon?: string }> = [];
   for (const r of rows) {
     const label = r.label.trim();
     if (!label) continue;
-    const o: { label: string; description?: string } = { label };
+    const o: { label: string; description?: string; icon?: string } = { label };
     const d = r.description.trim();
     if (d) o.description = d;
+    const icon = r.icon?.trim();
+    if (icon) o.icon = icon;
     out.push(o);
   }
   return out.length ? out : undefined;
@@ -53,13 +56,15 @@ function looksLikeStableKey(id: string): boolean {
 
 /** Preserve catalogue keys when editing an existing hoby. */
 export function rowsToTypesPayloadWithKeys(rows: HobyManualRow[]): unknown | undefined {
-  const out: Array<{ key?: string; label: string; description?: string }> = [];
+  const out: Array<{ key?: string; label: string; description?: string; icon?: string }> = [];
   for (const r of rows) {
     const label = r.label.trim();
     if (!label) continue;
-    const o: { key?: string; label: string; description?: string } = { label };
+    const o: { key?: string; label: string; description?: string; icon?: string } = { label };
     const d = r.description.trim();
     if (d) o.description = d;
+    const icon = r.icon?.trim();
+    if (icon) o.icon = icon;
     if (looksLikeStableKey(r.id)) o.key = r.id.trim();
     out.push(o);
   }
@@ -121,6 +126,12 @@ export function HobyManualMetadataEditor(props: {
         </div>
         {typeRows.map((row) => (
           <div key={row.id} className="card stack" style={{ padding: 10, gap: 8 }}>
+            <input
+              placeholder="Icon (emoji)"
+              value={row.icon ?? ""}
+              onChange={(e) => onChangeTypes((prev) => updateRow(prev, row.id, { icon: e.target.value }))}
+              style={{ width: 88 }}
+            />
             <LabelRowFields
               row={row}
               labelPlaceholder="Label (e.g. Clay court)"

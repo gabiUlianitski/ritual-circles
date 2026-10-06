@@ -1,7 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import type { CircleMemberResponse, CircleResponse, Hoby } from "../api/types";
-import { circleParticipationState } from "./circleParticipation";
 import { humanMemberLevelPhrase } from "./circleDetailsFormat";
 import { dedupeMembers, memberDisplayName } from "./circleMembers";
 import { findHobyCatalogue, memberHobbyLevelLabel } from "./memberHobbyLevel";
@@ -54,10 +53,6 @@ export function CircleDetailsMembersSection(props: {
   const { t } = useTranslation();
   const members = dedupeMembers(props.members);
   const catalogue = findHobyCatalogue(props.hobiesCatalog, props.circle.ritualType);
-  const participation = circleParticipationState(members.length, props.maxSize);
-  const joined = Math.max(0, members.length);
-  const capacity = Math.max(1, props.maxSize);
-  const spotsLeft = capacity - joined;
   const selectedMember = members.find((m) => m.id === props.selectedMemberId) ?? null;
 
   if (!members.length) return null;
@@ -80,7 +75,10 @@ export function CircleDetailsMembersSection(props: {
             <div>
               <div className="circle-details-member-profile-name">{name}</div>
               <div className="circle-details-member-profile-level muted">
-                {humanMemberLevelPhrase(levelRaw, t)}
+                {selectedMember.id === props.creatorUserId ? t("circleDetails.owner") : t("circleDetails.member")}
+                {levelRaw !== "Level not set" && levelRaw !== "—"
+                  ? ` · ${humanMemberLevelPhrase(levelRaw, t)}`
+                  : ""}
               </div>
             </div>
             <MemberBadges
@@ -103,32 +101,19 @@ export function CircleDetailsMembersSection(props: {
     <section className="circle-details-members-section stack">
       <div className="circle-details-members-head">
         <h3 className="circle-details-members-title">{t("circleDetails.whosComing")}</h3>
-        <div className="circle-details-members-meta">
-          {participation.isFull ? (
-            <span className="home-status-badge home-status-badge--full circle-participation-full">
-              {t("discoverPage.circleFull", { count: joined, max: capacity })}
-            </span>
-          ) : (
-            <div className="circle-participation-copy circle-participation-copy--meta">
-              {joined > 1 ? (
-                <span className="circle-participation-in">{t("home.peopleIn", { count: joined })}</span>
-              ) : null}
-              {spotsLeft > 0 ? (
-                <span className="circle-participation-spots">
-                  {spotsLeft === 1
-                    ? t("home.oneSpotLeft")
-                    : t("home.spotsLeft", { count: spotsLeft })}
-                </span>
-              ) : null}
-            </div>
-          )}
-        </div>
       </div>
+      {members.length <= 1 ? (
+        <div className="circle-details-empty-members">
+          {members[0]?.id !== props.myUserId ? (
+            <p className="circle-details-empty-lead">{t("circleDetails.beFirstToJoin")}</p>
+          ) : null}
+          <p>{t("circleDetails.lookingForParticipants")}</p>
+        </div>
+      ) : null}
 
       <div className="circle-details-member-list" role="list">
         {members.map((m) => {
           const name = memberDisplayName(m, members);
-          const levelRaw = memberHobbyLevelLabel(m, props.circle, catalogue);
           return (
             <button
               key={m.id}
@@ -140,16 +125,15 @@ export function CircleDetailsMembersSection(props: {
               <MemberAvatar name={name} isYou={m.id === props.myUserId} />
               <span className="circle-details-member-card-copy">
                 <span className="circle-details-member-card-name">{name}</span>
-                <span className="circle-details-member-card-level muted">
-                  {humanMemberLevelPhrase(levelRaw, t)}
+                <span className="circle-details-member-badges">
+                  {m.id === props.myUserId ? <span className="pill">{t("circleDetails.you")}</span> : null}
+                  {m.id === props.creatorUserId ? (
+                    <span className="pill pill--owner">{t("circleDetails.owner")}</span>
+                  ) : (
+                    <span className="pill pill--member">{t("circleDetails.member")}</span>
+                  )}
                 </span>
               </span>
-              <MemberBadges
-                memberId={m.id}
-                myUserId={props.myUserId}
-                creatorUserId={props.creatorUserId}
-                t={t}
-              />
             </button>
           );
         })}

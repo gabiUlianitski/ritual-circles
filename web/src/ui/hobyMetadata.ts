@@ -6,6 +6,8 @@ export type HobyTypeRow = {
   key: string;
   label?: string;
   description?: string;
+  /** One emoji for this variant. */
+  icon?: string;
   /** Legacy only: per-type levels. Prefer hoby-level `levels_json`. */
   levels: HobyLevelRow[];
 };
@@ -46,8 +48,9 @@ export function parseHobyTypesNested(types: unknown): HobyTypeRow[] {
       if (!key) return null;
       const label = x!["label"] != null ? String(x!["label"]) : undefined;
       const description = x!["description"] != null ? String(x!["description"]) : undefined;
+      const icon = x!["icon"] != null ? String(x!["icon"]).trim() : undefined;
       const levels = parseHobyLevelsFlat(x!["levels"]);
-      return { key, label, description, levels } satisfies HobyTypeRow;
+      return { key, label, description, icon: icon || undefined, levels } satisfies HobyTypeRow;
     })
     .filter(Boolean) as HobyTypeRow[];
 }

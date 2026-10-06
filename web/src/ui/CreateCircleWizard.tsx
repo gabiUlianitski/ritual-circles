@@ -83,14 +83,17 @@ export function CreateCircleWizard(props: {
   error: string | null;
   setError: (v: string | null) => void;
   initialMeetDate?: string;
+  initialHobbySlug?: string;
+  initialHobbySubtype?: string | null;
+  initialHobbyLevel?: string | null;
 }) {
   const { setError } = props;
   const navRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(1);
   const [hobies, setHobies] = useState<Hoby[]>([]);
-  const [hobySlug, setHobySlug] = useState("");
-  const [hobySubtype, setHobySubtype] = useState("");
-  const [hobyLevel, setHobyLevel] = useState("");
+  const [hobySlug, setHobySlug] = useState(props.initialHobbySlug ?? "");
+  const [hobySubtype, setHobySubtype] = useState(props.initialHobbySubtype ?? "");
+  const [hobyLevel, setHobyLevel] = useState(props.initialHobbyLevel ?? "");
   const [meetDate, setMeetDate] = useState(() => {
     const prefill = props.initialMeetDate?.trim();
     if (prefill && isMeetDateOnOrAfterToday(prefill)) return prefill;

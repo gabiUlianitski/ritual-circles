@@ -79,11 +79,11 @@ def load_ai_config() -> AIConfig:
         # default: groq (OpenAI-compatible endpoint)
         provider = "groq"
         api_key = str(data.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY") or "")
-        model = str(data.get("GROQ_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")))
+        model = str(data.get("GROQ_MODEL", os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")))
         api_url = str(data.get("GROQ_API_URL", os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions")))
 
     temperature = float(data.get("TEMPERATURE", os.getenv("TEMPERATURE", "0.2")))
-    max_tokens = int(data.get("MAX_TOKENS", os.getenv("MAX_TOKENS", "1200")))
+    max_tokens = int(data.get("MAX_TOKENS", os.getenv("MAX_TOKENS", "4096")))
     timeout_ms = int(data.get("TIMEOUT", os.getenv("TIMEOUT", "60000")))
 
     if not enabled or not api_key:

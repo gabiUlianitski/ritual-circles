@@ -12,11 +12,12 @@ import { FormError } from "./FormError";
 import { Login } from "./Login";
 import { Dashboard } from "./Dashboard";
 import { CreateJoinCircle } from "./CreateJoinCircle";
-import { Profile } from "./Profile";
+import { Profile, type ProfileTab } from "./Profile";
+import { ActivityPage } from "./ActivityPage";
 import { Hobies } from "./Hobies";
 import { Circles } from "./Circles";
 import { GuestRegisterPrompt } from "./GuestRegisterPrompt";
-import { GuestHobbyDetail } from "./welcome/GuestHobbyDetail";
+import { HobbyDetailPage } from "./HobbyDetailPage";
 import { WelcomePageMenu } from "./welcome/WelcomePageMenu";
 
 type AppStage =
@@ -27,7 +28,39 @@ type AppStage =
   | "hobies"
   | "hobbyDetail"
   | "circles"
+  | "myCircles"
+  | "activity"
   | "notifications";
+
+type NavItem = "home" | "discover" | "activity" | "circles" | "profile";
+
+const NAV_ITEMS: { id: NavItem; icon: string; labelKey: string; stage: AppStage; needsAccount: boolean }[] = [
+  { id: "home", icon: "🏠", labelKey: "nav.home", stage: "dashboard", needsAccount: false },
+  { id: "discover", icon: "🔍", labelKey: "nav.discover", stage: "circles", needsAccount: false },
+  { id: "activity", icon: "📅", labelKey: "nav.activity", stage: "activity", needsAccount: true },
+  { id: "circles", icon: "👥", labelKey: "nav.circles", stage: "myCircles", needsAccount: true },
+  { id: "profile", icon: "👤", labelKey: "nav.profile", stage: "profile", needsAccount: true },
+];
+
+function navItemForStage(stage: AppStage): NavItem | null {
+  switch (stage) {
+    case "dashboard":
+      return "home";
+    case "circles":
+      return "discover";
+    case "activity":
+      return "activity";
+    case "myCircles":
+    case "createJoin":
+      return "circles";
+    case "profile":
+    case "hobies":
+    case "hobbyDetail":
+      return "profile";
+    default:
+      return null;
+  }
+}
 
 /** Guests have no account, so Home is empty without calling the API. */
 const GUEST_HOME: HomeResponse = {
@@ -38,31 +71,7 @@ const GUEST_HOME: HomeResponse = {
   calendarSessions: [],
 };
 
-export type CirclesDeepLink = { circleId: string; initialTab: "details" | "chat" };
-
-function IconHome() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden fill="currentColor">
-      <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
-    </svg>
-  );
-}
-
-function IconCircles() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden fill="currentColor">
-      <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
-    </svg>
-  );
-}
-
-function IconProfile() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden fill="currentColor">
-      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-    </svg>
-  );
-}
+export type CirclesDeepLink = { circleId: string; initialTab: "details" | "chat"; justJoined?: boolean };
 
 function IconBell() {
   return (
@@ -92,8 +101,14 @@ export function App() {
   const [discoverDateFilter, setDiscoverDateFilter] = useState<string | null>(null);
   const [discoverHobbyFilter, setDiscoverHobbyFilter] = useState<string | null>(null);
   const [guestHobbySlug, setGuestHobbySlug] = useState<string | null>(null);
+  const [createHobby, setCreateHobby] = useState<{ slug: string; subtype: string | null; level: string | null } | null>(
+    null,
+  );
   const [createMeetDate, setCreateMeetDate] = useState<string | null>(null);
   const [returnStageAfterNotif, setReturnStageAfterNotif] = useState<AppStage>("dashboard");
+  /** Bumped on every bottom-nav tap so the destination resets to its top level. */
+  const [navVisitKey, setNavVisitKey] = useState(0);
+  const [profileInitialTab, setProfileInitialTab] = useState<ProfileTab | undefined>(undefined);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -303,8 +318,30 @@ export function App() {
   /** Navigate without moving focus to the Menu button (use for header icons). */
   function navigate(s: AppStage) {
     setMenuOpen(false);
-    if (s === "circles") setCirclesVisitKey((k) => k + 1);
+    if (s === "circles" || s === "myCircles") setCirclesVisitKey((k) => k + 1);
+    if (s !== "profile") setProfileInitialTab(undefined);
     setStage(s);
+  }
+
+  function navigateFromBottomNav(item: (typeof NAV_ITEMS)[number]) {
+    if (guest && item.needsAccount) {
+      requestRegister(t("guest.noticeDefault"));
+      return;
+    }
+    if (item.stage === "circles") {
+      setDiscoverDateFilter(null);
+      setDiscoverHobbyFilter(null);
+    }
+    setCirclesDeepLink(null);
+    setNavVisitKey((k) => k + 1);
+    navigate(item.stage);
+  }
+
+  function openDiscoverCircle(circleId: string) {
+    setDiscoverDateFilter(null);
+    setDiscoverHobbyFilter(null);
+    setCirclesDeepLink({ circleId, initialTab: "details" });
+    navigate("circles");
   }
 
   /** Used from Menu: close menu and return focus to Menu. */
@@ -330,53 +367,38 @@ export function App() {
     void checkNotifications(myUserId, home?.circle?.id);
   }
 
+  const showBottomNav = stage !== "login" && !guestWelcomeActive && !onboardingMode;
+  const activeNav = navItemForStage(stage);
+  const showGreeting = stage === "dashboard" && !onboardingMode;
+
   return (
-    <div className={`app${stage === "login" || guestWelcomeActive ? " app--login" : ""}${stage === "dashboard" && !guestWelcomeActive ? " app--home" : ""}`}>
+    <div
+      className={`app${stage === "login" || guestWelcomeActive ? " app--login" : ""}${
+        (stage === "dashboard" || stage === "circles" || stage === "myCircles" || stage === "activity") &&
+        !guestWelcomeActive
+          ? " app--home"
+          : ""
+      }${showBottomNav ? " app--with-bottom-nav" : ""}`}
+    >
       {stage !== "login" && !guestWelcomeActive ? (
       <div className="row app-header-row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-        <div className="h1" style={{ marginBottom: 0 }}>
-          {t("nav.appTitle")}
-        </div>
+        {showGreeting ? (
+          <header className="app-greeting">
+            <h1 className="home-welcome-greeting">
+              {userFirstName?.trim()
+                ? t("homeFeed.greetingName", { name: userFirstName.trim() })
+                : t("homeFeed.greeting")}
+            </h1>
+            <p className="home-welcome-context muted">{t("homeFeed.greetingSubline")}</p>
+          </header>
+        ) : (
+          <div className="h1" style={{ marginBottom: 0 }}>
+            {t("nav.appTitle")}
+          </div>
+        )}
         <div className="header-toolbar">
-            {!onboardingMode ? (
-            <>
-            <button
-              type="button"
-              className={`icon-btn${stage === "dashboard" ? " is-active" : ""}`}
-              aria-label={t("nav.home")}
-              aria-current={stage === "dashboard" ? "page" : undefined}
-              disabled={loading}
-              title={t("nav.home")}
-              onClick={() => navigate("dashboard")}
-            >
-              <IconHome />
-            </button>
-            <button
-              type="button"
-              className={`icon-btn${stage === "circles" ? " is-active" : ""}`}
-              aria-label={t("nav.discoverCircles")}
-              aria-current={stage === "circles" ? "page" : undefined}
-              disabled={loading}
-              title={t("nav.discoverCircles")}
-              onClick={() => navigate("circles")}
-            >
-              <IconCircles />
-            </button>
-            </>
-            ) : null}
             {!onboardingMode && !guest ? (
             <>
-            <button
-              type="button"
-              className={`icon-btn${stage === "profile" ? " is-active" : ""}`}
-              aria-label={t("nav.profile")}
-              aria-current={stage === "profile" ? "page" : undefined}
-              disabled={loading}
-              title={t("nav.profile")}
-              onClick={() => navigate("profile")}
-            >
-              <IconProfile />
-            </button>
             <button
               type="button"
               className={`icon-btn icon-btn-notif${stage === "notifications" ? " is-active" : ""}`}
@@ -464,25 +486,31 @@ export function App() {
           }
         />
       ) : stage === "profile" ? (
-        <Profile onBack={() => navigate("dashboard")} onLogout={logout} />
+        <Profile
+          key={`profile-${navVisitKey}-${profileInitialTab ?? ""}`}
+          initialTab={profileInitialTab}
+          onBack={() => navigate("dashboard")}
+          onLogout={logout}
+          onOpenHobby={(slug) => {
+            setGuestHobbySlug(slug);
+            navigate("hobbyDetail");
+          }}
+        />
       ) : stage === "hobies" ? (
         <Hobies onBack={() => navigate("dashboard")} />
       ) : stage === "hobbyDetail" && guestHobbySlug ? (
-        <GuestHobbyDetail
+        <HobbyDetailPage
           slug={guestHobbySlug}
           onBack={() => {
             setGuestHobbySlug(null);
-            navigate("dashboard");
+            setProfileInitialTab("hobbies");
+            setStage("profile");
           }}
-          onSeeCircles={
-            guest
-              ? (slug) => {
-                  setDiscoverHobbyFilter(slug);
-                  setCirclesVisitKey((k) => k + 1);
-                  navigate("circles");
-                }
-              : undefined
-          }
+          onInterestRemoved={() => {
+            setGuestHobbySlug(null);
+            setProfileInitialTab("hobbies");
+            setStage("profile");
+          }}
         />
       ) : stage === "notifications" ? (
         <Notifications
@@ -497,8 +525,39 @@ export function App() {
           onInboxChanged={() => void checkNotifications(myUserId, home?.circle?.id)}
           onHomeRefresh={refresh}
         />
+      ) : stage === "myCircles" ? (
+        <Circles
+          key={`mine-${navVisitKey}`}
+          mode="mine"
+          onBack={() => navigate("dashboard")}
+          onOpenDiscover={() => navigate("circles")}
+          onHomeRefresh={refresh}
+          deepLink={circlesDeepLink}
+          onDeepLinkConsumed={() => setCirclesDeepLink(null)}
+          visitKey={circlesVisitKey}
+          guest={guest}
+          onRegisterRequest={requestRegister}
+        />
+      ) : stage === "activity" && home ? (
+        <ActivityPage
+          key={`activity-${navVisitKey}`}
+          home={home}
+          onRefresh={refresh}
+          onGoCreateJoin={(dateIso) => {
+            setCreateHobby(null);
+            setCreateMeetDate(dateIso ?? null);
+            navigate("createJoin");
+          }}
+          onGoFindCircles={(dateIso) => {
+            setDiscoverDateFilter(dateIso ?? null);
+            setDiscoverHobbyFilter(null);
+            navigate("circles");
+          }}
+        />
       ) : stage === "circles" ? (
         <Circles
+          key={`discover-${navVisitKey}`}
+          mode="discover"
           onBack={() => {
             setDiscoverDateFilter(null);
             setDiscoverHobbyFilter(null);
@@ -518,22 +577,38 @@ export function App() {
         <CreateJoinCircle
           initialTab="create"
           initialMeetDate={createMeetDate ?? undefined}
+          initialHobbySlug={createHobby?.slug}
+          initialHobbySubtype={createHobby?.subtype}
+          initialHobbyLevel={createHobby?.level}
           onBack={() => {
             setCreateMeetDate(null);
             navigate("dashboard");
           }}
-          onDone={async () => {
+          onDone={async (joinedCircleId) => {
             setCreateMeetDate(null);
             await refresh();
-            navigate("dashboard");
+            if (joinedCircleId) {
+              setCirclesDeepLink({ circleId: joinedCircleId, initialTab: "details", justJoined: true });
+              setCirclesVisitKey((k) => k + 1);
+              navigate("circles");
+            } else {
+              navigate("dashboard");
+            }
           }}
         />
       ) : home === null ? (
         <div className="card muted">{t("common.loading")}</div>
       ) : (
         <Dashboard
+          key={`home-${navVisitKey}`}
           home={home}
           onRefresh={refresh}
+          onOpenCatalogCircle={openDiscoverCircle}
+          onChooseHobbies={() => {
+            setProfileInitialTab("hobbies");
+            setStage("profile");
+          }}
+          onOpenMessages={() => navigate("myCircles")}
           guest={guest}
           onRegisterRequest={requestRegister}
           onBackToAuth={guest ? goToAuth : undefined}
@@ -554,6 +629,7 @@ export function App() {
               requestRegister(t("guest.noticeCreateCircle"));
               return;
             }
+            setCreateHobby(null);
             setCreateMeetDate(dateIso ?? null);
             navigate("createJoin");
           }}
@@ -563,17 +639,36 @@ export function App() {
             setCirclesVisitKey((k) => k + 1);
             navigate("circles");
           }}
-          onBrowseHobby={
-            guest
-              ? (slug) => {
-                  setGuestHobbySlug(slug);
-                  navigate("hobbyDetail");
-                }
-              : undefined
-          }
-          userFirstName={userFirstName}
+          onBrowseHobby={(slug) => {
+            setDiscoverDateFilter(null);
+            setDiscoverHobbyFilter(slug);
+            setCirclesVisitKey((k) => k + 1);
+            navigate("circles");
+          }}
         />
       )}
+
+      {showBottomNav ? (
+        <nav className="bottom-nav" aria-label={t("nav.primary")}>
+          {NAV_ITEMS.map((item) => {
+            const active = activeNav === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={`bottom-nav-item${active ? " is-active" : ""}`}
+                aria-current={active ? "page" : undefined}
+                onClick={() => navigateFromBottomNav(item)}
+              >
+                <span className="bottom-nav-icon" aria-hidden>
+                  {item.icon}
+                </span>
+                <span className="bottom-nav-label">{t(item.labelKey)}</span>
+              </button>
+            );
+          })}
+        </nav>
+      ) : null}
     </div>
   );
 }

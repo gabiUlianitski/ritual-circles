@@ -3,40 +3,36 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import type { CircleListItem, Hoby, UserMeResponse } from "../api/types";
 import { CircleDetails } from "./CircleDetails";
-import { CircleDetailsPrimaryAction, CircleDetailsSummary } from "./CircleDetailsSummary";
+import { CircleDetailsPrimaryAction, CircleDetailsSummary, CircleDetailsWhyJoin } from "./CircleDetailsSummary";
+import { CircleMomentumNote, CircleProgressCard, circleMomentum, momentumRank } from "./CircleProgressCard";
+import { DiscoverHobbyChips, DiscoverMomentumCard } from "./DiscoverMomentumCard";
 import { CreateJoinCircle } from "./CreateJoinCircle";
 import { hobbiesFromMe } from "./circleJoinHobby";
 import {
   applyDiscoverFilters,
   filterCirclesByMeetDate,
   formatMeetDateLabel,
-  getAllDiscoverCircles,
-  getNearYouCircles,
-  getRecommendedCircles,
-  getInterestCategories,
-  buildHobyInterestLookup,
-  userHasLocationData,
+  scoreCircleForUser,
   type DiscoverLevelFilter,
   type DiscoverSizeFilter,
   type DiscoverTimeFilter,
-  type InterestCategoryId,
 } from "./circleDiscover";
 import { isCircleJoinable } from "./circleParticipation";
-import {
-  DiscoverCircleCard,
-  DiscoverEmptyState,
-  DiscoverFilterChips,
-  DiscoverInterestChips,
-  DiscoverSection,
-  DiscoverSectionHint,
-} from "./DiscoverCircleCard";
+import { DiscoverEmptyState, DiscoverFilterChips, DiscoverSection } from "./DiscoverCircleCard";
 import { FormError } from "./FormError";
+import { CircleJoinSuccess, hasSeenJoinSuccess, markJoinSuccessSeen } from "./CircleJoinSuccess";
 
-type CirclesDeepLink = { circleId: string; initialTab: "details" | "chat" };
+type CirclesDeepLink = { circleId: string; initialTab: "details" | "chat"; justJoined?: boolean };
 type DiscoverPageTab = "discover" | "mine" | "joined";
+
+const CLOSEST_LIMIT = 3;
+const RECOMMENDED_LIMIT = 4;
 
 export function Circles(props: {
   onBack: () => void;
+  /** discover = browse joinable circles; mine = circles the user joined or created. */
+  mode?: "discover" | "mine";
+  onOpenDiscover?: () => void;
   onHomeRefresh: () => Promise<void> | void;
   deepLink?: CirclesDeepLink | null;
   onDeepLinkConsumed?: () => void;
@@ -59,6 +55,8 @@ export function Circles(props: {
   const [showDetails, setShowDetails] = useState(false);
   const [detailsCircleId, setDetailsCircleId] = useState<string | null>(null);
   const [detailsInitialTab, setDetailsInitialTab] = useState<"details" | "chat">("details");
+  const [detailsInitialDraft, setDetailsInitialDraft] = useState<string | undefined>(undefined);
+  const [joinSuccessCircleId, setJoinSuccessCircleId] = useState<string | null>(null);
   const [catalogDetail, setCatalogDetail] = useState<CircleListItem | null>(null);
   const [joinBusyId, setJoinBusyId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -67,10 +65,11 @@ export function Circles(props: {
   const [filterLevel, setFilterLevel] = useState<DiscoverLevelFilter>("");
   const [filterTime, setFilterTime] = useState<DiscoverTimeFilter>("");
   const [filterSize, setFilterSize] = useState<DiscoverSizeFilter>("");
-  const [interestFilter, setInterestFilter] = useState<InterestCategoryId>("");
   const [hobies, setHobies] = useState<Hoby[]>([]);
+  const [hobbyListReady, setHobbyListReady] = useState(false);
   const [me, setMe] = useState<UserMeResponse | null>(null);
-  const [pageTab, setPageTab] = useState<DiscoverPageTab>("discover");
+  const mode = props.mode ?? "discover";
+  const [pageTab, setPageTab] = useState<DiscoverPageTab>(mode === "mine" ? "joined" : "discover");
 
   const userHobies = useMemo(() => hobbiesFromMe(me), [me]);
   const userCity = me?.city ?? null;
@@ -96,8 +95,6 @@ export function Circles(props: {
     setLoading(false);
   }, [props.guest]);
 
-  const interestCategories = useMemo(() => getInterestCategories(t), [t, i18n.language]);
-
   useEffect(() => {
     void load();
   }, [load, props.visitKey, i18n.language]);
@@ -119,7 +116,10 @@ export function Circles(props: {
     void (async () => {
       try {
         const list = await api.getHobies();
-        if (!cancelled) setHobies(Array.isArray(list) ? list : []);
+        if (!cancelled) {
+          setHobies(Array.isArray(list) ? list : []);
+          setHobbyListReady(true);
+        }
       } catch {
         if (!cancelled) setHobies([]);
       }
@@ -132,38 +132,69 @@ export function Circles(props: {
   useEffect(() => {
     const link = props.deepLink;
     if (!link) return;
-    setCatalogDetail(null);
     setShowForm(false);
+    if (link.justJoined && !hasSeenJoinSuccess(me?.id ?? null, link.circleId)) {
+      setCatalogDetail(null);
+      setJoinSuccessCircleId(link.circleId);
+      props.onDeepLinkConsumed?.();
+      return;
+    }
+    if (link.initialTab === "details") {
+      // Non-members can only see the public catalog view, so wait for the catalog.
+      if (loading) return;
+      const listed = catalog.find((c) => c.id === link.circleId);
+      if (listed && !listed.isYours) {
+        setShowDetails(false);
+        setDetailsCircleId(null);
+        setCatalogDetail(listed);
+        props.onDeepLinkConsumed?.();
+        return;
+      }
+    }
+    setCatalogDetail(null);
     setDetailsCircleId(link.circleId);
     setDetailsInitialTab(link.initialTab);
     setShowDetails(true);
     props.onDeepLinkConsumed?.();
-  }, [props.deepLink]);
+  }, [props.deepLink, me?.id, loading, catalog]);
+
+  useEffect(() => {
+    if (mode !== "mine" || loading) return;
+    const joinedAny = catalog.some((c) => c.isYours && !c.isCreator);
+    const createdAny = catalog.some((c) => c.isCreator);
+    if (!joinedAny && createdAny) setPageTab("mine");
+  }, [mode, loading, catalog]);
 
   const catalogSorted = useMemo(() => {
     return [...catalog].sort((a, b) => Number(b.isYours) - Number(a.isYours));
   }, [catalog]);
 
-  const recommended = useMemo(
-    () => getRecommendedCircles(catalogSorted, userHobies, userCity),
-    [catalogSorted, userHobies, userCity],
+  const sortByMomentum = useCallback(
+    (list: CircleListItem[]) =>
+      list
+        .map((c) => ({
+          c,
+          rank: momentumRank(circleMomentum(c.memberCount, c.maxSize, Boolean(c.nextSessionAt))),
+          score: scoreCircleForUser(c, userHobies, userCity),
+        }))
+        .sort((a, b) => a.rank - b.rank || b.c.memberCount - a.c.memberCount || b.score - a.score)
+        .map((x) => x.c),
+    [userHobies, userCity],
   );
 
-  const nearYou = useMemo(
-    () => (userHasLocationData(userCity) ? getNearYouCircles(catalogSorted, userCity) : []),
-    [catalogSorted, userCity],
-  );
-
-  const hobyInterestLookup = useMemo(() => buildHobyInterestLookup(hobies), [hobies]);
-
-  const allCircles = useMemo(
-    () => getAllDiscoverCircles(catalogSorted, interestFilter, hobyInterestLookup),
-    [catalogSorted, interestFilter, hobyInterestLookup],
+  const completeHobbySlugs = useMemo(
+    () => new Set(hobies.map((h) => h.slug.trim().toLowerCase())),
+    [hobies],
   );
 
   const joinableCircles = useMemo(
-    () => catalogSorted.filter((c) => !c.isYours),
-    [catalogSorted],
+    () =>
+      catalogSorted.filter(
+        (c) =>
+          !c.isYours &&
+          (!hobbyListReady || completeHobbySlugs.has(c.ritualType.trim().toLowerCase())),
+      ),
+    [catalogSorted, completeHobbySlugs, hobbyListReady],
   );
 
   const myCreatedCircles = useMemo(
@@ -176,36 +207,59 @@ export function Circles(props: {
     [catalogSorted],
   );
 
-  const searchResults = useMemo(
+  const discoverResults = useMemo(
     () =>
-      applyDiscoverFilters(catalogSorted.filter((c) => !c.isYours), {
-        query: searchQuery,
-        hobbySlug: filterHobby,
-        level: filterLevel,
-        time: filterTime,
-        size: filterSize,
-        meetDateIso: props.prefilterDateIso ?? undefined,
-      }),
-    [catalogSorted, searchQuery, filterHobby, filterLevel, filterTime, filterSize, props.prefilterDateIso],
+      sortByMomentum(
+        applyDiscoverFilters(joinableCircles, {
+          query: searchQuery,
+          hobbySlug: filterHobby,
+          level: filterLevel,
+          time: filterTime,
+          size: filterSize,
+        }),
+      ),
+    [joinableCircles, searchQuery, filterHobby, filterLevel, filterTime, filterSize, sortByMomentum],
   );
+
+  const discoverSections = useMemo(() => {
+    const fillPct = (c: CircleListItem) => c.memberCount / Math.max(1, c.maxSize);
+    const closest = discoverResults
+      .filter((c) => isCircleJoinable(c.memberCount, c.maxSize))
+      .map((c) => ({ c, status: circleMomentum(c.memberCount, c.maxSize, Boolean(c.nextSessionAt)) }))
+      .filter(({ status }) => status === "readyToSchedule" || status === "almostReady" || status === "growing")
+      .sort((a, b) => momentumRank(a.status) - momentumRank(b.status) || fillPct(b.c) - fillPct(a.c))
+      .slice(0, CLOSEST_LIMIT)
+      .map(({ c }) => c);
+    const taken = new Set(closest.map((c) => c.id));
+    const recommended = discoverResults
+      .filter((c) => !taken.has(c.id) && scoreCircleForUser(c, userHobies, userCity) > 0)
+      .slice(0, RECOMMENDED_LIMIT);
+    for (const c of recommended) taken.add(c.id);
+    const rest = discoverResults.filter((c) => !taken.has(c.id));
+    return { closest, recommended, rest };
+  }, [discoverResults, userHobies, userCity]);
 
   const datePrefilterResults = useMemo(() => {
     if (!props.prefilterDateIso) return [];
-    return filterCirclesByMeetDate(joinableCircles, props.prefilterDateIso);
-  }, [joinableCircles, props.prefilterDateIso]);
+    return sortByMomentum(filterCirclesByMeetDate(joinableCircles, props.prefilterDateIso));
+  }, [joinableCircles, props.prefilterDateIso, sortByMomentum]);
 
-  const hasActiveFilters = Boolean(
-    searchQuery.trim() || filterHobby || filterLevel || filterTime || filterSize || props.prefilterDateIso,
+  const hobbyChips = useMemo(
+    () => hobies.filter((h) => h.slug && h.displayName),
+    [hobies],
   );
 
-  const hasDetailFilters = Boolean(filterHobby || filterLevel || filterTime || filterSize);
+  const hasDetailFilters = Boolean(filterLevel || filterTime || filterSize);
 
-  async function afterCreateOrJoin() {
+  async function afterCreateOrJoin(joinedCircleId?: string) {
     setShowForm(false);
     setFormInitialTab("create");
     setFormInitialMeetDate(undefined);
     await load();
     await props.onHomeRefresh();
+    if (joinedCircleId && !hasSeenJoinSuccess(me?.id ?? null, joinedCircleId)) {
+      setJoinSuccessCircleId(joinedCircleId);
+    }
   }
 
   async function joinOpenCircle(circleId: string) {
@@ -216,6 +270,13 @@ export function Circles(props: {
       setCatalogDetail(null);
       await load();
       await props.onHomeRefresh();
+      if (!hasSeenJoinSuccess(me?.id ?? null, circleId)) {
+        setJoinSuccessCircleId(circleId);
+      } else {
+        setDetailsCircleId(circleId);
+        setDetailsInitialTab("details");
+        setShowDetails(true);
+      }
     } catch (e) {
       setError(String(e));
     } finally {
@@ -302,41 +363,24 @@ export function Circles(props: {
 
   function renderJoinedCircleCard(c: CircleListItem) {
     return (
-      <DiscoverCircleCard
-        key={c.id}
-        circle={c}
-        onPress={() => openDetails(c)}
-        joinAction={{
-          label: t("discoverPage.open"),
-          secondary: true,
-          onJoin: () => openDetails(c),
-        }}
-      />
+      <DiscoverMomentumCard key={c.id} circle={c} actionLabel={t("discoverPage.open")} onOpen={() => openDetails(c)} />
     );
   }
 
   function renderMyCircleCard(c: CircleListItem) {
     return (
-      <DiscoverCircleCard
-        key={c.id}
-        circle={c}
-        onPress={() => openDetails(c)}
-        joinAction={{
-          label: t("discoverPage.manage"),
-          secondary: true,
-          onJoin: () => openDetails(c),
-        }}
-      />
+      <DiscoverMomentumCard key={c.id} circle={c} actionLabel={t("discoverPage.manage")} onOpen={() => openDetails(c)} />
     );
   }
 
-  function renderDiscoverCard(c: CircleListItem) {
+  function renderDiscoverCard(c: CircleListItem, featured = false) {
     return (
-      <DiscoverCircleCard
+      <DiscoverMomentumCard
         key={c.id}
         circle={c}
-        onPress={() => openDetails(c)}
-        joinAction={joinActionFor(c)}
+        actionLabel={t("discoverPage.viewActivity")}
+        onOpen={() => openDetails(c)}
+        featured={featured}
       />
     );
   }
@@ -351,8 +395,38 @@ export function Circles(props: {
           setFormInitialTab("create");
           setFormInitialMeetDate(undefined);
         }}
-        onDone={async () => {
-          await afterCreateOrJoin();
+        onDone={async (joinedCircleId) => {
+          await afterCreateOrJoin(joinedCircleId);
+        }}
+      />
+    );
+  }
+
+  if (joinSuccessCircleId) {
+    return (
+      <CircleJoinSuccess
+        circleId={joinSuccessCircleId}
+        onOpenChat={(prefillDraft) => {
+          markJoinSuccessSeen(me?.id ?? null, joinSuccessCircleId);
+          const cid = joinSuccessCircleId;
+          setJoinSuccessCircleId(null);
+          setDetailsCircleId(cid);
+          setDetailsInitialTab("chat");
+          setDetailsInitialDraft(prefillDraft);
+          setShowDetails(true);
+        }}
+        onViewCircle={() => {
+          markJoinSuccessSeen(me?.id ?? null, joinSuccessCircleId);
+          const cid = joinSuccessCircleId;
+          setJoinSuccessCircleId(null);
+          setDetailsCircleId(cid);
+          setDetailsInitialTab("details");
+          setDetailsInitialDraft(undefined);
+          setShowDetails(true);
+        }}
+        onClose={() => {
+          markJoinSuccessSeen(me?.id ?? null, joinSuccessCircleId);
+          setJoinSuccessCircleId(null);
         }}
       />
     );
@@ -363,16 +437,19 @@ export function Circles(props: {
       <CircleDetails
         circleId={detailsCircleId}
         initialTab={detailsInitialTab}
+        initialDraft={detailsInitialDraft}
         onBack={() => {
           setShowDetails(false);
           setDetailsCircleId(null);
           setDetailsInitialTab("details");
+          setDetailsInitialDraft(undefined);
         }}
         onLeftCircle={async () => {
           await props.onHomeRefresh();
           setShowDetails(false);
           setDetailsCircleId(null);
           setDetailsInitialTab("details");
+          setDetailsInitialDraft(undefined);
           await load();
         }}
       />
@@ -393,7 +470,22 @@ export function Circles(props: {
           hobiesCatalog={hobies}
           memberCount={c.memberCount}
           maxSize={c.maxSize}
+          hasNextSession={Boolean(c.nextSessionAt)}
         />
+        <CircleProgressCard
+          joined={c.memberCount}
+          capacity={c.maxSize}
+          hasNextSession={Boolean(c.nextSessionAt)}
+        />
+        <CircleMomentumNote
+          joined={c.memberCount}
+          capacity={c.maxSize}
+          hasNextSession={Boolean(c.nextSessionAt)}
+          viewerIsMember={c.isYours}
+        />
+        {!c.isYours && c.memberCount <= 1 ? (
+          <p className="circle-momentum-message">{t("circleChat.visitorHelp")}</p>
+        ) : null}
 
         {!c.isYours ? (
           <>
@@ -404,6 +496,7 @@ export function Circles(props: {
               joinBusy={joinAction?.busy}
               onJoin={joinAction?.onJoin}
             />
+            <CircleDetailsWhyJoin circle={c} hobiesCatalog={hobies} />
           </>
         ) : null}
 
@@ -416,17 +509,9 @@ export function Circles(props: {
     <div className="card stack discover-page">
       <div className="discover-header row">
         <div className="discover-header-text">
+          {mode === "mine" ? (
           <div className="discover-header-title-row row">
             <div className="hoby-browse-toggle discover-page-tabs" role="tablist" aria-label={t("discoverPage.tabListAria")}>
-              <button
-                type="button"
-                role="tab"
-                className={pageTab === "discover" ? "is-active" : ""}
-                aria-selected={pageTab === "discover"}
-                onClick={() => setPageTab("discover")}
-              >
-                {t("discoverPage.tabDiscover")}
-              </button>
               <button
                 type="button"
                 role="tab"
@@ -447,13 +532,17 @@ export function Circles(props: {
               </button>
             </div>
           </div>
-          <p className="discover-subtitle muted">
-            {pageTab === "discover"
-              ? t("discoverPage.subtitleDiscover")
-              : pageTab === "mine"
-                ? t("discoverPage.subtitleMine")
-                : t("discoverPage.subtitleJoined")}
-          </p>
+          ) : null}
+          {pageTab === "discover" ? (
+            <div className="discover-hero">
+              <h1 className="discover-hero-title">{t("discoverPage.heroTitle")}</h1>
+              <p className="discover-hero-subtitle">{t("discoverPage.heroSubtitle")}</p>
+            </div>
+          ) : (
+            <p className="discover-subtitle muted">
+              {pageTab === "mine" ? t("discoverPage.subtitleMine") : t("discoverPage.subtitleJoined")}
+            </p>
+          )}
         </div>
         <div className="row discover-header-actions">
           <button type="button" className="primary" style={{ width: "auto" }} disabled={loading} onClick={() => openCreate()}>
@@ -495,7 +584,7 @@ export function Circles(props: {
               title={t("discoverPage.emptyJoinedTitle")}
               message={t("discoverPage.emptyJoinedMessage")}
               actionLabel={t("discoverPage.discoverCirclesAction")}
-              onAction={() => setPageTab("discover")}
+              onAction={() => (props.onOpenDiscover ? props.onOpenDiscover() : setPageTab("discover"))}
             />
           )}
         </div>
@@ -534,11 +623,11 @@ export function Circles(props: {
 
             <div className="discover-browse-row">
               <div className="discover-browse-interests">
-                <DiscoverInterestChips
-                  value={interestFilter}
-                  onChange={(v) => setInterestFilter(v as InterestCategoryId)}
+                <DiscoverHobbyChips
+                  hobies={hobbyChips}
+                  value={filterHobby}
+                  onChange={setFilterHobby}
                   disabled={loading}
-                  categories={interestCategories}
                 />
               </div>
               <button
@@ -560,19 +649,6 @@ export function Circles(props: {
 
             {filtersOpen ? (
               <div className="discover-filters-body stack">
-                <DiscoverFilterChips
-                  label={t("discoverPage.filterHobby")}
-                  value={filterHobby}
-                  disabled={loading}
-                  options={[
-                    { value: "", label: t("discoverPage.filterAll") },
-                    ...hobies.map((h) => ({
-                      value: h.slug,
-                      label: (h.icon ? `${h.icon} ` : "") + h.displayName,
-                    })),
-                  ]}
-                  onChange={setFilterHobby}
-                />
                 <DiscoverFilterChips
                   label={t("discoverPage.filterLevel")}
                   value={filterLevel}
@@ -613,7 +689,6 @@ export function Circles(props: {
                     type="button"
                     className="discover-filters-clear"
                     onClick={() => {
-                      setFilterHobby("");
                       setFilterLevel("");
                       setFilterTime("");
                       setFilterSize("");
@@ -626,66 +701,36 @@ export function Circles(props: {
             ) : null}
           </div>
 
-          {hasActiveFilters ? (
-            searchResults.length > 0 ? (
-              <DiscoverSection title={t("discoverPage.results")}>
-                <div className="discover-cards">{searchResults.map((c) => renderDiscoverCard(c))}</div>
-              </DiscoverSection>
-            ) : (
-              <DiscoverEmptyState
-                title={t("discoverPage.noResultsTitle")}
-                message={t("discoverPage.noResultsMessage")}
-                actionLabel={t("discoverPage.createCircleShort")}
-                onAction={() => openCreate()}
-              />
-            )
-          ) : joinableCircles.length === 0 ? (
+          {discoverResults.length > 0 ? (
+            <>
+              {discoverSections.closest.length > 0 ? (
+                <DiscoverSection
+                  title={t("discoverPage.closestTitle")}
+                  subtitle={t("discoverPage.closestSubtitle")}
+                >
+                  <div className="discover-cards discover-cards--featured">
+                    {discoverSections.closest.map((c) => renderDiscoverCard(c, true))}
+                  </div>
+                </DiscoverSection>
+              ) : null}
+              {discoverSections.recommended.length > 0 ? (
+                <DiscoverSection title={t("discoverPage.recommendedForYou")}>
+                  <div className="discover-cards">{discoverSections.recommended.map((c) => renderDiscoverCard(c))}</div>
+                </DiscoverSection>
+              ) : null}
+              {discoverSections.rest.length > 0 ? (
+                <DiscoverSection title={t("discoverPage.allActivities")}>
+                  <div className="discover-cards">{discoverSections.rest.map((c) => renderDiscoverCard(c))}</div>
+                </DiscoverSection>
+              ) : null}
+            </>
+          ) : (
             <DiscoverEmptyState
-              title={t("discoverPage.noCirclesTitle")}
-              actionLabel={t("discoverPage.createCircle")}
+              title={t("discoverPage.noMatchTitle")}
+              message={t("discoverPage.noMatchMessage")}
+              actionLabel={t("discoverPage.createCircleShort")}
               onAction={() => openCreate()}
             />
-          ) : (
-            <>
-              {recommended.length > 0 ? (
-                <DiscoverSection title={t("discoverPage.recommendedTitle")} subtitle={t("discoverPage.recommendedSubtitle")}>
-                  <div className="discover-cards">
-                    {recommended.map((c) => renderDiscoverCard(c))}
-                  </div>
-                </DiscoverSection>
-              ) : !props.guest ? (
-                <DiscoverSectionHint
-                  title={t("discoverPage.learningPrefsTitle")}
-                  message={t("discoverPage.learningPrefsMessage")}
-                />
-              ) : null}
-
-              {nearYou.length > 0 ? (
-                <DiscoverSection
-                  title={t("discoverPage.nearYouTitle")}
-                  subtitle={t("discoverPage.nearYouSubtitle")}
-                >
-                  <div className="discover-cards">
-                    {nearYou.map((c) => renderDiscoverCard(c))}
-                  </div>
-                </DiscoverSection>
-              ) : null}
-
-              <DiscoverSection title={t("discoverPage.allCircles")}>
-                {allCircles.length > 0 ? (
-                  <div className="discover-cards">
-                    {allCircles.map((c) => renderDiscoverCard(c))}
-                  </div>
-                ) : (
-                  <DiscoverEmptyState
-                    title={t("discoverPage.noCategoryTitle")}
-                    message={t("discoverPage.noCategoryMessage")}
-                    actionLabel={t("discoverPage.createCircle")}
-                    onAction={() => openCreate()}
-                  />
-                )}
-              </DiscoverSection>
-            </>
           )}
         </div>
       )}

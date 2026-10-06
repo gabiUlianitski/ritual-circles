@@ -48,8 +48,14 @@ export type HomeResponse = {
 export type UserHobyPreference = {
   slug: string;
   subtype?: string | null;
-  /** Catalogue level key — numeric (1, 2) or textual (beginner, intermediate). */
+  /** Catalogue level key — numeric (1, 2) or textual. Used when joining a circle. */
   level?: string | number | null;
+  /** Type keys chosen from this hobby. */
+  types?: string[] | null;
+  /** Internal only. Not shown in Profile. */
+  category?: string | null;
+  /** beginner | intermediate | advanced | expert. */
+  experienceLevel?: string | null;
 };
 
 export type UserLanguageItem = {
@@ -247,6 +253,12 @@ export type CommunityCirclePreview = {
   nextSessionAt?: string | null;
 };
 
+export type DiscoveryResponse = {
+  title: string;
+  body: string;
+  imagePrompt: string;
+};
+
 export type CommunityPreviewResponse = {
   stats: CommunityStats;
   featuredCircles: CommunityCirclePreview[];
@@ -347,13 +359,39 @@ export type Hoby = {
   slug: string;
   displayName: string;
   shortDescription?: string | null;
+  /** English catalogue name, even when displayName is localized. */
+  canonicalDisplayName?: string | null;
+  canonicalShortDescription?: string | null;
+  heDisplayName?: string | null;
+  heShortDescription?: string | null;
   icon?: string | null;
   levels: unknown;
   types: unknown;
-  /** Discover browse bucket: sports | arts | games | learning | social */
+  /** Stable Discover bucket: sports | arts | games | learning | social */
   interestCategory?: string | null;
   /** Suggested group size when creating circles for this hoby */
   groupSize?: GroupSizePayload | null;
+  archived?: boolean;
+};
+
+export type HobyBulkResponse = {
+  deleted: string[];
+  archived: string[];
+  regenerated: string[];
+  blocked: string[];
+  failed: string[];
+};
+
+export type HobyRegenField = "description" | "icon" | "category" | "types" | "levels" | "groupSize";
+
+export type HobyRegeneratePreview = {
+  shortDescription?: string | null;
+  icon?: string | null;
+  interestCategory?: string | null;
+  levels?: unknown;
+  types?: unknown;
+  groupSize?: GroupSizePayload | null;
+  fields: string[];
 };
 
 export type HobyCreateRequest = {
@@ -369,6 +407,8 @@ export type HobyCreateRequest = {
 export type HobyUpdateRequest = {
   displayName?: string;
   shortDescription?: string | null;
+  heDisplayName?: string | null;
+  heShortDescription?: string | null;
   icon?: string | null;
   levels?: unknown;
   types?: unknown;

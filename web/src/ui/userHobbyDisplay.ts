@@ -1,8 +1,15 @@
 import type { Hoby, UserHobyPreference } from "../api/types";
 import { levelsForSelectedType, parseHobyLevelsFlat, parseHobyTypesNested } from "./hobyMetadata";
 
+export function selectedTypeKeys(entry: UserHobyPreference): string[] {
+  const fromList = (entry.types ?? []).map((key) => key.trim()).filter(Boolean);
+  if (fromList.length) return fromList;
+  const single = entry.subtype?.trim();
+  return single ? [single] : [];
+}
+
 export function userHobyEntryKey(entry: UserHobyPreference): string {
-  return `${entry.slug}|${entry.subtype ?? ""}|${entry.level ?? ""}`;
+  return `${entry.slug}|${selectedTypeKeys(entry).join(",")}|${entry.level ?? ""}`;
 }
 
 export function userHobyEntryLabel(

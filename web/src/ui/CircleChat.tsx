@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
-import type { CircleMessage, CircleResponse, CitySuggestItem, CountryItem, VenueSuggestionItem } from "../api/types";
+import type { CircleMemberResponse, CircleMessage, CircleResponse, CitySuggestItem, CountryItem, VenueSuggestionItem } from "../api/types";
 import { meetingPlaceValue } from "../venueCardDisplay";
 import { markChatFullySeen } from "../chatLastSeen";
 import { buildPlaceSuggestMessage, parsePlaceSuggestMessage } from "./circleChatPlaceSuggest";
@@ -21,17 +21,16 @@ import { suggestionAcceptPayloadFromBody } from "./suggestionAccept";
 import {
   CHAT_PLACEHOLDERS,
   canMemberSuggest,
-  coordinationChips,
   countPlainMessages,
-  icebreakerChips,
   isChatQuiet,
   isPlainMessage,
   meetupIsFull,
   ownerOnlyCircle,
-  silenceRecoveryLines,
   suggestedFirstMessage,
   systemPrompts,
 } from "./circleChatUx";
+import { CircleChatGuide } from "./CircleChatGuide";
+import { useTranslation } from "react-i18next";
 
 export function CircleChat(props: {
   circleId: string;
@@ -41,15 +40,25 @@ export function CircleChat(props: {
   memberCount?: number;
   maxSize?: number;
   nextSessionAt?: string | null;
+  members?: CircleMemberResponse[];
+  creatorUserId?: string | null;
+  onOpenMember?: (id: string) => void;
+  onViewMeeting?: () => void;
+  onShareInvite?: () => void;
+  onEditSchedule?: () => void;
+  initialDraft?: string;
 }) {
+  const { t } = useTranslation();
   const [messages, setMessages] = useState<CircleMessage[]>([]);
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(props.initialDraft ?? "");
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [circle, setCircle] = useState<CircleResponse | null>(null);
   const [isCreator, setIsCreator] = useState(false);
   const [memberCount, setMemberCount] = useState(props.memberCount ?? 0);
+  const [members, setMembers] = useState<CircleMemberResponse[]>(props.members ?? []);
+  const [creatorUserId, setCreatorUserId] = useState<string | null>(props.creatorUserId ?? null);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [placeOpen, setPlaceOpen] = useState(false);
   const [meetDate, setMeetDate] = useState(() => toDateInputValue(defaultSuggestDate()));
@@ -68,6 +77,8 @@ export function CircleChat(props: {
   const [venueSearchNonce, setVenueSearchNonce] = useState(0);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const messagesRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const minMeetDate = todayIsoLocal();
   const maxSize = props.maxSize ?? circle?.maxSize ?? 6;
 
@@ -88,10 +99,25 @@ export function CircleChat(props: {
   const canSuggest = canMemberSuggest(memberCount, isCreator);
   const quiet = isChatQuiet(messages);
   const ritualType = circle?.ritualType ?? "";
-  const chips = useMemo(
-    () => (quiet || plainCount === 0 ? icebreakerChips(ritualType) : coordinationChips(ritualType, isFull)),
-    [quiet, plainCount, ritualType, isFull],
+  const starters = useMemo(
+    () => [
+      t("circleChat.starterLevel"),
+      t("circleChat.starterDays"),
+      t("circleChat.starterBefore"),
+      t("circleChat.starterEnjoy"),
+    ],
+    [t],
   );
+  const pendingDateVote = useMemo(
+    () => messages.some((m) => Boolean(parseTimeSuggestMessage(m.body))),
+    [messages],
+  );
+  const latestTimeSuggestId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (parseTimeSuggestMessage(messages[i].body)) return messages[i].id;
+    }
+    return null;
+  }, [messages]);
   const prompts = useMemo(
     () =>
       systemPrompts({
@@ -189,6 +215,8 @@ export function CircleChat(props: {
         if (!cancelled) {
           setCircle(me.circle ?? null);
           setIsCreator(Boolean(me.isCreator));
+          setCreatorUserId(me.creatorUserId ?? null);
+          setMembers(me.members ?? []);
           if (props.memberCount == null) setMemberCount(me.members?.length ?? 0);
         }
       } catch {
@@ -199,6 +227,14 @@ export function CircleChat(props: {
       cancelled = true;
     };
   }, [props.circleId, props.memberCount]);
+
+  useEffect(() => {
+    if (props.members) setMembers(props.members);
+  }, [props.members]);
+
+  useEffect(() => {
+    if (props.creatorUserId !== undefined) setCreatorUserId(props.creatorUserId);
+  }, [props.creatorUserId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -239,7 +275,9 @@ export function CircleChat(props: {
   }, [props.circleId, props.nextSessionAt]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const box = messagesRef.current;
+    if (!box) return;
+    box.scrollTop = box.scrollHeight;
   }, [messages.length, suggestOpen, placeOpen, plainCount]);
 
   async function postMessage(body: string) {
@@ -267,8 +305,29 @@ export function CircleChat(props: {
     }
   }
 
-  async function sendChip(text: string) {
-    await send(text);
+  function insertDraft(text: string) {
+    setDraft((current) => (current.trim() && !starters.includes(current.trim()) ? current : text));
+    window.requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
+  function focusVote() {
+    document.getElementById("circle-chat-open-vote")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function suggestDate() {
+    if (isCreator && props.onEditSchedule) {
+      props.onEditSchedule();
+      return;
+    }
+    openTimeSuggest();
+  }
+
+  function suggestPlace() {
+    if (isCreator && props.onEditSchedule) {
+      props.onEditSchedule();
+      return;
+    }
+    openPlaceSuggest();
   }
 
   async function acceptSuggestion(messageId: string, body: string) {
@@ -436,7 +495,10 @@ export function CircleChat(props: {
 
     if (timeSuggest) {
       return (
-        <div className={`circle-chat-msg-card circle-chat-suggest-card${isMine ? " circle-chat-msg-card--mine" : ""}`}>
+        <div
+          id={m.id === latestTimeSuggestId ? "circle-chat-open-vote" : undefined}
+          className={`circle-chat-msg-card circle-chat-suggest-card${isMine ? " circle-chat-msg-card--mine" : ""}`}
+        >
           <div className="circle-chat-msg-meta">
             <span className="circle-chat-msg-author">{m.authorName}{isMine ? " · You" : ""}</span>
             <span className="circle-chat-msg-time">{formatMsgTime(m.createdAt)}</span>
@@ -508,36 +570,34 @@ export function CircleChat(props: {
     );
   }
 
-  const icebreakerSection = (
+  const icebreakerSection = soloOwner ? null : (
     <div className="circle-chat-icebreakers stack">
       {plainCount === 0 ? (
         <>
-          <p className="circle-chat-empty-title">No messages yet</p>
-          <p className="circle-chat-empty-sub muted">Start the conversation before you meet</p>
+          <p className="circle-chat-empty-title">{t("circleChat.quietTitle")}</p>
+          <p className="circle-chat-empty-sub muted">{t("circleChat.quietHint")}</p>
         </>
-      ) : quiet ? (
-        silenceRecoveryLines().map((line) => (
-          <p key={line} className="circle-chat-silence-line muted">{line}</p>
-        ))
       ) : null}
-      <div className="circle-chat-chips" role="list">
-        {chips.map((text) => (
-          <button
-            key={text}
-            type="button"
-            className="circle-chat-chip"
-            disabled={sending || soloOwner}
-            onClick={() => void sendChip(text)}
-          >
-            {text}
-          </button>
-        ))}
-      </div>
+      {quiet || plainCount === 0 ? (
+        <div className="circle-chat-chips" role="list">
+          {starters.map((text) => (
+            <button
+              key={text}
+              type="button"
+              className="circle-chat-chip"
+              disabled={sending}
+              onClick={() => insertDraft(text)}
+            >
+              {text}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 
   const messageList = (
-    <div className="circle-chat-messages stack">
+    <div className="circle-chat-messages stack" ref={messagesRef}>
       {isFull ? (
         <div className="circle-chat-system-prompt circle-chat-system-prompt--confirmed">
           ✅ Meetup confirmed
@@ -653,15 +713,15 @@ export function CircleChat(props: {
         <div className="circle-chat-first-suggest card stack">
           <div className="circle-chat-first-suggest-label">👋 Suggested first message</div>
           <p className="circle-chat-first-suggest-text">&ldquo;{firstMessage}&rdquo;</p>
-          <button type="button" className="primary" style={{ width: "auto", alignSelf: "flex-start" }} disabled={sending} onClick={() => void send(firstMessage)}>
-            Send
+          <button type="button" className="primary" style={{ width: "auto", alignSelf: "flex-start" }} disabled={sending} onClick={() => insertDraft(firstMessage)}>
+            {t("circleChat.useMessage")}
           </button>
         </div>
       ) : null}
 
       <div className="circle-chat-quick-actions row">
-        <button type="button" className="circle-chat-quick-btn" disabled={sending} onClick={() => void sendChip("Hey everyone 👋 looking forward to it")}>
-          Say hi
+        <button type="button" className="circle-chat-quick-btn" disabled={sending} onClick={() => insertDraft(t("circleChat.starterHello"))}>
+          {t("circleChat.sayHi")}
         </button>
         {canSuggest ? (
           <>
@@ -683,6 +743,7 @@ export function CircleChat(props: {
       ) : null}
 
       <textarea
+        ref={inputRef}
         rows={2}
         className="circle-chat-input"
         value={draft}
@@ -701,9 +762,29 @@ export function CircleChat(props: {
     </div>
   );
 
+  const guide = circle ? (
+    <CircleChatGuide
+      circle={circle}
+      joined={memberCount}
+      isCreator={isCreator}
+      members={members}
+      myUserId={myUserId}
+      creatorUserId={creatorUserId}
+      hasNextSession={Boolean(nextSessionAt)}
+      pendingDateVote={pendingDateVote}
+      onSuggestDate={suggestDate}
+      onSuggestPlace={suggestPlace}
+      onVote={focusVote}
+      onViewMeeting={() => props.onViewMeeting?.()}
+      onShare={() => props.onShareInvite?.()}
+      onOpenMember={(id) => props.onOpenMember?.(id)}
+    />
+  ) : null;
+
   if (props.embedded) {
     return (
       <div className="circle-chat-embedded stack">
+        {guide}
         {messageList}
         {error ? <FormError>{error}</FormError> : null}
         {compose}
@@ -714,16 +795,13 @@ export function CircleChat(props: {
   return (
     <div className="card stack circle-chat-page">
       <div className="row" style={{ justifyContent: "space-between", flexShrink: 0 }}>
-        <div className="circle-chat-page-title">
-          <div className="circle-chat-page-lead">💬 Chat with your circle</div>
-          <div className="muted circle-chat-page-sub">Break the ice before the meetup</div>
-        </div>
         {props.onBack ? (
           <button type="button" style={{ width: "auto" }} onClick={props.onBack}>
             Back
           </button>
         ) : null}
       </div>
+      {guide}
       {messageList}
       {error ? <FormError>{error}</FormError> : null}
       {compose}

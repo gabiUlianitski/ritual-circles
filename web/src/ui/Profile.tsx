@@ -10,11 +10,16 @@ import { FormError } from "./FormError";
 import { ProfileHobbiesTab } from "./ProfileHobbiesTab";
 import { ProfilePersonalTab } from "./ProfilePersonalTab";
 
-type ProfileTab = "personal" | "hobbies" | "security";
+export type ProfileTab = "personal" | "hobbies" | "security";
 
-export function Profile(props: { onBack: () => void; onLogout: () => void }) {
+export function Profile(props: {
+  onBack: () => void;
+  onLogout: () => void;
+  initialTab?: ProfileTab;
+  onOpenHobby?: (slug: string) => void;
+}) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<ProfileTab>("personal");
+  const [tab, setTab] = useState<ProfileTab>(props.initialTab ?? "personal");
   const [me, setMe] = useState<UserMeResponse | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -227,6 +232,7 @@ export function Profile(props: { onBack: () => void; onLogout: () => void }) {
               onSaved={load}
               onInfo={setInfo}
               onError={setError}
+              onOpenHobby={props.onOpenHobby}
             />
           ) : null}
 

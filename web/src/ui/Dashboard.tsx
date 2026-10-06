@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
-import type { HomeResponse, UserMeResponse } from "../api/types";
+import type { CircleListItem, CommunityStats, HomeResponse, Hoby, UserMeResponse } from "../api/types";
 import {
   dismissChecklist,
   getChecklistProgress,
@@ -10,29 +11,126 @@ import {
   shouldShowWelcomeTutorial,
 } from "../onboarding/onboardingState";
 import { CircleDetails } from "./CircleDetails";
-import { HomeCalendar } from "./HomeCalendar";
-import { HomeEmptyDayPrompt } from "./HomeEmptyDayPrompt";
-import { HomeCirclesList } from "./HomeCirclesList";
-import { HomeNextActivityCard } from "./HomeNextActivityCard";
-import { HomeSessionEvents } from "./HomeSessionEvents";
-import { HomeWeekStrip } from "./HomeWeekStrip";
-import { HomeWelcomeHeader } from "./HomeWelcomeHeader";
+import { circleHobyTitle } from "./circleDisplay";
+import { formatCircleLocationChip } from "./circleDetailsFormat";
+import { hobbiesFromMe } from "./circleJoinHobby";
+import { buildHomeFeed, MIN_VISIBLE_COUNT, socialStatusKey, type HomeUpcoming } from "./homeSections";
+import { CommunityPulse, HobbyVisual, InterestCarousel } from "./HomeVisuals";
+import { formatSessionDateTimeHero, sessionTitle } from "./homeDashboardUtils";
+import { TodaysDiscovery } from "./TodaysDiscovery";
 import { OnboardingChecklist } from "./onboarding/OnboardingChecklist";
 import { OnboardingFlow } from "./onboarding/OnboardingFlow";
-import { dateToIsoLocal, getUpcomingSessions } from "./homeDashboardUtils";
 
-function ymdKey(d: Date): string {
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+function socialLine(t: TFunction, members: number, confirmed = false): string {
+  if (confirmed) return t(socialStatusKey({ members, confirmed }));
+  if (members >= MIN_VISIBLE_COUNT) return t("homeFeed.peopleJoinedLine", { count: members });
+  return t(socialStatusKey({ members }));
 }
 
-function defaultSelectedDay(sessions: HomeResponse["calendarSessions"]): Date | null {
-  const next = getUpcomingSessions(sessions ?? [])[0];
-  if (next) {
-    const d = new Date(next.session.dateTime);
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+function NextActivity(props: {
+  upcoming: HomeUpcoming | undefined;
+  onOpen: (circleId: string) => void;
+  onFind: () => void;
+  onExplore: () => void;
+}) {
+  const { t } = useTranslation();
+  const u = props.upcoming;
+  if (!u) {
+    return (
+      <section className="card home-next-empty" aria-label={t("homeFeed.nothingPlannedYet")}>
+        <h2 className="home-next-compact-title">{t("homeFeed.nothingPlannedYet")}</h2>
+        <p className="home-next-compact-meta">{t("homeFeed.nothingPlannedInvite")}</p>
+        <div className="home-next-empty-actions">
+          <button type="button" className="primary" onClick={props.onFind}>
+            {t("homeFeed.findActivities")}
+          </button>
+          <button type="button" onClick={props.onExplore}>
+            {t("homeFeed.exploreCircles")}
+          </button>
+        </div>
+      </section>
+    );
   }
-  const today = new Date();
-  return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const circleId = u.kind === "session" ? u.item.circleId : u.circle.id;
+  const icon = u.kind === "session" ? u.item.hobyIcon : u.circle.hobyIcon;
+  const title = u.kind === "session" ? sessionTitle(u.item) : circleHobyTitle(u.circle);
+  const when =
+    u.kind === "session" ? formatSessionDateTimeHero(u.item.session.dateTime) : t("homeFeed.readyToChooseDate");
+  const place =
+    u.kind === "session"
+      ? u.item.session.locationOrLink
+      : formatCircleLocationChip(u.circle, t);
+  const members = u.kind === "session" ? (u.item.memberCount ?? 0) : u.circle.memberCount;
+  const confirmed =
+    u.kind === "session" &&
+    (u.item.myAttendance?.status === "attending" || (u.item.attendingCount ?? 0) > 0);
+  return (
+    <section className="card home-next-compact" aria-label={t("homeFeed.yourNextActivity")}>
+      <div className="home-next-compact-row">
+        <span className="home-hobby-badge home-hobby-badge--sm" aria-hidden>
+          {icon?.trim() || "✨"}
+        </span>
+        <span className="home-next-compact-copy">
+          <span className="home-next-compact-title">{title}</span>
+          <span className="home-next-compact-meta">
+            {when}
+            {place ? ` · ${place}` : ""}
+            {` · ${socialLine(t, members, confirmed)}`}
+          </span>
+        </span>
+        <button type="button" className="primary" onClick={() => props.onOpen(circleId)}>
+          {t("homeFeed.openActivity")}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function RecommendStrip(props: {
+  circles: CircleListItem[];
+  onOpen: (c: CircleListItem) => void;
+  onFind: () => void;
+  onCreate: () => void;
+}) {
+  const { t } = useTranslation();
+  if (props.circles.length === 0) {
+    return (
+      <section className="home-feed-block" aria-label={t("discoverPage.recommendedForYou")}>
+        <h2 className="home-section-title">{t("discoverPage.recommendedForYou")}</h2>
+        <button type="button" className="home-recommend-card home-recommend-card--invite" onClick={props.onCreate}>
+          <HobbyVisual slug="invite" icon="🌱" size="sm" />
+          <span className="home-recommend-body">
+            <span className="home-recommend-name">{t("homeFeed.inviteCardTitle")}</span>
+            <span className="home-recommend-blurb">{t("homeFeed.inviteCardBody")}</span>
+            <span className="home-recommend-cta">{t("homeFeed.startCircleCta")}</span>
+          </span>
+        </button>
+      </section>
+    );
+  }
+  return (
+    <section className="home-feed-block" aria-label={t("discoverPage.recommendedForYou")}>
+      <div className="home-section-head">
+        <h2 className="home-section-title">{t("discoverPage.recommendedForYou")}</h2>
+        <button type="button" className="home-section-link" onClick={props.onFind}>
+          {t("homeFeed.seeAll")}
+        </button>
+      </div>
+      <div className="home-carousel">
+        {props.circles.map((c) => (
+          <button key={c.id} type="button" className="home-recommend-card" onClick={() => props.onOpen(c)}>
+            <HobbyVisual slug={c.ritualType} icon={c.hobyIcon} size="sm" />
+            <span className="home-recommend-body">
+              <span className="home-recommend-name">{circleHobyTitle(c)}</span>
+              <span className="home-recommend-meta">{formatCircleLocationChip(c, t)}</span>
+              <span className="home-recommend-social">{socialLine(t, c.memberCount)}</span>
+              <span className="home-recommend-cta">{t("homeFeed.viewCircle")}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 export function Dashboard(props: {
@@ -40,22 +138,26 @@ export function Dashboard(props: {
   onRefresh: () => Promise<void> | void;
   onGoCreateJoin: (prefillDateIso?: string) => void;
   onGoFindCircles: (prefillDateIso?: string, hobbySlug?: string) => void;
+  /** Open a circle the user is not a member of (public catalog view). */
+  onOpenCatalogCircle: (circleId: string) => void;
+  onChooseHobbies: () => void;
+  onOpenMessages: () => void;
   onBrowseHobby?: (hobbySlug: string) => void;
-  userFirstName?: string | null;
   guest?: boolean;
   onRegisterRequest?: (notice?: string) => void;
   onBackToAuth?: () => void;
   guestWelcomeHeaderMenu?: React.ReactNode;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [detailsCircleId, setDetailsCircleId] = useState<string | null>(null);
-  const [detailsInitialTab, setDetailsInitialTab] = useState<"details" | "chat" | "scheduled">("details");
+  const [detailsTab, setDetailsTab] = useState<"details" | "chat">("details");
   const [me, setMe] = useState<UserMeResponse | null>(null);
+  const [catalog, setCatalog] = useState<CircleListItem[] | null>(null);
+  const [hobyCatalog, setHobyCatalog] = useState<Hoby[]>([]);
+  const [hobyCatalogReady, setHobyCatalogReady] = useState(false);
+  const [stats, setStats] = useState<CommunityStats | null>(null);
+  const [checklistDismissed, setChecklistDismissed] = useState(() => isChecklistDismissed());
   const calendarSessions = props.home.calendarSessions ?? [];
-  const myCircles = props.home.myCircles ?? [];
-  const hasActivities = calendarSessions.length > 0;
-  const [showFullCalendar, setShowFullCalendar] = useState(false);
-  const [selectedDay, setSelectedDay] = useState<Date | null>(() => defaultSelectedDay(calendarSessions));
 
   useEffect(() => {
     if (props.guest) {
@@ -65,51 +167,67 @@ export function Dashboard(props: {
     void api.getMe().then(setMe).catch(() => setMe(null));
   }, [props.home, props.guest]);
 
-  const [checklistDismissed, setChecklistDismissed] = useState(() => isChecklistDismissed());
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .listCircles()
+      .then((list) => !cancelled && setCatalog(Array.isArray(list) ? list : []))
+      .catch(() => !cancelled && setCatalog([]));
+    void api
+      .getCommunityPreview()
+      .then((res) => !cancelled && setStats(res.stats))
+      .catch(() => !cancelled && setStats(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [props.home]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .getHobies()
+      .then((list) => {
+        if (cancelled) return;
+        setHobyCatalog(Array.isArray(list) ? list : []);
+        setHobyCatalogReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setHobyCatalog([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [i18n.language]);
 
   const checklistProgress = useMemo(
     () => getChecklistProgress(props.home, me?.userHobies ?? []),
     [props.home, me?.userHobies],
   );
 
-  const selectedDaySessions = useMemo(() => {
-    if (!selectedDay) return [];
-    const key = ymdKey(selectedDay);
-    return calendarSessions
-      .filter((s) => ymdKey(new Date(s.session.dateTime)) === key)
-      .sort((a, b) => new Date(a.session.dateTime).getTime() - new Date(b.session.dateTime).getTime());
-  }, [calendarSessions, selectedDay]);
+  const hobbies = useMemo(() => hobbiesFromMe(me), [me]);
 
-  const showEmptyDayPrompt = selectedDay != null && selectedDaySessions.length === 0 && hasActivities;
-
-  function openCircle(circleId: string, tab: "details" | "chat" | "scheduled" = "details") {
-    setDetailsCircleId(circleId);
-    setDetailsInitialTab(tab);
-  }
-
-  function findCirclesForSelectedDay() {
-    if (!selectedDay) return;
-    props.onGoFindCircles(dateToIsoLocal(selectedDay));
-  }
-
-  function createCircleForSelectedDay() {
-    if (!selectedDay) return;
-    props.onGoCreateJoin(dateToIsoLocal(selectedDay));
-  }
+  const feed = useMemo(
+    () =>
+      buildHomeFeed({
+        catalog: catalog ?? [],
+        sessions: calendarSessions,
+        hobbies,
+        hobyCatalog,
+        city: me?.city ?? null,
+        onlyCompleteHobbies: hobyCatalogReady,
+      }),
+    [catalog, calendarSessions, hobbies, hobyCatalog, hobyCatalogReady, me?.city],
+  );
 
   if (detailsCircleId) {
     return (
       <CircleDetails
         circleId={detailsCircleId}
-        initialTab={detailsInitialTab}
-        onBack={() => {
-          setDetailsCircleId(null);
-          setDetailsInitialTab("details");
-        }}
+        initialTab={detailsTab}
+        onBack={() => setDetailsCircleId(null)}
         onLeftCircle={async () => {
           await props.onRefresh();
           setDetailsCircleId(null);
-          setDetailsInitialTab("details");
         }}
       />
     );
@@ -137,8 +255,30 @@ export function Dashboard(props: {
     );
   }
 
+  function openMember(circleId: string, tab: "details" | "chat" = "details") {
+    setDetailsTab(tab);
+    setDetailsCircleId(circleId);
+  }
+
+  function openListed(c: CircleListItem, chat = false) {
+    if (c.isYours) openMember(c.id, chat ? "chat" : "details");
+    else props.onOpenCatalogCircle(c.id);
+  }
+
+  const openHobby = (slug: string) => props.onGoFindCircles(undefined, slug);
+  const openDiscover = () => props.onGoFindCircles();
+  const nextActivity = feed.upcoming[0];
+
+  function guard(action: () => void) {
+    if (props.guest) {
+      props.onRegisterRequest?.(t("guest.noticeDefault"));
+      return;
+    }
+    action();
+  }
+
   return (
-    <div className="stack dashboard-home">
+    <div className="stack dashboard-home home-feed">
       {shouldShowChecklist(checklistProgress, checklistDismissed) ? (
         <OnboardingChecklist
           progress={checklistProgress}
@@ -149,70 +289,72 @@ export function Dashboard(props: {
         />
       ) : null}
 
-      <HomeWelcomeHeader sessions={calendarSessions} firstName={props.userFirstName} />
+      <TodaysDiscovery
+        hobies={hobyCatalog}
+        userSlugs={hobbies.map((h) => h.slug)}
+        circleSlugs={(catalog ?? []).filter((c) => c.isYours).map((c) => c.ritualType)}
+        userId={me?.id ?? null}
+        onExplore={openHobby}
+      />
 
-      <section className="home-primary-section stack" aria-label={t("home.upcomingThisWeek")}>
-        <h2 className="home-section-title">{t("home.upcomingThisWeek")}</h2>
-        <HomeNextActivityCard
-          sessions={calendarSessions}
-          onOpenCircle={(id) => openCircle(id, "details")}
-          onRefresh={props.onRefresh}
-          onFindCircles={() => props.onGoFindCircles()}
-          onCreateCircle={() => props.onGoCreateJoin()}
+      <NextActivity
+        upcoming={nextActivity}
+        onOpen={(id) => openMember(id)}
+        onFind={openDiscover}
+        onExplore={openDiscover}
+      />
+
+      {catalog === null ? (
+        <section className="home-feed-block" aria-busy="true">
+          <h2 className="home-section-title">{t("discoverPage.recommendedForYou")}</h2>
+          <div className="home-carousel">
+            <div className="home-recommend-card home-recommend-card--skeleton" />
+            <div className="home-recommend-card home-recommend-card--skeleton" />
+          </div>
+        </section>
+      ) : (
+        <RecommendStrip
+          circles={feed.recommended}
+          onOpen={(c) => openListed(c)}
+          onFind={openDiscover}
+          onCreate={() => guard(() => props.onGoCreateJoin())}
         />
+      )}
 
-        {hasActivities ? (
-          <>
-            <HomeWeekStrip sessions={calendarSessions} selectedDay={selectedDay} onSelectDay={setSelectedDay} />
-            {showEmptyDayPrompt && selectedDay ? (
-              <HomeEmptyDayPrompt
-                selectedDay={selectedDay}
-                onFindCircles={findCirclesForSelectedDay}
-                onCreateCircle={createCircleForSelectedDay}
-              />
-            ) : null}
-            <button
-              type="button"
-              className="home-btn-text home-calendar-toggle"
-              aria-expanded={showFullCalendar}
-              onClick={() => setShowFullCalendar((v) => !v)}
-            >
-              {showFullCalendar ? t("home.hideFullCalendar") : t("home.viewFullCalendar")}
-            </button>
-            <HomeCalendar
-              expanded={showFullCalendar}
-              sessions={calendarSessions}
-              selectedDay={selectedDay}
-              onSelectDay={setSelectedDay}
-            />
-            {selectedDay && selectedDaySessions.length > 0 ? (
-              <HomeSessionEvents
-                sessions={selectedDaySessions}
-                selectedDay={selectedDay}
-                onOpenCircle={(id) => openCircle(id, "details")}
-                onRefresh={props.onRefresh}
-              />
-            ) : null}
-          </>
-        ) : null}
+      <CommunityPulse stats={stats} groupsForming={feed.groupsForming} />
+
+      <section className="home-feed-block" aria-label={t("homeFeed.quickActions")}>
+        <h2 className="home-section-title">{t("homeFeed.quickActions")}</h2>
+        <div className="home-quick-grid">
+          <button type="button" className="home-quick-btn" onClick={() => guard(() => props.onGoCreateJoin())}>
+            <span aria-hidden>＋</span>
+            {t("homeFeed.quickCreate")}
+          </button>
+          <button type="button" className="home-quick-btn" onClick={openDiscover}>
+            <span aria-hidden>🔍</span>
+            {t("homeFeed.quickDiscover")}
+          </button>
+          <button
+            type="button"
+            className="home-quick-btn"
+            onClick={() => {
+              if (!props.guest && hobbies.length === 0) props.onChooseHobbies();
+              else document.getElementById("home-hobbies")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          >
+            <span aria-hidden>🎯</span>
+            {t("homeFeed.quickHobbies")}
+          </button>
+          <button type="button" className="home-quick-btn" onClick={() => guard(props.onOpenMessages)}>
+            <span aria-hidden>💬</span>
+            {t("homeFeed.quickMessages")}
+          </button>
+        </div>
       </section>
 
-      <section className="home-secondary-section stack" aria-label={t("emptyStates.myCirclesTitle")}>
-        <h2 className="home-section-title">{t("emptyStates.myCirclesTitle")}</h2>
-        <HomeCirclesList
-          items={myCircles}
-          sessions={calendarSessions}
-          onRefresh={props.onRefresh}
-          onOpenCircle={openCircle}
-          hideHeading
-          emptyTitle={t("emptyStates.circlesTitle")}
-          emptySubtitle={t("emptyStates.circlesSubtitle")}
-          emptyActionLabel={t("emptyStates.discoverCircles")}
-          onEmptyAction={() => props.onGoFindCircles()}
-          emptySecondaryActionLabel={t("emptyStates.createCircle")}
-          onEmptySecondaryAction={() => props.onGoCreateJoin()}
-        />
-      </section>
+      <div id="home-hobbies">
+        <InterestCarousel interests={feed.interests} onPick={props.onBrowseHobby ?? openHobby} />
+      </div>
     </div>
   );
 }

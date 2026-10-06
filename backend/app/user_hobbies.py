@@ -7,6 +7,29 @@ from app.schemas import UserHobyPreference
 
 _MAX_USER_HOBIES = 24
 
+LIFE_CATEGORIES = frozenset(
+    {
+        "sports",
+        "arts",
+        "food",
+        "technology",
+        "music",
+        "wellness",
+        "outdoor",
+        "learning",
+        "social",
+        "creativity",
+    }
+)
+EXPERIENCE_LEVELS = frozenset({"beginner", "intermediate", "advanced", "expert"})
+
+
+def _allowed(raw: Any, choices: frozenset[str]) -> str | None:
+    if raw is None:
+        return None
+    value = str(raw).strip().lower()
+    return value if value in choices else None
+
 
 def parse_hoby_level_key(level_raw: Any) -> str | int | None:
     if level_raw is None or level_raw == "":
@@ -38,6 +61,26 @@ def _level_is_set(level: str | int | None) -> bool:
     return True
 
 
+def _clean_types(raw: Any, subtype: str | None) -> list[str]:
+    found: list[str] = []
+    seen: set[str] = set()
+    source = raw if isinstance(raw, list) else []
+    for item in source:
+        key = str(item or "").strip()
+        if not key:
+            continue
+        marker = key.lower()
+        if marker in seen:
+            continue
+        seen.add(marker)
+        found.append(key)
+        if len(found) >= 12:
+            break
+    if not found and subtype:
+        found.append(subtype)
+    return found
+
+
 def _entry_key(slug: str, subtype: str | None, level: str | int | None) -> tuple[str, str, str]:
     level_part = "" if level is None else str(level).strip().lower()
     return (slug.strip().lower(), (subtype or "").strip().lower(), level_part)
@@ -52,11 +95,23 @@ def normalize_user_hobies(items: list[UserHobyPreference]) -> list[UserHobyPrefe
             continue
         subtype = (item.subtype or "").strip() or None
         level = parse_hoby_level_key(item.level)
+        types = _clean_types(item.types, subtype)
+        if types and (subtype or "").lower() not in {key.lower() for key in types}:
+            subtype = types[0]
         key = _entry_key(slug, subtype, level)
         if key in seen:
             continue
         seen.add(key)
-        out.append(UserHobyPreference(slug=slug, subtype=subtype, level=level))
+        out.append(
+            UserHobyPreference(
+                slug=slug,
+                subtype=subtype,
+                level=level,
+                types=types,
+                category=_allowed(item.category, LIFE_CATEGORIES),
+                experienceLevel=_allowed(item.experienceLevel, EXPERIENCE_LEVELS),
+            )
+        )
         if len(out) >= _MAX_USER_HOBIES:
             break
     return out
@@ -68,8 +123,14 @@ def user_hobies_to_json(items: list[UserHobyPreference]) -> list[dict[str, Any]]
         row: dict[str, Any] = {"slug": item.slug}
         if item.subtype:
             row["subtype"] = item.subtype
+        if item.types:
+            row["types"] = item.types
         if _level_is_set(item.level):
             row["level"] = item.level
+        if item.category:
+            row["category"] = item.category
+        if item.experienceLevel:
+            row["experienceLevel"] = item.experienceLevel
         rows.append(row)
     return rows
 
@@ -95,7 +156,16 @@ def parse_user_hobies_json(raw: Any) -> list[UserHobyPreference]:
         subtype_raw = item.get("subtype")
         subtype = str(subtype_raw).strip() if subtype_raw is not None and str(subtype_raw).strip() else None
         level = parse_hoby_level_key(item.get("level"))
-        out.append(UserHobyPreference(slug=slug, subtype=subtype, level=level))
+        out.append(
+            UserHobyPreference(
+                slug=slug,
+                subtype=subtype,
+                level=level,
+                types=_clean_types(item.get("types"), subtype),
+                category=_allowed(item.get("category"), LIFE_CATEGORIES),
+                experienceLevel=_allowed(item.get("experienceLevel"), EXPERIENCE_LEVELS),
+            )
+        )
     return normalize_user_hobies(out)
 
 
