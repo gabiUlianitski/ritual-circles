@@ -31,10 +31,14 @@ function itemTitle(item: StoredNotification): string {
   if (item.kind === "place_suggest") return `Place suggestion in ${item.circleName}`;
   if (item.kind === "chat") return `New message in ${item.circleName}`;
   if (item.kind === "circle_dropped") return `${item.circleName} was dropped`;
+  if (item.kind === "circle_invite") return item.circleName;
   return `New member in ${item.circleName}`;
 }
 
-function itemBody(item: StoredNotification): string {
+function itemBody(
+  item: StoredNotification,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
   if (item.kind === "time_suggest") {
     return `${item.authorName ?? "Someone"} suggested: ${item.suggestLabel ?? "a new meeting time"}`;
   }
@@ -45,10 +49,23 @@ function itemBody(item: StoredNotification): string {
   if (item.kind === "circle_dropped") {
     return item.body ?? "The organizer ended this circle. You are no longer in it.";
   }
+  if (item.kind === "circle_invite") {
+    return t("invitePreview.invitedBody", {
+      name: item.authorName?.trim() || t("invitePreview.someone"),
+    });
+  }
   return `Your circle now has ${item.memberCount ?? "?"} members.`;
 }
 
-function decisionLabel(item: StoredNotification): string | null {
+function decisionLabel(
+  item: StoredNotification,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string | null {
+  if (item.kind === "circle_invite") {
+    if (item.decision === "accepted") return t("invitePreview.joined");
+    if (item.decision === "declined") return t("invitePreview.declinedStatus");
+    return null;
+  }
   if (item.kind !== "time_suggest" && item.kind !== "place_suggest") return null;
   if (item.decision === "accepted") return "You accepted this suggestion";
   if (item.decision === "declined") return "You declined this suggestion";
@@ -143,6 +160,8 @@ export function Notifications(props: {
   onBack: () => void;
   onOpenCircleChat: (circleId: string) => void;
   onOpenCircleDetails: (circleId: string) => void;
+  onViewInvitation: (invitationId: string) => void;
+  declineNotice?: boolean;
   onInboxChanged?: () => void;
   onHomeRefresh?: () => Promise<void> | void;
 }) {
@@ -152,6 +171,11 @@ export function Notifications(props: {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [showDeclined, setShowDeclined] = useState(false);
+
+  useEffect(() => {
+    if (props.declineNotice) setShowDeclined(true);
+  }, [props.declineNotice]);
 
   const refreshList = useCallback(() => {
     if (!props.myUserId) {
@@ -199,6 +223,18 @@ export function Notifications(props: {
       return;
     }
 
+    if (item.kind === "circle_invite") {
+      if (item.decision === "accepted") {
+        props.onOpenCircleDetails(item.circleId);
+        return;
+      }
+      if (item.decision === "declined") return;
+      const invitationId =
+        item.invitationId || (item.id.startsWith("invite:") ? item.id.slice("invite:".length) : "");
+      if (invitationId) props.onViewInvitation(invitationId);
+      return;
+    }
+
     if (item.kind === "member_joined") {
       if (item.memberCount != null) {
         acknowledgeMemberCount(props.myUserId, item.circleId, item.memberCount);
@@ -219,6 +255,29 @@ export function Notifications(props: {
     if (!props.myUserId) return;
     deleteNotification(props.myUserId, item.id);
     notifyChanged();
+  }
+
+  async function respondToInvitation(item: StoredNotification, action: "accept" | "decline") {
+    if (!props.myUserId || !item.invitationId) return;
+    setBusyId(item.id);
+    setError(null);
+    try {
+      if (action === "accept") {
+        await api.acceptInvitation(item.invitationId);
+        markSuggestionDecision(props.myUserId, item.id, "accepted");
+        await props.onHomeRefresh?.();
+        props.onOpenCircleDetails(item.circleId);
+      } else {
+        await api.declineInvitation(item.invitationId);
+        markSuggestionDecision(props.myUserId, item.id, "declined");
+        setShowDeclined(true);
+      }
+      notifyChanged();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function respondToSuggestion(item: StoredNotification, action: "accept" | "decline") {
@@ -255,8 +314,8 @@ export function Notifications(props: {
   const visibleItems = filter === "unread" ? items.filter((n) => !n.read) : items;
 
   function renderItem(item: StoredNotification) {
-    const isSuggestion = item.kind === "time_suggest" || item.kind === "place_suggest";
-    const statusLabel = decisionLabel(item);
+    const isSuggestion = item.kind === "time_suggest" || item.kind === "place_suggest" || item.kind === "circle_invite";
+    const statusLabel = decisionLabel(item, t);
     const menu = (
       <NotificationItemMenu
         item={item}
@@ -285,7 +344,7 @@ export function Notifications(props: {
               <span className="notif-item-title">{itemTitle(item)}</span>
               {menu}
             </div>
-            <span className="notif-item-body muted">{itemBody(item)}</span>
+            <span className="notif-item-body muted">{itemBody(item, t)}</span>
             <span className="notif-item-when muted">{formatWhen(item.createdAt)}</span>
             {statusLabel ? (
               <span className="notif-item-decision muted">{statusLabel}</span>
@@ -296,17 +355,25 @@ export function Notifications(props: {
                   className="primary"
                   style={{ width: "auto" }}
                   disabled={busyId === item.id}
-                  onClick={() => void respondToSuggestion(item, "accept")}
+                  onClick={() =>
+                    void (item.kind === "circle_invite"
+                      ? respondToInvitation(item, "accept")
+                      : respondToSuggestion(item, "accept"))
+                  }
                 >
-                  {busyId === item.id ? "…" : "Agree"}
+                  {busyId === item.id ? "…" : item.kind === "circle_invite" ? t("invitePreview.acceptInvitation") : "Agree"}
                 </button>
                 <button
                   type="button"
                   style={{ width: "auto" }}
                   disabled={busyId === item.id}
-                  onClick={() => void respondToSuggestion(item, "decline")}
+                  onClick={() =>
+                    void (item.kind === "circle_invite"
+                      ? respondToInvitation(item, "decline")
+                      : respondToSuggestion(item, "decline"))
+                  }
                 >
-                  Decline
+                  {item.kind === "circle_invite" ? t("invitePreview.declineInvitation") : "Decline"}
                 </button>
                 <button
                   type="button"
@@ -314,7 +381,7 @@ export function Notifications(props: {
                   disabled={busyId === item.id}
                   onClick={() => openItem(item)}
                 >
-                  View chat
+                  {item.kind === "circle_invite" ? t("invitePreview.viewCircle") : "View chat"}
                 </button>
               </div>
             )}
@@ -341,7 +408,7 @@ export function Notifications(props: {
             <span className="notif-item-title">{itemTitle(item)}</span>
             {menu}
           </div>
-          <span className="notif-item-body muted">{itemBody(item)}</span>
+          <span className="notif-item-body muted">{itemBody(item, t)}</span>
           <span className="notif-item-when muted">{formatWhen(item.createdAt)}</span>
         </div>
       </li>
@@ -387,6 +454,11 @@ export function Notifications(props: {
       </p>
 
       {loading ? <div className="muted">Loading…</div> : null}
+      {showDeclined ? (
+        <p className="notif-item-decision" role="status">
+          {t("invitePreview.declinedBanner")}
+        </p>
+      ) : null}
       {error ? <FormError>{error}</FormError> : null}
 
       {!loading && !error && visibleItems.length === 0 ? (

@@ -109,9 +109,10 @@ export function RecommendedCircles(props: {
                       onJoin: () => void joinCircle(c.id),
                     }
                   : {
-                      label: t("discoverPage.requestJoin"),
+                      label: t("discoverPage.invitationOnly"),
                       secondary: true,
-                      onJoin: props.onCreateCircle,
+                      disabled: true,
+                      onJoin: () => {},
                     }
               }
             />

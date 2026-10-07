@@ -16,6 +16,7 @@ from app.schemas import (
     JoinCircleResponse,
     MeetingPlacePatch,
 )
+from app.circle_identity import circle_identity
 from app.hoby_i18n import localized_display_name
 from app.services.session_replenish import ensure_future_sessions_for_circle, ensure_future_sessions_for_user
 from app.user_hobbies import user_can_join_circle
@@ -104,6 +105,18 @@ def _max_size_from_group_size(spec: GroupSizeSpec | None) -> int:
     return 6
 
 
+def _optional_text(raw: object) -> str | None:
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    return text or None
+
+
+def _identity_kwargs(name: object, hobby_display_name: object, ritual_type: object) -> dict[str, object]:
+    stored, title, has_custom, _hobby = circle_identity(name, hobby_display_name, ritual_type)
+    return {"name": stored, "displayTitle": title, "hasCustomName": has_custom}
+
+
 def _cost_payment_from_json(raw: object) -> CirclePaymentSpec | None:
     if raw is None:
         return None
@@ -163,6 +176,8 @@ def _circle_response_from_row(
         hobyDisplayName=hoby_name,
         hobyIcon=hoby_icon,
         isRecurring=bool(row.get("is_recurring", row.get("isRecurring", True))),
+        description=_optional_text(row.get("description")),
+        **_identity_kwargs(row.get("name"), hoby_name, row.get("ritualType")),
     )
 
 
@@ -283,6 +298,11 @@ async def _join_circle_response(conn: asyncpg.Connection, circle: asyncpg.Record
     return JoinCircleResponse(circle=_circle_response_from_row(circle, hoby_name=hoby_name, hoby_icon=hoby_icon))
 
 
+def initial_creator_attendance_status(session_index: int) -> str:
+    """The meeting the creator just scheduled is a yes. Later weeks stay unset."""
+    return "attending" if session_index == 0 else "not_attending"
+
+
 async def create_circle(
     conn: asyncpg.Connection, *, user_id: UUID, payload: CircleCreateRequest, lang: str = "en"
 ) -> CircleResponse:
@@ -329,9 +349,9 @@ async def create_circle(
                 INSERT INTO circles (
                   id, "ritualType", ritual_level, ritual_subtype, modality, "recurringTime",
                   city, country_code, city_name, meeting_place, "maxSize", group_size_json,
-                  cost_payment_json, "inviteCode", created_by, invite_only, is_recurring
+                  cost_payment_json, "inviteCode", created_by, invite_only, is_recurring, description, name
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
                 """,
                 circle_id,
                 payload.ritualType,
@@ -350,6 +370,8 @@ async def create_circle(
                 user_id,
                 payload.inviteOnly,
                 payload.isRecurring,
+                _optional_text(payload.description),
+                payload.name,
             )
         except asyncpg.exceptions.DataError as e:
             msg = str(e).lower()
@@ -392,14 +414,15 @@ async def create_circle(
             if payload.isRecurring:
                 dt = next_session_datetime_after(dt, payload.recurringTime)
 
-        for session_id in session_ids:
+        for index, session_id in enumerate(session_ids):
             await conn.execute(
                 """
                 INSERT INTO attendance ("userId", "sessionId", status)
-                VALUES ($1, $2, 'not_attending')
+                VALUES ($1, $2, $3)
                 """,
                 user_id,
                 session_id,
+                initial_creator_attendance_status(index),
             )
 
     hoby_name, hoby_icon = await hoby_meta_for_ritual_type(conn, payload.ritualType, lang)
@@ -422,6 +445,8 @@ async def create_circle(
         hobyDisplayName=hoby_name,
         hobyIcon=hoby_icon,
         isRecurring=payload.isRecurring,
+        description=_optional_text(payload.description),
+        **_identity_kwargs(payload.name, hoby_name, payload.ritualType),
     )
 
 
@@ -460,7 +485,7 @@ async def join_circle_open(conn: asyncpg.Connection, *, user_id: UUID, circle_id
         if bool(circle.get("invite_only", True)):
             raise HTTPException(
                 status_code=403,
-                detail="This circle is invite-only; join with an invite code",
+                detail="This circle is invite-only. Ask the organizer to invite you.",
             )
 
         await _complete_join_transaction(conn, user_id=user_id, circle=circle)
@@ -496,6 +521,10 @@ async def patch_circle(
     recurring_time: str | None = None,
     is_recurring: bool | None = None,
     meeting_place_update: MeetingPlacePatch | None = None,
+    description: str | None = None,
+    update_description: bool = False,
+    name: str | None = None,
+    update_name: bool = False,
     lang: str = "en",
 ) -> CircleResponse:
     circle = await conn.fetchrow("SELECT * FROM circles WHERE id = $1", circle_id)
@@ -561,6 +590,20 @@ async def patch_circle(
                 is_recurring=is_recurring,
             )
         schedule_updated = True
+
+    if update_description:
+        await conn.execute(
+            "UPDATE circles SET description = $1 WHERE id = $2",
+            _optional_text(description),
+            circle_id,
+        )
+
+    if update_name:
+        await conn.execute(
+            "UPDATE circles SET name = $1 WHERE id = $2",
+            name,
+            circle_id,
+        )
 
     if meeting_place_update is not None:
         from app.services.circle_suggestions import apply_circle_meeting_place
@@ -702,7 +745,8 @@ async def get_circle_me(conn: asyncpg.Connection, *, user_id: UUID, circle_id: U
                u.user_hobies_json,
                u.preferred_hoby_slug,
                u.preferred_hoby_level,
-               u.preferred_hoby_subtype
+               u.preferred_hoby_subtype,
+               u.avatar_url
         FROM users u
         WHERE u.id IN (
             SELECT DISTINCT a."userId"
@@ -735,7 +779,7 @@ async def get_next_session_attendance_roster(
     rows = await conn.fetch(
         """
         WITH next_s AS (
-            SELECT s.id, s."dateTime"
+            SELECT s.id, s."dateTime", s."locationOrLink"
             FROM sessions s
             WHERE s."circleId" = $1
               AND s."dateTime" >= NOW()
@@ -745,6 +789,7 @@ async def get_next_session_attendance_roster(
         SELECT
             ns.id AS session_id,
             ns."dateTime" AS session_datetime,
+            ns."locationOrLink" AS session_location,
             u.id AS user_id,
             u.user_name,
             u.first_name,
@@ -762,6 +807,7 @@ async def get_next_session_attendance_roster(
     return {
         "sessionId": str(rows[0]["session_id"]),
         "dateTime": rows[0]["session_datetime"],
+        "locationOrLink": rows[0]["session_location"],
         "members": [
             {
                 "userId": str(r["user_id"]),
@@ -793,6 +839,8 @@ async def list_circles_catalog(conn: asyncpg.Connection, *, user_id: UUID, lang:
                c.group_size_json AS group_size_json,
                c.cost_payment_json AS cost_payment_json,
                c.invite_only AS "inviteOnly",
+               c.description,
+               c.name,
                h.display_name AS hoby_display_name_raw,
                h.icon AS "hobyIcon",
                h.i18n_json AS hoby_i18n_json,
@@ -874,6 +922,8 @@ async def list_circles_catalog(conn: asyncpg.Connection, *, user_id: UUID, lang:
                 "ritualSubtype": r["ritualSubtype"],
                 "hobyDisplayName": hoby_display,
                 "hobyIcon": r["hobyIcon"],
+                "description": _optional_text(r.get("description")),
+                **_identity_kwargs(r.get("name"), hoby_display, r.get("ritualType")),
                 "groupSize": _group_size_from_json(r.get("group_size_json")),
                 "costPayment": _cost_payment_from_json(r.get("cost_payment_json")),
                 "inviteOnly": bool(r["inviteOnly"]),

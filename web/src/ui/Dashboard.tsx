@@ -11,12 +11,12 @@ import {
   shouldShowWelcomeTutorial,
 } from "../onboarding/onboardingState";
 import { CircleDetails } from "./CircleDetails";
-import { circleHobyTitle } from "./circleDisplay";
+import { circleDisplayTitle, circleHobbySubtitle } from "./circleDisplay";
 import { formatCircleLocationChip } from "./circleDetailsFormat";
 import { hobbiesFromMe } from "./circleJoinHobby";
 import { buildHomeFeed, MIN_VISIBLE_COUNT, socialStatusKey, type HomeUpcoming } from "./homeSections";
 import { CommunityPulse, HobbyVisual, InterestCarousel } from "./HomeVisuals";
-import { formatSessionDateTimeHero, sessionTitle } from "./homeDashboardUtils";
+import { formatSessionDateTimeHero, sessionHobbySubtitle, sessionTitle } from "./homeDashboardUtils";
 import { TodaysDiscovery } from "./TodaysDiscovery";
 import { OnboardingChecklist } from "./onboarding/OnboardingChecklist";
 import { OnboardingFlow } from "./onboarding/OnboardingFlow";
@@ -53,7 +53,8 @@ function NextActivity(props: {
   }
   const circleId = u.kind === "session" ? u.item.circleId : u.circle.id;
   const icon = u.kind === "session" ? u.item.hobyIcon : u.circle.hobyIcon;
-  const title = u.kind === "session" ? sessionTitle(u.item) : circleHobyTitle(u.circle);
+  const title = u.kind === "session" ? sessionTitle(u.item) : circleDisplayTitle(u.circle);
+  const hobbyLine = u.kind === "session" ? sessionHobbySubtitle(u.item) : circleHobbySubtitle(u.circle);
   const when =
     u.kind === "session" ? formatSessionDateTimeHero(u.item.session.dateTime) : t("homeFeed.readyToChooseDate");
   const place =
@@ -71,8 +72,9 @@ function NextActivity(props: {
           {icon?.trim() || "✨"}
         </span>
         <span className="home-next-compact-copy">
-          <span className="home-next-compact-title">{title}</span>
+          <span className="home-next-compact-title circle-title-wrap">{title}</span>
           <span className="home-next-compact-meta">
+            {hobbyLine ? `${hobbyLine} · ` : ""}
             {when}
             {place ? ` · ${place}` : ""}
             {` · ${socialLine(t, members, confirmed)}`}
@@ -121,7 +123,10 @@ function RecommendStrip(props: {
           <button key={c.id} type="button" className="home-recommend-card" onClick={() => props.onOpen(c)}>
             <HobbyVisual slug={c.ritualType} icon={c.hobyIcon} size="sm" />
             <span className="home-recommend-body">
-              <span className="home-recommend-name">{circleHobyTitle(c)}</span>
+              <span className="home-recommend-name circle-title-wrap">{circleDisplayTitle(c)}</span>
+              {circleHobbySubtitle(c) ? (
+                <span className="home-recommend-meta">{circleHobbySubtitle(c)}</span>
+              ) : null}
               <span className="home-recommend-meta">{formatCircleLocationChip(c, t)}</span>
               <span className="home-recommend-social">{socialLine(t, c.memberCount)}</span>
               <span className="home-recommend-cta">{t("homeFeed.viewCircle")}</span>

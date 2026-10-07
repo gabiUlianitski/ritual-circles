@@ -1,26 +1,47 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import type { CostPaymentPayload, GroupSizePayload, Hoby } from "../api/types";
-import { circleHobyTitle, type CircleHobyFields } from "./circleDisplay";
+import type { CircleMemberResponse, CostPaymentPayload, GroupSizePayload, Hoby } from "../api/types";
+import { BidiText } from "./BidiText";
+import { circleIdentity, type CircleHobyFields, type CircleIdentityFields } from "./circleDisplay";
 import {
   formatCircleCostChip,
   formatCircleLocationChip,
   formatCircleScheduleChip,
 } from "./circleDetailsFormat";
-import { activityStatusMark, circleMomentum } from "./CircleProgressCard";
 import { circleHobyTypeLevelLabels, findHobyCatalogue } from "./memberHobbyLevel";
+import { parseHobyTypesNested } from "./hobyMetadata";
+import { memberDisplayName } from "./circleMembers";
+import { CircleMemberAvatar } from "./CircleMemberAvatar";
+
+/** Circle description, then the hobby catalogue line, then the shared fallback sentence. */
+export function circleSummaryDescription(
+  description: string | null | undefined,
+  catalogue: Hoby | undefined,
+  fallback: string,
+): string {
+  return description?.trim() || catalogue?.shortDescription?.trim() || fallback;
+}
 
 export function CircleDetailsSummary(props: {
-  circle: CircleHobyFields & {
+  circle: CircleIdentityFields & {
     modality?: string;
     costPayment?: CostPaymentPayload | null;
     groupSize?: GroupSizePayload | null;
     maxSize?: number;
+    description?: string | null;
   };
   hobiesCatalog?: Hoby[];
+  members?: CircleMemberResponse[];
+  myUserId?: string | null;
   memberCount?: number;
   maxSize?: number;
   hasNextSession?: boolean;
+  /** Invitation preview shows schedule and place in their own sections. */
+  hideFacts?: boolean;
+  hideDescription?: boolean;
+  hidePeople?: boolean;
+  hideStatus?: boolean;
+  showEyebrow?: boolean;
 }) {
   const { t } = useTranslation();
   const { circle } = props;
@@ -28,62 +49,144 @@ export function CircleDetailsSummary(props: {
     ? findHobyCatalogue(props.hobiesCatalog, circle.ritualType)
     : undefined;
 
-  const title = circleHobyTitle(circle);
+  const identity = circleIdentity(circle);
+  const title = identity.displayTitle;
   const typeLevel = catalogue ? circleHobyTypeLevelLabels(circle, catalogue) : null;
+  const selectedType = parseHobyTypesNested(catalogue?.types).find(
+    (item) => item.key === circle.ritualSubtype?.trim(),
+  );
   const level = typeLevel && typeLevel.level !== "—" ? typeLevel.level : null;
-  const description = catalogue?.shortDescription?.trim() || "";
+  const type = typeLevel && typeLevel.type !== "—" ? typeLevel.type : null;
+  const description = circleSummaryDescription(
+    circle.description,
+    catalogue,
+    t("circleDetails.descriptionFallback"),
+  );
   const icon = circle.hobyIcon?.trim() || catalogue?.icon?.trim() || "";
   const scheduleChip = formatCircleScheduleChip(circle, t);
   const locationChip = formatCircleLocationChip(circle, t);
   const costChip = formatCircleCostChip(circle.costPayment, circle.groupSize, t);
   const joined = Math.max(0, props.memberCount ?? 0);
   const capacity = Math.max(1, props.maxSize ?? circle.maxSize ?? 6);
-  const status = circleMomentum(joined, capacity, Boolean(props.hasNextSession));
+  const status =
+    joined >= capacity ? "full" : !props.hasNextSession ? "noActivity" : joined >= 3 ? "ready" : "forming";
   const statusKey = {
-    justStarted: "circleDetails.statusJustStarted",
-    growing: "circleDetails.statusGrowing",
-    almostReady: "circleDetails.statusAlmostReady",
-    readyToSchedule: "circleDetails.statusReadyToSchedule",
-    meetingConfirmed: "circleDetails.statusMeetingConfirmed",
+    full: "circleDetails.statusFull",
+    noActivity: "circleDetails.statusNoActivity",
+    ready: "circleDetails.statusReady",
+    forming: "circleDetails.statusForming",
   }[status];
+  const allMembers = props.members ?? [];
+  const previewMembers = allMembers.slice(0, 5);
+  const showHobbyLine = identity.hasCustomName && identity.hobbyDisplayName !== identity.displayTitle;
+  const identityLine = [
+    showHobbyLine ? identity.hobbyDisplayName : null,
+    type ? `${selectedType?.icon ? `${selectedType.icon} ` : ""}${type}` : null,
+    level,
+  ].filter((part): part is string => Boolean(part));
+  const peopleLine = membersNamesLine(allMembers, props.myUserId ?? null, t);
+  const seats = Array.from({ length: capacity }, (_, i) => i < joined);
 
   return (
-    <div className="circle-details-summary stack">
+    <div className="circle-details-summary">
       <header className="circle-details-hero">
-        <div className="circle-details-title-row">
+        <div className="circle-details-hero-glow" aria-hidden />
+        <div className="circle-details-hero-top">
           <span className="home-hobby-badge circle-details-hobby-badge" aria-hidden>
             {icon}
           </span>
-          <div className="circle-details-title-copy">
-            <h2 className="circle-details-hero-title">{level ? `${level} ${title}` : title}</h2>
-            <p className="circle-activity-status">
-              <span className="circle-activity-status-kicker">{t("circleDetails.activityStatus")}</span>
-              <span className={`circle-activity-status-badge circle-progress-status--${status}`}>
-                <span aria-hidden>{activityStatusMark(status)}</span>
-                {t(statusKey)}
-              </span>
+          {props.hideStatus ? null : (
+            <span className={`circle-activity-status-badge circle-details-status--${status}`}>
+              {t(statusKey)}
+            </span>
+          )}
+        </div>
+
+        <div className="circle-details-title-copy">
+          {props.showEyebrow === false ? null : (
+            <p className="circle-details-hero-eyebrow">{t("circleDetails.communityEyebrow")}</p>
+          )}
+          <BidiText as="h1" className="circle-details-hero-title circle-title-wrap">
+            {title}
+          </BidiText>
+          {identityLine.length ? (
+            <p className="circle-details-hero-identity" aria-label={t("circleDetails.identityAria")}>
+              {identityLine.map((part, i) => (
+                <React.Fragment key={part}>
+                  {i > 0 ? <span aria-hidden> · </span> : null}
+                  <BidiText>{part}</BidiText>
+                </React.Fragment>
+              ))}
             </p>
-            {description ? <p className="circle-details-hero-rhythm">{description}</p> : null}
+          ) : null}
+        </div>
+
+        {props.hideDescription ? null : <p className="circle-details-hero-rhythm">{description}</p>}
+
+        {props.hidePeople ? null : (
+        <div className="circle-details-hero-people" aria-label={t("circleDetails.members")}>
+          {previewMembers.length ? (
+            <div className="circle-details-avatar-stack">
+              {previewMembers.map((member) => (
+                <CircleMemberAvatar
+                  key={member.id}
+                  name={memberDisplayName(member, allMembers)}
+                  avatarUrl={member.avatarUrl}
+                  isYou={member.id === props.myUserId}
+                  compact
+                />
+              ))}
+            </div>
+          ) : null}
+          <div className="circle-details-hero-people-copy">
+            {peopleLine ? <BidiText className="circle-details-hero-names">{peopleLine}</BidiText> : null}
+            <span className="circle-details-seats" aria-label={t("circleDetails.seatsFilled", { joined, capacity })}>
+              <span className="circle-details-seat-dots" aria-hidden>
+                {seats.map((filled, i) => (
+                  <span key={i} className={filled ? "is-filled" : undefined} />
+                ))}
+              </span>
+              {t("circleDetails.seatsFilled", { joined, capacity })}
+            </span>
           </div>
         </div>
-      </header>
+        )}
 
-      <ul className="circle-details-facts" aria-label={t("circleDetails.chipsAria")}>
-        <li>
-          <DetailIcon kind="when" />
-          <span>{scheduleChip}</span>
-        </li>
-        <li>
-          <DetailIcon kind="where" />
-          <span>{locationChip}</span>
-        </li>
-        <li>
-          <DetailIcon kind="cost" />
-          <span>{costChip}</span>
-        </li>
-      </ul>
+        {props.hideFacts ? null : (
+          <ul className="circle-details-hero-facts" aria-label={t("circleDetails.chipsAria")}>
+            <li>
+              <DetailIcon kind="when" />
+              <span>{scheduleChip}</span>
+            </li>
+            <li>
+              <DetailIcon kind="where" />
+              <span>{locationChip}</span>
+            </li>
+            <li>
+              <DetailIcon kind="cost" />
+              <span>{costChip}</span>
+            </li>
+          </ul>
+        )}
+      </header>
     </div>
   );
+}
+
+/** "You, Dana and 2 others" — first names only, the viewer first. */
+function membersNamesLine(
+  members: CircleMemberResponse[],
+  myUserId: string | null,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string | null {
+  if (!members.length) return null;
+  const ordered = [...members].sort((a, b) => Number(b.id === myUserId) - Number(a.id === myUserId));
+  const names = ordered.map((m) =>
+    m.id === myUserId ? t("circleDetails.you") : memberDisplayName(m, members).split(/\s+/)[0] || "?",
+  );
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return t("circleDetails.namesTwo", { first: names[0], second: names[1] });
+  return t("circleDetails.namesMany", { first: names[0], second: names[1], count: names.length - 2 });
 }
 
 function DetailIcon(props: { kind: "when" | "where" | "cost" }) {

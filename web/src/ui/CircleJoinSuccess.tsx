@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import type { CircleMeResponse, CircleMessage } from "../api/types";
-import { circleHobyTitle } from "./circleDisplay";
+import { BidiText } from "./BidiText";
+import { circleDisplayTitle, circleHobbySubtitle } from "./circleDisplay";
 import {
   activityStatusMark,
   circleMomentum,
@@ -47,7 +48,6 @@ export function CircleJoinSuccess(props: {
   const [messages, setMessages] = useState<CircleMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [shareHint, setShareHint] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -130,31 +130,6 @@ export function CircleJoinSuccess(props: {
     [t],
   );
 
-  async function handleShare() {
-    setShareHint(null);
-    const text = t("circleJoinSuccess.shareDefaultText");
-    const shareUrl = window.location.href;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: circle ? circleHobyTitle(circle) : "Ritual Circles",
-          text,
-          url: shareUrl,
-        });
-        return;
-      } catch {
-        /* share sheet dismissed */
-      }
-    }
-    try {
-      const copyText = circle?.inviteCode ? `${text} (Invite: ${circle.inviteCode})` : text;
-      await navigator.clipboard.writeText(copyText);
-      setShareHint(t("circleJoinSuccess.shareCopied"));
-    } catch {
-      setShareHint(t("circleDetails.copyFailed"));
-    }
-  }
-
   const visibleMembers = members.slice(0, 5);
   const extraMembersCount = members.length - visibleMembers.length;
   const isQuietTwoPeople = joined === 2;
@@ -184,7 +159,14 @@ export function CircleJoinSuccess(props: {
                 {circle.hobyIcon?.trim() ?? ""}
               </span>
               <div className="circle-join-success-summary-copy">
-                <h2 className="circle-join-success-circle-name">{circleHobyTitle(circle)}</h2>
+                <div>
+                  <BidiText as="h2" className="circle-join-success-circle-name circle-title-wrap">
+                    {circleDisplayTitle(circle)}
+                  </BidiText>
+                  {circleHobbySubtitle(circle) ? (
+                    <p className="muted circle-identity-hobby">{circleHobbySubtitle(circle)}</p>
+                  ) : null}
+                </div>
               </div>
               <span className={`circle-activity-status-badge circle-progress-status--${status}`}>
                 <span aria-hidden>{activityStatusMark(status)}</span>
@@ -278,30 +260,17 @@ export function CircleJoinSuccess(props: {
             <button
               type="button"
               className="circle-details-primary circle-join-success-action-primary"
-              onClick={() => props.onOpenChat()}
-            >
-              {t("circleJoinSuccess.openChat")}
-            </button>
-
-            <button
-              type="button"
-              className="circle-join-success-action-secondary"
               onClick={props.onViewCircle}
             >
-              {t("circleJoinSuccess.viewCircle")}
+              {t("circleJoinSuccess.openCircle")}
             </button>
 
-            <button
-              type="button"
-              className="circle-join-success-action-tertiary"
-              onClick={() => void handleShare()}
-            >
-              {t("circleJoinSuccess.shareCircle")}
-            </button>
-
-            {shareHint ? (
-              <p className="circle-join-success-share-hint muted">{shareHint}</p>
+            {props.onClose ? (
+              <button type="button" className="circle-join-success-action-secondary" onClick={props.onClose}>
+                {t("circleJoinSuccess.continue")}
+              </button>
             ) : null}
+
           </div>
         </>
       ) : null}

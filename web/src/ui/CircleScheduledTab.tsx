@@ -38,6 +38,9 @@ import { CreateCircleVenuePicker } from "./CreateCircleVenuePicker";
 import { MeetDateTimePicker } from "./MeetDateTimePicker";
 import { circleAdjustTheme } from "./circleAdjustTheme";
 import { FormError } from "./FormError";
+import { CircleNameField, circleNameIsValid, circleNamePayload } from "./CircleNameField";
+import { useTranslation } from "react-i18next";
+import { CIRCLE_NAME_MAX } from "./circleDisplay";
 import { geolocationUserMessage } from "../geolocationMessage";
 import {
   costPaymentStateFromPayload,
@@ -113,6 +116,7 @@ export function CircleScheduledTab(props: {
   editWhenTrigger?: number;
   onCircleUpdated?: () => void | Promise<void>;
 }) {
+  const { t } = useTranslation();
   const [circle, setCircle] = useState<CircleResponse | null>(null);
   const [roster, setRoster] = useState<CircleNextSessionRoster | null>(null);
   const [myUserId, setMyUserId] = useState<string | null>(null);
@@ -134,6 +138,7 @@ export function CircleScheduledTab(props: {
   const [groupSizeN, setGroupSizeN] = useState(6);
   const [openToEveryone, setOpenToEveryone] = useState(false);
   const [repeatsWeekly, setRepeatsWeekly] = useState(true);
+  const [circleName, setCircleName] = useState("");
 
   const hydratedRef = useRef(false);
   const meetDateRef = useRef(meetDate);
@@ -197,6 +202,7 @@ export function CircleScheduledTab(props: {
         setGroupSizeN(groupSizeFromCircle(c));
         setOpenToEveryone(c.inviteOnly === false);
         setRepeatsWeekly(c.isRecurring !== false);
+        setCircleName(c.name?.trim() || "");
         if (city && c.ritualType) setVenueSearchNonce(1);
         hydratedRef.current = true;
       } else if (c) {
@@ -410,6 +416,27 @@ export function CircleScheduledTab(props: {
         </Typography>
 
         <SectionCard title="Meetup details">
+          <CircleNameField
+            id="circle-adjust-name"
+            value={circleName}
+            onChange={setCircleName}
+            disabled={saving}
+          />
+          <button
+            type="button"
+            className="primary"
+            style={{ width: "auto" }}
+            disabled={saving || !circleNameIsValid(circleName) || circleNamePayload(circleName) === (circle?.name?.trim() || null)}
+            onClick={() => {
+              if (!circleNameIsValid(circleName)) {
+                setError(t("circleDetails.circleNameTooLong", { max: CIRCLE_NAME_MAX }));
+                return;
+              }
+              void patchAndRefresh({ name: circleNamePayload(circleName) });
+            }}
+          >
+            {saving ? t("common.saving") : t("common.save")}
+          </button>
           <Box className="circle-adjust-wizards stack">
             <div className="stack" style={{ gap: 12 }}>
               <h2 className="create-circle-step-title" style={{ margin: 0 }}>

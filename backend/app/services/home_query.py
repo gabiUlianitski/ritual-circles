@@ -12,6 +12,7 @@ from app.schemas import (
     HomeResponse,
     SessionResponse,
 )
+from app.circle_identity import circle_identity
 from app.hoby_i18n import localized_display_name
 from app.services.circles_service import _circle_response_from_row
 from app.services.session_replenish import ensure_future_sessions_for_user
@@ -32,6 +33,8 @@ SELECT
   c."maxSize" AS max_size,
   c."inviteCode" AS invite_code,
   c.invite_only AS circle_invite_only,
+  c.description AS circle_description,
+  c.name AS circle_name,
   c.created_by AS circle_created_by,
   h.display_name AS hoby_display_name,
   h.i18n_json AS hoby_i18n_json,
@@ -92,6 +95,8 @@ def _circle_from_row(row: asyncpg.Record, lang: str = "en") -> CircleResponse:
         "invite_only": row.get("circle_invite_only"),
         "ritual_level": row.get("ritual_level"),
         "ritual_subtype": row.get("ritual_subtype"),
+        "description": row.get("circle_description"),
+        "name": row.get("circle_name"),
     }
     return _circle_response_from_row(
         circle_row,  # type: ignore[arg-type]
@@ -140,12 +145,19 @@ async def fetch_home(conn: asyncpg.Connection, user_id: UUID, lang: str = "en") 
     for row in rows:
         sess = _session_from_row(row)
         att = _attendance_from_row(row, user_id)
+        _stored, session_title, session_has_name, _hobby = circle_identity(
+            row.get("circle_name"),
+            _localized_hoby_name(row, lang),
+            row.get("ritual_type"),
+        )
         cal_item = HomeCalendarSession(
             session=sess,
             circleId=str(row["session_circle_id"]),
             ritualType=row["ritual_type"],
             hobyDisplayName=_localized_hoby_name(row, lang),
             hobyIcon=row.get("hoby_icon"),
+            displayTitle=session_title,
+            hasCustomName=session_has_name,
             myAttendance=att,
             attendingCount=int(row.get("attending_count") or 0),
             memberCount=int(row.get("member_count") or 0),

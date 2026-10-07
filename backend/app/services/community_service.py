@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncpg
 
+from app.circle_identity import circle_identity
 from app.hoby_i18n import localized_display_name
 from app.services.circles_service import _meeting_display
 
@@ -44,6 +45,7 @@ async def get_community_preview(conn: asyncpg.Connection, *, lang: str = "en") -
                c.country_code AS "countryCode",
                c.city_name AS "cityName",
                c.meeting_place AS "meetingPlace",
+               c.name,
                h.display_name AS hoby_display_name_raw,
                h.icon AS "hobyIcon",
                h.i18n_json AS hoby_i18n_json,
@@ -81,6 +83,7 @@ async def get_community_preview(conn: asyncpg.Connection, *, lang: str = "en") -
     for r in rows:
         hoby_row = {"display_name": r.get("hoby_display_name_raw"), "i18n_json": r.get("hoby_i18n_json")}
         hoby_display = localized_display_name(hoby_row, lang) if r.get("hoby_display_name_raw") else None
+        stored, title, has_custom, _hobby = circle_identity(r.get("name"), hoby_display, r.get("ritualType"))
         featured.append(
             {
                 "id": str(r["id"]),
@@ -93,6 +96,9 @@ async def get_community_preview(conn: asyncpg.Connection, *, lang: str = "en") -
                 "memberCount": int(r["memberCount"]),
                 "hobyDisplayName": hoby_display,
                 "hobyIcon": r["hobyIcon"],
+                "name": stored,
+                "displayTitle": title,
+                "hasCustomName": has_custom,
                 "nextSessionAt": r.get("nextSessionAt"),
             }
         )

@@ -1,10 +1,14 @@
 import React, { useState } from "react";
-import { api } from "../api/client";
-import { FormError } from "./FormError";
+import type { CircleResponse } from "../api/types";
+import { CircleCreationSuccess } from "./CircleCreationSuccess";
 import { CreateCircleWizard } from "./CreateCircleWizard";
 
 export function CreateJoinCircle(props: {
   onDone: (joinedCircleId?: string) => Promise<void> | void;
+  /** Called when the circle was created but the response had no id. */
+  onCreated: (createdCircleId: string | null) => Promise<void> | void;
+  /** Open the circle that was just created. Details is view; scheduled is the existing editor. */
+  onOpenCircle: (circleId: string, tab: "details" | "scheduled") => Promise<void> | void;
   onBack: () => void;
   /** When opening from Circles → join flow */
   initialTab?: "create" | "join";
@@ -14,22 +18,20 @@ export function CreateJoinCircle(props: {
   initialHobbySubtype?: string | null;
   initialHobbyLevel?: string | null;
 }) {
-  const [tab, setTab] = useState<"create" | "join">(() => props.initialTab ?? "create");
-  const [inviteCode, setInviteCode] = useState("");
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [createdCircle, setCreatedCircle] = useState<CircleResponse | null>(null);
+  const [createdMeetingAt, setCreatedMeetingAt] = useState<string | null>(null);
 
-  async function join() {
-    setWorking(true);
-    setError(null);
-    try {
-      const res = await api.joinCircle(inviteCode.trim());
-      await props.onDone(res.circle.id);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setWorking(false);
-    }
+  if (createdCircle?.id) {
+    return (
+      <CircleCreationSuccess
+        circle={createdCircle}
+        meetingAt={createdMeetingAt}
+        onViewCircle={() => props.onOpenCircle(createdCircle.id, "details")}
+        onEditCircle={() => props.onOpenCircle(createdCircle.id, "scheduled")}
+      />
+    );
   }
 
   return (
@@ -41,20 +43,15 @@ export function CreateJoinCircle(props: {
         </button>
       </div>
 
-      {tab === "join" ? (
-        <div className="row create-join-mode-tabs">
-          <button onClick={() => setTab("create")} disabled={working}>
-            Create
-          </button>
-          <button className="primary" onClick={() => setTab("join")} disabled={working}>
-            Join
-          </button>
-        </div>
-      ) : null}
-
-      {tab === "create" ? (
-        <CreateCircleWizard
-          onDone={props.onDone}
+      <CreateCircleWizard
+          onDone={async (created, firstSessionAt) => {
+            if (!created?.id?.trim()) {
+              await props.onCreated(null);
+              return;
+            }
+            setCreatedMeetingAt(firstSessionAt?.trim() || null);
+            setCreatedCircle(created);
+          }}
           working={working}
           setWorking={setWorking}
           error={error}
@@ -64,15 +61,6 @@ export function CreateJoinCircle(props: {
           initialHobbySubtype={props.initialHobbySubtype}
           initialHobbyLevel={props.initialHobbyLevel}
         />
-      ) : (
-        <>
-          <input placeholder="Invite code" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} />
-          {error ? <FormError>{error}</FormError> : null}
-          <button className="primary" disabled={working || !inviteCode.trim()} onClick={() => void join()}>
-            {working ? "Working…" : "Join circle"}
-          </button>
-        </>
-      )}
     </div>
   );
 }

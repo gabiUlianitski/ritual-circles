@@ -44,7 +44,7 @@ export function CircleChat(props: {
   creatorUserId?: string | null;
   onOpenMember?: (id: string) => void;
   onViewMeeting?: () => void;
-  onShareInvite?: () => void;
+  onInvite?: () => void;
   onEditSchedule?: () => void;
   initialDraft?: string;
 }) {
@@ -776,7 +776,7 @@ export function CircleChat(props: {
       onSuggestPlace={suggestPlace}
       onVote={focusVote}
       onViewMeeting={() => props.onViewMeeting?.()}
-      onShare={() => props.onShareInvite?.()}
+      onInvite={() => props.onInvite?.()}
       onOpenMember={(id) => props.onOpenMember?.(id)}
     />
   ) : null;

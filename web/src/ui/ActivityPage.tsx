@@ -9,7 +9,13 @@ import { HomeEmptyDayPrompt } from "./HomeEmptyDayPrompt";
 import { HomeNextActivityCard } from "./HomeNextActivityCard";
 import { HomeSessionEvents } from "./HomeSessionEvents";
 import { HomeWeekStrip } from "./HomeWeekStrip";
-import { dateToIsoLocal, formatSessionDateTimeHero, getUpcomingSessions, sessionTitle } from "./homeDashboardUtils";
+import {
+  dateToIsoLocal,
+  formatSessionDateTimeHero,
+  getUpcomingSessions,
+  sessionHobbySubtitle,
+  sessionTitle,
+} from "./homeDashboardUtils";
 
 const HISTORY_LIMIT = 6;
 
@@ -167,11 +173,13 @@ export function ActivityPage(props: {
                     {item.hobyIcon ?? ""}
                   </span>
                   <span className="activity-history-copy">
-                    <BidiText as="span" className="activity-history-title">
+                    <BidiText as="span" className="activity-history-title circle-title-wrap">
                       {sessionTitle(item)}
                     </BidiText>
                     <span className="activity-history-time muted">
-                      {formatSessionDateTimeHero(item.session.dateTime)}
+                      {[sessionHobbySubtitle(item), formatSessionDateTimeHero(item.session.dateTime)]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </span>
                   </span>
                   <span className="activity-history-status muted">

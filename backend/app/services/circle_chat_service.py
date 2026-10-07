@@ -51,14 +51,18 @@ async def list_messages(
     try:
         rows = await conn.fetch(
             """
-            SELECT m.id, m.circle_id, m.user_id,
+            SELECT recent.id, recent.circle_id, recent.user_id,
                    u.user_name, u.first_name, u.last_name,
-                   m.body, m.created_at
-            FROM circle_messages m
-            JOIN users u ON u.id = m.user_id
-            WHERE m.circle_id = $1
-            ORDER BY m.created_at ASC
-            LIMIT $2
+                   recent.body, recent.created_at
+            FROM (
+                SELECT id, circle_id, user_id, body, created_at
+                FROM circle_messages
+                WHERE circle_id = $1
+                ORDER BY created_at DESC
+                LIMIT $2
+            ) recent
+            JOIN users u ON u.id = recent.user_id
+            ORDER BY recent.created_at ASC
             """,
             circle_id,
             limit,

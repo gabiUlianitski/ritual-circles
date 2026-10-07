@@ -8,6 +8,9 @@ import type {
   AuthConfigResponse,
   GoogleAuthResponse,
   CircleCreateRequest,
+  CircleInvitation,
+  CircleInvitationPreview,
+  SharedCircleLink,
   CircleListItem,
   CircleMeResponse,
   CirclePatchRequest,
@@ -23,6 +26,7 @@ import type {
   HobyRegenField,
   HobySpellSuggestResponse,
   HobyUpdateRequest,
+  InvitationCandidate,
   HomeResponse,
   JoinCircleResponse,
   ReverseLocateResponse,
@@ -146,6 +150,34 @@ export const api = {
   createCircle: (payload: CircleCreateRequest) => request<CircleResponse>("POST", "/circles", payload),
   patchCircle: (circleId: string, payload: CirclePatchRequest) =>
     request<CircleResponse>("PATCH", `/circles/${encodeURIComponent(circleId)}`, payload),
+  searchInvitationCandidates: (circleId: string, q: string, sameCity: boolean) =>
+    request<InvitationCandidate[]>(
+      "GET",
+      `/circles/${encodeURIComponent(circleId)}/invitation-candidates?q=${encodeURIComponent(q)}&sameCity=${sameCity ? "true" : "false"}`,
+    ),
+  listCircleInvitations: (circleId: string) =>
+    request<CircleInvitation[]>(
+      "GET",
+      `/circles/${encodeURIComponent(circleId)}/invitations`,
+    ),
+  createCircleInvitation: (circleId: string, inviteeUserId: string) =>
+    request<CircleInvitation>("POST", `/circles/${encodeURIComponent(circleId)}/invitations`, {
+      inviteeUserId,
+    }),
+  cancelCircleInvitation: (circleId: string, invitationId: string) =>
+    request<CircleInvitation>(
+      "POST",
+      `/circles/${encodeURIComponent(circleId)}/invitations/${encodeURIComponent(invitationId)}/cancel`,
+    ),
+  openSharedCircleLink: (circleId: string) =>
+    request<SharedCircleLink>("POST", `/circles/${encodeURIComponent(circleId)}/shared-link`),
+  listMyInvitations: () => request<CircleInvitation[]>("GET", "/me/invitations"),
+  getInvitationPreview: (invitationId: string) =>
+    request<CircleInvitationPreview>("GET", `/me/invitations/${encodeURIComponent(invitationId)}`),
+  acceptInvitation: (invitationId: string) =>
+    request<CircleInvitation>("POST", `/me/invitations/${encodeURIComponent(invitationId)}/accept`),
+  declineInvitation: (invitationId: string) =>
+    request<CircleInvitation>("POST", `/me/invitations/${encodeURIComponent(invitationId)}/decline`),
   joinCircle: (inviteCode: string) => request<JoinCircleResponse>("POST", `/circles/join/${inviteCode}`),
   joinCircleOpen: (circleId: string) =>
     request<JoinCircleResponse>("POST", "/circles/join-open", { circleId }),

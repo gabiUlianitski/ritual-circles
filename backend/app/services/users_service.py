@@ -55,6 +55,7 @@ async def get_user(conn: asyncpg.Connection, *, user_id: UUID):
           preferred_hoby_level,
           preferred_hoby_subtype,
           user_hobies_json,
+          avatar_url,
           created_at,
           (password_hash IS NOT NULL) AS password_set,
           COALESCE(onboarding_completed, true) AS onboarding_completed
@@ -91,12 +92,13 @@ async def upsert_user(conn: asyncpg.Connection, *, user_id: UUID, payload: UserU
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
         await assert_user_name_available(conn, uname)
+        avatar = str(payload.avatarUrl).strip() if payload.avatarUrl else ""
         await conn.execute(
             """
             INSERT INTO users (
-              id, user_name, first_name, last_name, city, availability_day, availability_time, device_token
+              id, user_name, first_name, last_name, city, availability_day, availability_time, device_token, avatar_url
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, NULL)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, $8)
             """,
             user_id,
             uname,
@@ -105,6 +107,7 @@ async def upsert_user(conn: asyncpg.Connection, *, user_id: UUID, payload: UserU
             payload.city,
             payload.availability_day,
             availability_time,
+            avatar or None,
         )
     else:
         dump = payload.model_dump(exclude_unset=True)
@@ -212,6 +215,11 @@ async def upsert_user(conn: asyncpg.Connection, *, user_id: UUID, payload: UserU
         if "onboardingCompleted" in dump and dump["onboardingCompleted"] is not None:
             sets.append(f"onboarding_completed = ${len(params) + 1}")
             params.append(bool(dump["onboardingCompleted"]))
+        if "avatarUrl" in dump:
+            raw_avatar = dump["avatarUrl"]
+            avatar = str(raw_avatar).strip() if raw_avatar is not None else ""
+            sets.append(f"avatar_url = ${len(params) + 1}")
+            params.append(avatar or None)
 
         if sets:
             sql = f"UPDATE users SET {', '.join(sets)} WHERE id = $1"

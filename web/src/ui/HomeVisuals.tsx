@@ -3,10 +3,10 @@ import { useTranslation } from "react-i18next";
 import type { CircleListItem, CommunityStats } from "../api/types";
 import { api } from "../api/client";
 import { BidiText } from "./BidiText";
-import { circleHobyTitle } from "./circleDisplay";
+import { circleDisplayTitle, circleHobbySubtitle } from "./circleDisplay";
 import { activityStatusMark, circleStatusKey } from "./CircleProgressCard";
 import { FormError } from "./FormError";
-import { formatSessionDateTimeHero, sessionTitle } from "./homeDashboardUtils";
+import { formatSessionDateTimeHero, sessionHobbySubtitle, sessionTitle } from "./homeDashboardUtils";
 import { circleStatus, MIN_VISIBLE_COUNT, type HomeInterest, type HomeUpcoming } from "./homeSections";
 
 /** Dark-blue gradients; the hobby slug always maps to the same one. */
@@ -117,7 +117,8 @@ export function HomeHeroActivity(props: {
   const circleId = u.kind === "session" ? u.item.circleId : u.circle.id;
   const slug = u.kind === "session" ? u.item.ritualType : u.circle.ritualType;
   const icon = u.kind === "session" ? u.item.hobyIcon : u.circle.hobyIcon;
-  const title = u.kind === "session" ? sessionTitle(u.item) : circleHobyTitle(u.circle);
+  const title = u.kind === "session" ? sessionTitle(u.item) : circleDisplayTitle(u.circle);
+  const hobbyLine = u.kind === "session" ? sessionHobbySubtitle(u.item) : circleHobbySubtitle(u.circle);
   const members = u.kind === "session" ? (u.item.memberCount ?? 0) : u.circle.memberCount;
   const coming = u.kind === "session" ? u.item.attendingCount : undefined;
 
@@ -147,9 +148,10 @@ export function HomeHeroActivity(props: {
         </span>
       </HobbyVisual>
       <div className="home-hero-visual-body">
-        <BidiText as="h2" className="home-hero-visual-title">
+        <BidiText as="h2" className="home-hero-visual-title circle-title-wrap">
           {title}
         </BidiText>
+        {hobbyLine ? <p className="home-hero-visual-meta circle-identity-hobby">{hobbyLine}</p> : null}
         <p className="home-hero-visual-meta">
           {u.kind === "session" ? (
             <>
@@ -262,7 +264,12 @@ export function HappeningCarousel(props: { circles: CircleListItem[]; onOpen: (c
               </span>
             </HobbyVisual>
             <div className="home-happening-body">
-              <h3 className="home-happening-title">{circleHobyTitle(c)}</h3>
+              <h3 className="home-happening-title circle-title-wrap">
+                <BidiText>{circleDisplayTitle(c)}</BidiText>
+              </h3>
+              {circleHobbySubtitle(c) ? (
+                <p className="home-happening-when circle-identity-hobby">{circleHobbySubtitle(c)}</p>
+              ) : null}
               {c.nextSessionAt ? (
                 <p className="home-happening-when">📅 {formatSessionDateTimeHero(c.nextSessionAt)}</p>
               ) : null}
@@ -331,12 +338,17 @@ export function UpcomingList(props: { items: HomeUpcoming[]; onOpen: (circleId: 
                 </span>
                 <span className="activity-history-copy">
                   <BidiText as="span" className="activity-history-title">
-                    {u.kind === "session" ? sessionTitle(u.item) : circleHobyTitle(u.circle)}
+                    {u.kind === "session" ? sessionTitle(u.item) : circleDisplayTitle(u.circle)}
                   </BidiText>
                   <span className="activity-history-time muted">
-                    {u.kind === "session"
-                      ? formatSessionDateTimeHero(u.item.session.dateTime)
-                      : t("homeFeed.readyToChooseDate")}
+                    {[
+                      u.kind === "session" ? sessionHobbySubtitle(u.item) : circleHobbySubtitle(u.circle),
+                      u.kind === "session"
+                        ? formatSessionDateTimeHero(u.item.session.dateTime)
+                        : t("homeFeed.readyToChooseDate"),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </span>
                 </span>
                 <span className="activity-history-status muted">

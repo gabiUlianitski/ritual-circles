@@ -3,7 +3,8 @@ import { useTranslation } from "react-i18next";
 import type { AttendanceStatus, HomeCalendarSession, HomeCircleItem } from "../api/types";
 import { api } from "../api/client";
 import { markCircleLeftBySelf } from "../notificationInbox";
-import { circleHobyTitle } from "./circleDisplay";
+import { BidiText } from "./BidiText";
+import { circleDisplayTitle, circleHobbySubtitle } from "./circleDisplay";
 import { formatSessionDateTimeHero } from "./homeDashboardUtils";
 import { FormError } from "./FormError";
 
@@ -96,7 +97,8 @@ export function HomeCirclesList(props: {
       <div className="home-circles-cards stack">
         {props.items.map((item) => {
           const open = expandedId === item.circle.id;
-          const title = circleHobyTitle(item.circle);
+          const title = circleDisplayTitle(item.circle);
+          const hobbyLine = circleHobbySubtitle(item.circle);
           const busy = workingId === item.circle.id;
           const related = (props.sessions ?? []).filter((s) => s.circleId === item.circle.id);
           const matched =
@@ -121,10 +123,12 @@ export function HomeCirclesList(props: {
                   {item.circle.hobyIcon ?? ""}
                 </span>
                 <span className="home-circle-compact-copy grow">
-                  <span className="home-circle-compact-title">{title}</span>
-                  {memberLine || when ? (
+                  <span className="home-circle-compact-title circle-title-wrap">
+                    <BidiText>{title}</BidiText>
+                  </span>
+                  {hobbyLine || memberLine || when ? (
                     <span className="home-circle-compact-meta">
-                      {[memberLine, when].filter(Boolean).join(" • ")}
+                      {[hobbyLine, memberLine, when].filter(Boolean).join(" • ")}
                     </span>
                   ) : null}
                 </span>

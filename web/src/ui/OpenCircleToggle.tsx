@@ -8,10 +8,12 @@ export function OpenCircleToggle(props: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
+  id?: string;
 }) {
   return (
-    <label className="create-circle-repeat-row row create-circle-open-row">
+    <label className="create-circle-repeat-row row create-circle-open-row" htmlFor={props.id}>
       <input
+        id={props.id}
         type="checkbox"
         className="create-circle-repeat-checkbox"
         checked={props.checked}

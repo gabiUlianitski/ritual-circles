@@ -1,6 +1,7 @@
 import { api } from "./api/client";
 import type { CircleListItem, CircleMessage } from "./api/types";
-import { circleHobyTitle } from "./ui/circleDisplay";
+import i18n from "./i18n";
+import { circleDisplayTitle } from "./ui/circleDisplay";
 import { parsePlaceSuggestMessage } from "./ui/circleChatPlaceSuggest";
 import { parseTimeSuggestMessage } from "./ui/circleChatTimeSuggest";
 import { getChatSeenAt, messageTimeMs, sameUserId } from "./chatLastSeen";
@@ -9,6 +10,7 @@ export type NotificationKind =
   | "chat"
   | "member_joined"
   | "circle_dropped"
+  | "circle_invite"
   | "time_suggest"
   | "place_suggest";
 
@@ -24,6 +26,7 @@ export type StoredNotification = {
   authorName?: string;
   body?: string;
   memberCount?: number;
+  invitationId?: string;
   messageId?: string;
   suggestLabel?: string;
   messageBody?: string;
@@ -246,7 +249,7 @@ function syncDroppedCircleNotifications(
   const catalogById = new Map(catalog.map((c) => [c.id, c]));
   const current: CircleMembershipSnapshot[] = circleIds.map((id) => {
     const c = catalogById.get(id);
-    return { id, name: c ? circleHobyTitle(c) : "Your circle" };
+    return { id, name: c ? circleDisplayTitle(c) : i18n.t("circleDetails.yourCircle") };
   });
   const currentIds = new Set(current.map((c) => c.id));
   const previous = loadCircleMembershipSnapshot(userId);
@@ -289,6 +292,30 @@ export async function syncNotificationInbox(
   const existingIds = new Set(existing.map((n) => n.id));
   const deletedIds = loadDeletedIds(userId);
 
+  try {
+    const invites = await api.listMyInvitations();
+    for (const invite of Array.isArray(invites) ? invites : []) {
+      if (invite.status !== "pending") continue;
+      const id = `invite:${invite.id}`;
+      if (deletedIds.has(id)) continue;
+      const prev = existing.find((n) => n.id === id);
+      upsertInbox(userId, {
+        id,
+        kind: "circle_invite",
+        read: prev?.read ?? false,
+        createdAt: invite.createdAt,
+        circleId: invite.circleId,
+        circleName: invite.circleTitle,
+        authorName: invite.inviterName,
+        invitationId: invite.id,
+        decision: prev?.decision ?? "pending",
+      });
+      existingIds.add(id);
+    }
+  } catch {
+    /* invitations are optional until the migration is applied */
+  }
+
   const list = await api.listCircles();
   const catalog = Array.isArray(list) ? list : [];
   const circleIds = memberCircleIds(catalog, homeCircleId);
@@ -299,7 +326,7 @@ export async function syncNotificationInbox(
   await Promise.all(
     circleIds.map(async (circleId) => {
       const c = catalogById.get(circleId);
-      const circleName = c ? circleHobyTitle(c) : "Your circle";
+      const circleName = c ? circleDisplayTitle(c) : i18n.t("circleDetails.yourCircle");
       const memberCount = c?.memberCount ?? 0;
 
       if (c) {

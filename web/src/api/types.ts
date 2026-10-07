@@ -28,6 +28,8 @@ export type HomeCalendarSession = {
   ritualType: string;
   hobyDisplayName?: string | null;
   hobyIcon?: string | null;
+  displayTitle?: string | null;
+  hasCustomName?: boolean;
   myAttendance: AttendanceResponse | null;
   /** Members who tapped "I'm coming" for this session. */
   attendingCount?: number;
@@ -90,6 +92,7 @@ export type UserMeResponse = {
   createdAt: string | null;
   passwordSet: boolean;
   onboardingCompleted?: boolean;
+  avatarUrl?: string | null;
 };
 
 export type UserUpdateRequest = Partial<
@@ -109,6 +112,7 @@ export type UserUpdateRequest = Partial<
     | "availability_day"
     | "availability_time"
     | "onboardingCompleted"
+    | "avatarUrl"
   >
 >;
 
@@ -131,6 +135,10 @@ export type CircleResponse = {
   ritualSubtype?: string | null;
   hobyDisplayName?: string | null;
   hobyIcon?: string | null;
+  description?: string | null;
+  name?: string | null;
+  displayTitle?: string | null;
+  hasCustomName?: boolean;
 };
 
 export type MeetingPlacePatch = {
@@ -147,6 +155,8 @@ export type CirclePatchRequest = {
   recurringTime?: string;
   isRecurring?: boolean;
   meetingPlaceUpdate?: MeetingPlacePatch;
+  description?: string | null;
+  name?: string | null;
 };
 
 export type GroupSizeType = "fixed" | "max" | "min" | "range";
@@ -180,6 +190,8 @@ export type CircleCreateRequest = {
   countryCode?: string | null;
   cityName?: string | null;
   meetingPlace?: string | null;
+  description?: string | null;
+  name?: string | null;
   inviteOnly?: boolean;
   /** Exact first meeting time (local browser time sent as ISO UTC). */
   firstSessionAt?: string | null;
@@ -250,6 +262,9 @@ export type CommunityCirclePreview = {
   memberCount: number;
   hobyDisplayName?: string | null;
   hobyIcon?: string | null;
+  name?: string | null;
+  displayTitle?: string | null;
+  hasCustomName?: boolean;
   nextSessionAt?: string | null;
 };
 
@@ -283,6 +298,10 @@ export type CircleListItem = {
   ritualSubtype?: string | null;
   hobyDisplayName?: string | null;
   hobyIcon?: string | null;
+  description?: string | null;
+  name?: string | null;
+  displayTitle?: string | null;
+  hasCustomName?: boolean;
   groupSize?: GroupSizePayload | null;
   costPayment?: CostPaymentPayload | null;
   nextSessionAt?: string | null;
@@ -318,6 +337,7 @@ export type CircleMemberResponse = {
   availability_time?: string | null;
   hobby_subtype?: string | null;
   hobby_level?: string | number | null;
+  avatarUrl?: string | null;
 };
 export type CircleMemberAttendanceItem = {
   userId: string;
@@ -330,6 +350,7 @@ export type CircleMemberAttendanceItem = {
 export type CircleNextSessionRoster = {
   sessionId: string;
   dateTime: string;
+  locationOrLink?: string | null;
   members: CircleMemberAttendanceItem[];
 };
 
@@ -353,6 +374,58 @@ export type CircleMessage = {
 };
 
 export type CircleMessageCreateRequest = { body: string };
+
+export type InvitationStatus = "pending" | "accepted" | "declined" | "canceled";
+
+export type InvitationCandidate = {
+  id: string;
+  displayName: string;
+  city?: string | null;
+  avatarUrl?: string | null;
+  reasonLabel?: string | null;
+};
+
+export type SharedCircleLink = {
+  circleId: string;
+  invitationId?: string | null;
+  alreadyMember: boolean;
+};
+
+export type CircleInvitation = {
+  id: string;
+  circleId: string;
+  status: InvitationStatus;
+  createdAt: string;
+  circleTitle: string;
+  inviterName: string;
+  inviteeId: string;
+  inviteeName: string;
+};
+
+/** Pending-invitee read. Counts only — no invite code and no member identities. */
+export type CircleInvitationPreview = {
+  id: string;
+  circleId: string;
+  status: InvitationStatus;
+  inviterName: string;
+  title: string;
+  name?: string | null;
+  hasCustomName?: boolean;
+  ritualType: string;
+  hobyDisplayName?: string | null;
+  hobyIcon?: string | null;
+  description?: string | null;
+  recurringTime: string;
+  isRecurring?: boolean;
+  nextSessionAt?: string | null;
+  modality: string;
+  city?: string | null;
+  cityName?: string | null;
+  meetingPlace?: string | null;
+  memberCount: number;
+  maxSize: number;
+  matchedHobbyName?: string | null;
+};
 
 export type Hoby = {
   id: string;

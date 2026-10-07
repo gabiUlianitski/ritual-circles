@@ -508,6 +508,7 @@ export function applyDiscoverFilters(circles: CircleListItem[], filters: Discove
       const hay = [
         c.hobyDisplayName,
         c.ritualType,
+        c.name,
         c.ritualSubtype,
         c.city,
         c.cityName,

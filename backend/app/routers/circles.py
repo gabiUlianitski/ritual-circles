@@ -8,6 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.schemas import (
     CircleCreateRequest,
+    CircleInvitationCreateRequest,
+    CircleInvitationResponse,
+    InvitationCandidateResponse,
     CircleJoinByIdRequest,
     CircleLeaveRequest,
     CircleListItemResponse,
@@ -18,6 +21,7 @@ from app.schemas import (
     CircleSuggestionActionRequest,
     CircleResponse,
     JoinCircleResponse,
+    SharedCircleLinkResponse,
     MapCenter,
     VenueSuggestionItem,
     VenueSuggestionsRequest,
@@ -27,6 +31,13 @@ from app.deps import CurrentUser, conn_dep, get_current_user, get_optional_user,
 from app.user_availability_windows import availability_windows_from_row
 from app.user_hobbies import pick_hobby_for_slug
 from app.services.circle_suggestions import respond_to_circle_suggestion
+from app.services.circle_invitations import (
+    cancel_invitation,
+    create_invitation,
+    list_circle_invitations,
+    open_shared_circle_link,
+    search_invitation_candidates,
+)
 from app.services.circles_service import create_circle as create_circle_svc
 from app.services.circles_service import get_circle_me as get_circle_me_svc
 from app.services.circles_service import get_next_session_attendance_roster
@@ -186,8 +197,95 @@ async def patch_circle(
         recurring_time=payload.recurringTime,
         is_recurring=payload.isRecurring,
         meeting_place_update=payload.meetingPlaceUpdate,
+        description=payload.description,
+        update_description="description" in payload.model_fields_set,
+        name=payload.name,
+        update_name="name" in payload.model_fields_set,
         lang=lang,
     )
+
+
+def _parse_uuid(value: str, label: str) -> UUID:
+    try:
+        return UUID(value.strip())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"invalid {label}") from e
+
+
+@router.post("/{circleId}/shared-link", response_model=SharedCircleLinkResponse)
+async def open_shared_link(
+    circleId: str,
+    conn: asyncpg.Connection = Depends(conn_dep),
+    user: CurrentUser = Depends(get_current_user),
+) -> SharedCircleLinkResponse:
+    row = await open_shared_circle_link(
+        conn,
+        user_id=user.id,
+        circle_id=_parse_uuid(circleId, "circleId"),
+    )
+    return SharedCircleLinkResponse(**row)
+
+
+@router.get("/{circleId}/invitation-candidates", response_model=list[InvitationCandidateResponse])
+async def invitation_candidates(
+    circleId: str,
+    q: str = "",
+    sameCity: bool = False,
+    conn: asyncpg.Connection = Depends(conn_dep),
+    user: CurrentUser = Depends(get_current_user),
+    lang: str = Depends(get_request_lang),
+) -> list[InvitationCandidateResponse]:
+    rows = await search_invitation_candidates(
+        conn,
+        user_id=user.id,
+        circle_id=_parse_uuid(circleId, "circleId"),
+        query=q,
+        same_city=sameCity,
+        lang=lang,
+    )
+    return [InvitationCandidateResponse(**row) for row in rows]
+
+
+@router.get("/{circleId}/invitations", response_model=list[CircleInvitationResponse])
+async def circle_invitations(
+    circleId: str,
+    conn: asyncpg.Connection = Depends(conn_dep),
+    user: CurrentUser = Depends(get_current_user),
+) -> list[CircleInvitationResponse]:
+    rows = await list_circle_invitations(conn, user_id=user.id, circle_id=_parse_uuid(circleId, "circleId"))
+    return [CircleInvitationResponse(**row) for row in rows]
+
+
+@router.post("/{circleId}/invitations", response_model=CircleInvitationResponse)
+async def invite_member(
+    circleId: str,
+    payload: CircleInvitationCreateRequest,
+    conn: asyncpg.Connection = Depends(conn_dep),
+    user: CurrentUser = Depends(get_current_user),
+) -> CircleInvitationResponse:
+    row = await create_invitation(
+        conn,
+        user_id=user.id,
+        circle_id=_parse_uuid(circleId, "circleId"),
+        invitee_id=_parse_uuid(payload.inviteeUserId, "inviteeUserId"),
+    )
+    return CircleInvitationResponse(**row)
+
+
+@router.post("/{circleId}/invitations/{invitationId}/cancel", response_model=CircleInvitationResponse)
+async def cancel_circle_invitation(
+    circleId: str,
+    invitationId: str,
+    conn: asyncpg.Connection = Depends(conn_dep),
+    user: CurrentUser = Depends(get_current_user),
+) -> CircleInvitationResponse:
+    row = await cancel_invitation(
+        conn,
+        user_id=user.id,
+        circle_id=_parse_uuid(circleId, "circleId"),
+        invitation_id=_parse_uuid(invitationId, "invitationId"),
+    )
+    return CircleInvitationResponse(**row)
 
 
 @router.post("/join/{inviteCode}", response_model=JoinCircleResponse)
@@ -278,6 +376,7 @@ async def get_my_circle(
                 "availability_time": r["availability_time"],
                 "hobby_subtype": match.subtype if match else None,
                 "hobby_level": match.level if match else None,
+                "avatarUrl": r.get("avatar_url"),
             }
         )
     roster_raw = await get_next_session_attendance_roster(conn, circle_id=circle_row["id"])
@@ -286,6 +385,7 @@ async def get_my_circle(
         next_session_roster = CircleNextSessionRoster(
             sessionId=str(roster_raw["sessionId"]),
             dateTime=roster_raw["dateTime"],
+            locationOrLink=roster_raw.get("locationOrLink"),
             members=[CircleMemberAttendanceItem(**m) for m in roster_raw["members"]],
         )
     is_creator = circle_row.get("created_by") == user.id

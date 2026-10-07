@@ -1,7 +1,8 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import type { CircleMemberResponse, CircleResponse } from "../api/types";
-import { circleHobyTitle } from "./circleDisplay";
+import { BidiText } from "./BidiText";
+import { circleDisplayTitle, circleHobbySubtitle } from "./circleDisplay";
 import { memberDisplayName } from "./circleMembers";
 import {
   activityStatusMark,
@@ -43,7 +44,7 @@ export function CircleChatGuide(props: {
   onSuggestPlace: () => void;
   onVote: () => void;
   onViewMeeting: () => void;
-  onShare: () => void;
+  onInvite: () => void;
   onOpenMember: (id: string) => void;
 }) {
   const { t } = useTranslation();
@@ -78,8 +79,8 @@ export function CircleChatGuide(props: {
     onAction = props.onSuggestDate;
   } else if (solo && props.isCreator) {
     actionTitle = t("circleChat.creatorLooking");
-    actionLabel = t("circleChat.shareCircle");
-    onAction = props.onShare;
+    actionLabel = t("circleDetails.inviteTitle");
+    onAction = props.onInvite;
   }
 
   return (
@@ -88,7 +89,14 @@ export function CircleChatGuide(props: {
         <span className="home-hobby-badge circle-details-hobby-badge" aria-hidden>
           {props.circle.hobyIcon?.trim() ?? ""}
         </span>
-        <h2 className="circle-chat-guide-title">{circleHobyTitle(props.circle)}</h2>
+        <div className="circle-chat-guide-title-wrap">
+          <BidiText as="h2" className="circle-chat-guide-title circle-title-wrap">
+            {circleDisplayTitle(props.circle)}
+          </BidiText>
+          {circleHobbySubtitle(props.circle) ? (
+            <p className="muted circle-identity-hobby">{circleHobbySubtitle(props.circle)}</p>
+          ) : null}
+        </div>
         <span className={`circle-activity-status-badge circle-progress-status--${status}`}>
           <span aria-hidden>{activityStatusMark(status)}</span>
           {t(circleStatusKey(status))}

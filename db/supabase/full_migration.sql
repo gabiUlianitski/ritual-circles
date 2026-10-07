@@ -33,6 +33,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS work_summary TEXT NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS education_summary TEXT NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS availability_windows_json JSONB NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS languages_json JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_uq
   ON users (LOWER(email))
@@ -69,6 +70,8 @@ ALTER TABLE circles ADD COLUMN IF NOT EXISTS group_size_json JSONB NULL;
 ALTER TABLE circles ADD COLUMN IF NOT EXISTS cost_payment_json JSONB NULL;
 ALTER TABLE circles ADD COLUMN IF NOT EXISTS invite_only BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE circles ADD COLUMN IF NOT EXISTS is_recurring BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE circles ADD COLUMN IF NOT EXISTS description TEXT NULL;
+ALTER TABLE circles ADD COLUMN IF NOT EXISTS name TEXT NULL;
 
 ALTER TABLE circles DROP CONSTRAINT IF EXISTS circles_maxSize_check;
 ALTER TABLE circles DROP CONSTRAINT IF EXISTS "circles_maxSize_check";
@@ -169,5 +172,21 @@ CREATE INDEX IF NOT EXISTS idx_attendance_updated_at
 
 CREATE INDEX IF NOT EXISTS idx_circle_messages_circle_created
   ON circle_messages (circle_id, created_at);
+
+CREATE TABLE IF NOT EXISTS circle_invitations (
+  id UUID PRIMARY KEY,
+  circle_id UUID NOT NULL REFERENCES circles(id) ON DELETE CASCADE,
+  inviter_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  invitee_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'declined', 'canceled')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  responded_at TIMESTAMPTZ NULL,
+  canceled_at TIMESTAMPTZ NULL,
+  CHECK (inviter_user_id <> invitee_user_id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_circle_invitations_pending
+  ON circle_invitations (circle_id, invitee_user_id)
+  WHERE status = 'pending';
 
 COMMIT;

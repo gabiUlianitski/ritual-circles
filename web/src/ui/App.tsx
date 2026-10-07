@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, getAuthToken, setAuthToken } from "../api/client";
+import { captureCircleInviteFromLocation, clearCircleInvite } from "../circleInviteLink";
 import { resetDevUserId } from "../api/devUserId";
 import type { HomeResponse } from "../api/types";
 import i18n from "../i18n";
 import { hasAnyNotifications } from "../notificationsFeed";
 import { AppLanguageSelect } from "./AppLanguageSelect";
 import { shouldShowWelcomeTutorial } from "../onboarding/onboardingState";
+import { CircleInvitePreview } from "./CircleInvitePreview";
 import { Notifications } from "./Notifications";
 import { FormError } from "./FormError";
 import { Login } from "./Login";
@@ -71,7 +73,11 @@ const GUEST_HOME: HomeResponse = {
   calendarSessions: [],
 };
 
-export type CirclesDeepLink = { circleId: string; initialTab: "details" | "chat"; justJoined?: boolean };
+export type CirclesDeepLink = {
+  circleId: string;
+  initialTab: "details" | "chat" | "scheduled";
+  justJoined?: boolean;
+};
 
 function IconBell() {
   return (
@@ -105,7 +111,10 @@ export function App() {
     null,
   );
   const [createMeetDate, setCreateMeetDate] = useState<string | null>(null);
+  const [createResultNotice, setCreateResultNotice] = useState<string | null>(null);
   const [returnStageAfterNotif, setReturnStageAfterNotif] = useState<AppStage>("dashboard");
+  const [invitePreviewId, setInvitePreviewId] = useState<string | null>(null);
+  const [inviteDeclineNotice, setInviteDeclineNotice] = useState(false);
   /** Bumped on every bottom-nav tap so the destination resets to its top level. */
   const [navVisitKey, setNavVisitKey] = useState(0);
   const [profileInitialTab, setProfileInitialTab] = useState<ProfileTab | undefined>(undefined);
@@ -261,7 +270,15 @@ export function App() {
     setGuestGateOpen(false);
     setStage("dashboard");
     await refresh();
+    const circleId = captureCircleInviteFromLocation();
+    if (circleId) await claimSharedInvite(circleId);
   }
+
+  useEffect(() => {
+    const circleId = captureCircleInviteFromLocation();
+    if (!circleId || !getAuthToken()) return;
+    void claimSharedInvite(circleId);
+  }, []);
 
   function startGuest() {
     setGuest(true);
@@ -312,12 +329,18 @@ export function App() {
     setMyUserId(null);
     setCirclesDeepLink(null);
     setOnboardingCompleted(false);
+    setInvitePreviewId(null);
+    setInviteDeclineNotice(false);
     setStage("login");
   }
 
   /** Navigate without moving focus to the Menu button (use for header icons). */
   function navigate(s: AppStage) {
     setMenuOpen(false);
+    if (s !== "notifications") {
+      setInvitePreviewId(null);
+      setInviteDeclineNotice(false);
+    }
     if (s === "circles" || s === "myCircles") setCirclesVisitKey((k) => k + 1);
     if (s !== "profile") setProfileInitialTab(undefined);
     setStage(s);
@@ -361,10 +384,29 @@ export function App() {
   }
 
   function openCircleFromNotification(circleId: string, initialTab: "details" | "chat") {
+    setInvitePreviewId(null);
     setCirclesDeepLink({ circleId, initialTab });
     setCirclesVisitKey((k) => k + 1);
     setStage("circles");
     void checkNotifications(myUserId, home?.circle?.id);
+  }
+
+  async function claimSharedInvite(circleId: string) {
+    try {
+      const result = await api.openSharedCircleLink(circleId);
+      clearCircleInvite();
+      if (result.alreadyMember || !result.invitationId) {
+        openCircleFromNotification(result.circleId, "details");
+        return;
+      }
+      setReturnStageAfterNotif("dashboard");
+      setInviteDeclineNotice(false);
+      setInvitePreviewId(result.invitationId);
+      setStage("notifications");
+    } catch (e) {
+      clearCircleInvite();
+      setError(String(e));
+    }
   }
 
   const showBottomNav = stage !== "login" && !guestWelcomeActive && !onboardingMode;
@@ -512,16 +554,41 @@ export function App() {
             setStage("profile");
           }}
         />
+      ) : stage === "notifications" && invitePreviewId ? (
+        <CircleInvitePreview
+          invitationId={invitePreviewId}
+          myUserId={myUserId}
+          onBack={() => setInvitePreviewId(null)}
+          onAccepted={async (circleId) => {
+            setInvitePreviewId(null);
+            try {
+              await refresh();
+            } catch {
+              /* The join already succeeded. Open the circle even if home refresh fails. */
+            }
+            openCircleFromNotification(circleId, "details");
+          }}
+          onDeclined={() => {
+            setInvitePreviewId(null);
+            setInviteDeclineNotice(true);
+          }}
+        />
       ) : stage === "notifications" ? (
         <Notifications
           myUserId={myUserId}
           homeCircleId={home?.circle?.id}
+          declineNotice={inviteDeclineNotice}
           onBack={async () => {
+            setInviteDeclineNotice(false);
             await refresh();
             navigate(returnStageAfterNotif === "notifications" ? "dashboard" : returnStageAfterNotif);
           }}
           onOpenCircleChat={(circleId) => openCircleFromNotification(circleId, "chat")}
           onOpenCircleDetails={(circleId) => openCircleFromNotification(circleId, "details")}
+          onViewInvitation={(invitationId) => {
+            setInviteDeclineNotice(false);
+            setInvitePreviewId(invitationId);
+          }}
           onInboxChanged={() => void checkNotifications(myUserId, home?.circle?.id)}
           onHomeRefresh={refresh}
         />
@@ -544,6 +611,7 @@ export function App() {
           home={home}
           onRefresh={refresh}
           onGoCreateJoin={(dateIso) => {
+            setCreateResultNotice(null);
             setCreateHobby(null);
             setCreateMeetDate(dateIso ?? null);
             navigate("createJoin");
@@ -595,10 +663,27 @@ export function App() {
               navigate("dashboard");
             }
           }}
+          onCreated={async (createdCircleId) => {
+            if (createdCircleId) return;
+            setCreateMeetDate(null);
+            setCreateHobby(null);
+            setCreateResultNotice(t("createCircle.missingId"));
+            navigate("dashboard");
+          }}
+          onOpenCircle={(circleId, tab) => {
+            setCreateMeetDate(null);
+            setCreateHobby(null);
+            void refresh();
+            setCirclesDeepLink({ circleId, initialTab: tab });
+            setCirclesVisitKey((k) => k + 1);
+            navigate("circles");
+          }}
         />
       ) : home === null ? (
         <div className="card muted">{t("common.loading")}</div>
       ) : (
+        <>
+        {createResultNotice ? <FormError>{createResultNotice}</FormError> : null}
         <Dashboard
           key={`home-${navVisitKey}`}
           home={home}
@@ -629,6 +714,7 @@ export function App() {
               requestRegister(t("guest.noticeCreateCircle"));
               return;
             }
+            setCreateResultNotice(null);
             setCreateHobby(null);
             setCreateMeetDate(dateIso ?? null);
             navigate("createJoin");
@@ -646,6 +732,7 @@ export function App() {
             navigate("circles");
           }}
         />
+        </>
       )}
 
       {showBottomNav ? (

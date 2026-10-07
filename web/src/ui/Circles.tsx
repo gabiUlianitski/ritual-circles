@@ -22,7 +22,7 @@ import { DiscoverEmptyState, DiscoverFilterChips, DiscoverSection } from "./Disc
 import { FormError } from "./FormError";
 import { CircleJoinSuccess, hasSeenJoinSuccess, markJoinSuccessSeen } from "./CircleJoinSuccess";
 
-type CirclesDeepLink = { circleId: string; initialTab: "details" | "chat"; justJoined?: boolean };
+type CirclesDeepLink = { circleId: string; initialTab: "details" | "chat" | "scheduled"; justJoined?: boolean };
 type DiscoverPageTab = "discover" | "mine" | "joined";
 
 const CLOSEST_LIMIT = 3;
@@ -54,7 +54,7 @@ export function Circles(props: {
   const [formInitialMeetDate, setFormInitialMeetDate] = useState<string | undefined>();
   const [showDetails, setShowDetails] = useState(false);
   const [detailsCircleId, setDetailsCircleId] = useState<string | null>(null);
-  const [detailsInitialTab, setDetailsInitialTab] = useState<"details" | "chat">("details");
+  const [detailsInitialTab, setDetailsInitialTab] = useState<"details" | "chat" | "scheduled">("details");
   const [detailsInitialDraft, setDetailsInitialDraft] = useState<string | undefined>(undefined);
   const [joinSuccessCircleId, setJoinSuccessCircleId] = useState<string | null>(null);
   const [catalogDetail, setCatalogDetail] = useState<CircleListItem | null>(null);
@@ -262,6 +262,25 @@ export function Circles(props: {
     }
   }
 
+  async function openCreatedCircle(createdCircleId: string | null) {
+    setShowForm(false);
+    setFormInitialTab("create");
+    setFormInitialMeetDate(undefined);
+    await load();
+    await props.onHomeRefresh();
+    if (!createdCircleId) {
+      setError(t("createCircle.missingId"));
+      return;
+    }
+    setError(null);
+    setCatalogDetail(null);
+    setJoinSuccessCircleId(null);
+    setDetailsCircleId(createdCircleId);
+    setDetailsInitialTab("details");
+    setDetailsInitialDraft(undefined);
+    setShowDetails(true);
+  }
+
   async function joinOpenCircle(circleId: string) {
     setJoinBusyId(circleId);
     setError(null);
@@ -277,8 +296,8 @@ export function Circles(props: {
         setDetailsInitialTab("details");
         setShowDetails(true);
       }
-    } catch (e) {
-      setError(String(e));
+    } catch {
+      setError(t("circleDetails.joinFailed"));
     } finally {
       setJoinBusyId(null);
     }
@@ -318,15 +337,6 @@ export function Circles(props: {
   function joinActionFor(c: CircleListItem) {
     if (c.isYours) return null;
 
-    if (props.guest) {
-      return {
-        label: t("guest.createAccountToJoin"),
-        busy: false,
-        disabled: false,
-        onJoin: () => props.onRegisterRequest?.(t("guest.noticeJoin")),
-      };
-    }
-
     const busy = joinBusyId !== null;
     const joining = joinBusyId === c.id;
 
@@ -340,36 +350,46 @@ export function Circles(props: {
       };
     }
 
-    if (!c.inviteOnly) {
+    if (c.inviteOnly) return null;
+
+    if (props.guest) {
       return {
-        label: t("discoverPage.join"),
-        busy: joining,
-        disabled: busy,
-        onJoin: () => void joinOpenCircle(c.id),
+        label: t("guest.createAccountToJoin"),
+        busy: false,
+        disabled: false,
+        onJoin: () => props.onRegisterRequest?.(t("guest.noticeJoin")),
       };
     }
 
     return {
-      label: t("discoverPage.requestJoin"),
+      label: t("discoverPage.join"),
       busy: joining,
       disabled: busy,
-      onJoin: () => {
-        setCatalogDetail(null);
-        setFormInitialTab("join");
-        setShowForm(true);
-      },
+      onJoin: () => void joinOpenCircle(c.id),
     };
   }
 
   function renderJoinedCircleCard(c: CircleListItem) {
     return (
-      <DiscoverMomentumCard key={c.id} circle={c} actionLabel={t("discoverPage.open")} onOpen={() => openDetails(c)} />
+      <DiscoverMomentumCard
+        key={c.id}
+        circle={c}
+        hobiesCatalog={hobies}
+        actionLabel={t("discoverPage.open")}
+        onOpen={() => openDetails(c)}
+      />
     );
   }
 
   function renderMyCircleCard(c: CircleListItem) {
     return (
-      <DiscoverMomentumCard key={c.id} circle={c} actionLabel={t("discoverPage.manage")} onOpen={() => openDetails(c)} />
+      <DiscoverMomentumCard
+        key={c.id}
+        circle={c}
+        hobiesCatalog={hobies}
+        actionLabel={t("discoverPage.manage")}
+        onOpen={() => openDetails(c)}
+      />
     );
   }
 
@@ -378,6 +398,7 @@ export function Circles(props: {
       <DiscoverMomentumCard
         key={c.id}
         circle={c}
+        hobiesCatalog={hobies}
         actionLabel={t("discoverPage.viewActivity")}
         onOpen={() => openDetails(c)}
         featured={featured}
@@ -397,6 +418,21 @@ export function Circles(props: {
         }}
         onDone={async (joinedCircleId) => {
           await afterCreateOrJoin(joinedCircleId);
+        }}
+        onCreated={openCreatedCircle}
+        onOpenCircle={(circleId, tab) => {
+          setShowForm(false);
+          setFormInitialTab("create");
+          setFormInitialMeetDate(undefined);
+          void load();
+          void props.onHomeRefresh();
+          setError(null);
+          setCatalogDetail(null);
+          setJoinSuccessCircleId(null);
+          setDetailsCircleId(circleId);
+          setDetailsInitialTab(tab);
+          setDetailsInitialDraft(undefined);
+          setShowDetails(true);
         }}
       />
     );
@@ -487,18 +523,19 @@ export function Circles(props: {
           <p className="circle-momentum-message">{t("circleChat.visitorHelp")}</p>
         ) : null}
 
-        {!c.isYours ? (
-          <>
-            <CircleDetailsPrimaryAction
-              isMember={false}
-              joinLabel={joinAction?.label === t("discoverPage.join") ? t("discoverPage.joinThisCircle") : joinAction?.label}
-              joinDisabled={joinAction?.disabled}
-              joinBusy={joinAction?.busy}
-              onJoin={joinAction?.onJoin}
-            />
-            <CircleDetailsWhyJoin circle={c} hobiesCatalog={hobies} />
-          </>
+        {!c.isYours && joinAction ? (
+          <CircleDetailsPrimaryAction
+            isMember={false}
+            joinLabel={joinAction.label === t("discoverPage.join") ? t("discoverPage.joinThisCircle") : joinAction.label}
+            joinDisabled={joinAction.disabled}
+            joinBusy={joinAction.busy}
+            onJoin={joinAction.onJoin}
+          />
         ) : null}
+        {!c.isYours && !joinAction && c.inviteOnly ? (
+          <p className="muted">{t("discoverPage.invitationOnlyHint")}</p>
+        ) : null}
+        {!c.isYours ? <CircleDetailsWhyJoin circle={c} hobiesCatalog={hobies} /> : null}
 
         {error ? <FormError>{error}</FormError> : null}
       </div>

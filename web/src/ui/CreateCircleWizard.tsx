@@ -1,17 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
-import type { CitySuggestItem, CountryItem, Hoby, VenueSuggestionItem } from "../api/types";
+import type { CircleResponse, CitySuggestItem, CountryItem, Hoby, VenueSuggestionItem } from "../api/types";
 import {
   isSubcategoryAny,
   levelsForSelectedType,
   parseHobyLevelsFlat,
   parseHobyTypesNested,
-  SUBCATEGORY_ANY,
   SUBCATEGORY_ANY_LABEL,
 } from "./hobyMetadata";
 import { parseHobyLevelKey } from "./hobyLevelKey";
 import { FormError } from "./FormError";
-import { OpenCircleToggle } from "./OpenCircleToggle";
 import { CreateCircleVenuePicker } from "./CreateCircleVenuePicker";
 import {
   buildFirstSessionIso,
@@ -42,27 +41,77 @@ import {
 } from "./groupSize";
 import { CreateCircleGroupSizeStep } from "./CreateCircleGroupSizeStep";
 import { geolocationUserMessage } from "../geolocationMessage";
+import { CIRCLE_DESCRIPTION_MAX, CIRCLE_NAME_MAX, type CircleIdentityFields } from "./circleDisplay";
+import { circleNameIsValid, circleNamePayload } from "./CircleNameField";
+import { circleDescriptionIsValid, circleDescriptionPayload } from "./CircleDescriptionField";
+import { CreateCircleHobbyStep } from "./CreateCircleHobbyStep";
+import { type CirclePurposeId } from "./CreateCircleIdentityStep";
+import { CreateCircleReviewStep } from "./CreateCircleReviewStep";
 
 const TOTAL_STEPS = 6;
 
+function friendlyCreateError(error: unknown, fallback: string): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  const text = raw.replace(/^\d{3}:\s*/, "").trim();
+  if (!text || text.length > 180 || /traceback|exception|sqlalchemy|asyncpg|internal server/i.test(text)) {
+    return fallback;
+  }
+  return text;
+}
+
 function CreateCircleSoFarSummary(props: {
   step: number;
-  activityLine: string;
-  activityIcon: string;
+  hobbyName: string;
+  hobbyIcon: string;
+  typeName: string;
+  levelName: string;
+  cityName: string;
   scheduleLine: string;
 }) {
-  if (props.step < 2 || !props.activityLine) return null;
+  const { t } = useTranslation();
+  if (props.step < 2 || props.step > 5 || !props.hobbyName) return null;
+  const icon = props.hobbyIcon || "🎯";
 
   return (
-    <aside className="create-circle-progress-summary" aria-label="Your choices so far">
-      <p className="create-circle-progress-summary-heading muted">So far</p>
+    <aside className="create-circle-progress-summary" aria-label={t("createCircle.soFar")}>
+      <p className="create-circle-progress-summary-heading muted">{t("createCircle.soFar")}</p>
       <ul className="create-circle-progress-summary-list">
         <li>
           <span className="create-circle-progress-summary-icon" aria-hidden>
-            {props.activityIcon || "🎯"}
+            {icon}
           </span>
-          <span>{props.activityLine}</span>
+          <span dir="auto">{props.hobbyName}</span>
         </li>
+        {props.typeName ? (
+          <li>
+            <span className="create-circle-progress-summary-icon" aria-hidden>
+              {icon}
+            </span>
+            <span>
+              {t("createCircle.typeLabel")}: <span dir="auto">{props.typeName}</span>
+            </span>
+          </li>
+        ) : null}
+        {props.levelName ? (
+          <li>
+            <span className="create-circle-progress-summary-icon" aria-hidden>
+              ⭐
+            </span>
+            <span>
+              {t("createCircle.levelLabel")}: <span dir="auto">{props.levelName}</span>
+            </span>
+          </li>
+        ) : null}
+        {props.cityName ? (
+          <li>
+            <span className="create-circle-progress-summary-icon" aria-hidden>
+              📍
+            </span>
+            <span>
+              {t("createCircle.cityLabel")}: <span dir="auto">{props.cityName}</span>
+            </span>
+          </li>
+        ) : null}
         {props.step >= 4 && props.scheduleLine ? (
           <li>
             <span className="create-circle-progress-summary-icon" aria-hidden>
@@ -77,7 +126,7 @@ function CreateCircleSoFarSummary(props: {
 }
 
 export function CreateCircleWizard(props: {
-  onDone: () => Promise<void> | void;
+  onDone: (created: CircleResponse | null, firstSessionAt?: string) => Promise<void> | void;
   working: boolean;
   setWorking: (v: boolean) => void;
   error: string | null;
@@ -87,6 +136,7 @@ export function CreateCircleWizard(props: {
   initialHobbySubtype?: string | null;
   initialHobbyLevel?: string | null;
 }) {
+  const { t } = useTranslation();
   const { setError } = props;
   const navRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(1);
@@ -100,7 +150,7 @@ export function CreateCircleWizard(props: {
     return defaultMeetDateIso();
   });
   const [meetHour, setMeetHour] = useState("17");
-  const [repeatsWeekly, setRepeatsWeekly] = useState(false);
+  const [repeatsWeekly, setRepeatsWeekly] = useState(true);
   const [openCircle, setOpenCircle] = useState(true);
   const [cityQuery, setCityQuery] = useState("");
   const [citySelected, setCitySelected] = useState("");
@@ -114,6 +164,12 @@ export function CreateCircleWizard(props: {
   const [groupSizeError, setGroupSizeError] = useState<string | null>(null);
   const [costPayment, setCostPayment] = useState<CostPaymentState>(DEFAULT_COST_PAYMENT);
   const [costPaymentError, setCostPaymentError] = useState<string | null>(null);
+  const [circleName, setCircleName] = useState("");
+  const [circleDescription, setCircleDescription] = useState("");
+  // No purpose column yet. Draft-only, so it can appear in the preview and is not created.
+  const [circlePurpose, setCirclePurpose] = useState<CirclePurposeId | null>(null);
+  const [createLocked, setCreateLocked] = useState(false);
+  const creatingRef = useRef(false);
 
   const clearMeetingPlace = useCallback(() => {
     setMeetingPlace("");
@@ -194,18 +250,23 @@ export function CreateCircleWizard(props: {
     [meetingPlace],
   );
 
-  const activitySummary = useMemo(() => {
-    const name = selectedHoby?.displayName ?? hobySlug.trim();
-    if (!name) return "";
-    let line = name;
-    if (hobySubtype && !isSubcategoryAny(hobySubtype)) line += ` · ${subtypeLabel}`;
-    if (hobyLevel) line += ` (${levelLabel})`;
-    return line;
-  }, [selectedHoby, hobySlug, hobySubtype, subtypeLabel, hobyLevel, levelLabel]);
+  const hobbySummaryName = selectedHoby?.displayName ?? hobySlug.trim();
+  const typeSummaryName =
+    hobySubtype && !isSubcategoryAny(hobySubtype) ? subtypeLabel : "";
+  const levelSummaryName = hobyLevel ? levelLabel : "";
+  const citySummaryName = citySelected.trim().split(",")[0]?.trim() ?? "";
 
   const scheduleSummary = useMemo(() => {
     return formatScheduleSummary(meetDate, meetHour, repeatsWeekly, formatHourOnlyDisplay);
   }, [meetDate, meetHour, repeatsWeekly]);
+  const reviewIdentity: CircleIdentityFields = {
+    name: circleNamePayload(circleName),
+    ritualType: hobySlug.trim(),
+    recurringTime: "",
+    hobyDisplayName: selectedHoby?.displayName?.trim() || hobySlug.trim(),
+    hobyIcon: selectedHoby?.icon ?? null,
+  };
+  const placeLine = [citySummaryName, meetingPlaceReview.placeName].filter(Boolean).join(" · ");
 
   function onCityQueryChange(q: string) {
     setCityQuery(q);
@@ -326,19 +387,37 @@ export function CreateCircleWizard(props: {
     setStep((s) => Math.max(1, s - 1));
   }
 
+  function editStep(next: number) {
+    setError(null);
+    setGroupSizeError(null);
+    setCostPaymentError(null);
+    setStep(next);
+  }
+
   async function create() {
+    if (creatingRef.current || props.working || createLocked) return;
     setError(null);
     const gsErr = validateGroupSize(groupSize);
     const cpErr = validateCostPayment(costPayment);
+    if (!circleNameIsValid(circleName)) {
+      setError(t("circleDetails.circleNameTooLong", { max: CIRCLE_NAME_MAX }));
+      return;
+    }
+    if (!circleDescriptionIsValid(circleDescription)) {
+      setError(t("circleDetails.circleDescriptionTooLong", { max: CIRCLE_DESCRIPTION_MAX }));
+      return;
+    }
     if (!step1Complete || !step2Complete || !step3Complete || gsErr || cpErr) {
-      setError(cpErr ?? gsErr ?? "Complete all steps before creating.");
+      setError(cpErr ?? gsErr ?? t("createCircle.incomplete"));
       if (gsErr) setGroupSizeError(gsErr);
       if (cpErr) setCostPaymentError(cpErr);
       return;
     }
+    creatingRef.current = true;
     props.setWorking(true);
+    let created = false;
     try {
-      await api.createCircle({
+      const circle = await api.createCircle({
         ritualType: hobySlug.trim() || "hoby",
         ritualLevel: parseHobyLevelKey(hobyLevel),
         ritualSubtype: isSubcategoryAny(hobySubtype) ? null : hobySubtype.trim() || null,
@@ -349,105 +428,54 @@ export function CreateCircleWizard(props: {
         countryCode: countryCode.trim() || null,
         cityName: citySelected.trim() || null,
         meetingPlace: meetingPlace.trim(),
+        name: circleNamePayload(circleName),
+        description: circleDescriptionPayload(circleDescription),
         inviteOnly: !openCircle,
         groupSize: groupSizePayload,
         costPayment: costPaymentPayload,
       });
-      await props.onDone();
+      created = true;
+      setCreateLocked(true);
+      await props.onDone(circle.id?.trim() ? circle : null, buildFirstSessionIso(meetDate, meetHour));
     } catch (e) {
-      setError(String(e));
+      if (!created) setError(friendlyCreateError(e, t("createCircle.createFailed")));
+      else setError(t("createCircle.openFailed"));
     } finally {
+      creatingRef.current = false;
       props.setWorking(false);
     }
   }
 
 
   return (
-    <div className={`create-circle-wizard stack${step === 2 ? " create-circle-wizard--sticky-nav" : ""}`}>
+    <div className={`create-circle-wizard stack${step === 2 || step === 6 ? " create-circle-wizard--sticky-nav" : ""}`}>
       <div className="create-circle-step-meta muted">Step {step} of {TOTAL_STEPS}</div>
 
       <CreateCircleSoFarSummary
         step={step}
-        activityLine={activitySummary}
-        activityIcon={selectedHoby?.icon ?? "🎯"}
+        hobbyName={hobbySummaryName}
+        hobbyIcon={selectedHoby?.icon ?? "🎯"}
+        typeName={typeSummaryName}
+        levelName={levelSummaryName}
+        cityName={citySummaryName}
         scheduleLine={scheduleSummary}
       />
 
       {step === 1 ? (
-        <section className="create-circle-step stack" aria-labelledby="create-step-1">
-          <h2 id="create-step-1" className="create-circle-step-title">
-            What&apos;s your circle about?
-          </h2>
-          <label className="create-circle-field stack">
-            <span className="create-circle-label">Activity</span>
-            {hobies.length ? (
-              <select
-                className="create-circle-input"
-                value={hobySlug}
-                onChange={(e) => onActivityChange(e.target.value)}
-                disabled={props.working}
-                aria-label="Activity"
-              >
-                <option value="">Choose activity…</option>
-                {hobies.map((h) => (
-                  <option key={h.id} value={h.slug}>
-                    {(h.icon ? `${h.icon} ` : "") + h.displayName}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                className="create-circle-input"
-                placeholder="Activity"
-                value={hobySlug}
-                onChange={(e) => onActivityChange(e.target.value)}
-                disabled={props.working}
-                aria-label="Activity"
-              />
-            )}
-          </label>
-
-          {showSubtypeField ? (
-            <label className="create-circle-field stack">
-              <span className="create-circle-label">Subcategory</span>
-              <select
-                className="create-circle-input"
-                value={hobySubtype}
-                disabled={props.working}
-                aria-label="Subcategory"
-                onChange={(e) => onSubtypeChange(e.target.value)}
-              >
-                <option value="">Choose subcategory…</option>
-                <option value={SUBCATEGORY_ANY}>{SUBCATEGORY_ANY_LABEL}</option>
-                {types.map((t) => (
-                  <option key={t.key} value={t.key}>
-                    {t.label ?? t.key}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-
-          {showLevelField ? (
-            <label className="create-circle-field stack">
-              <span className="create-circle-label">Level</span>
-              <select
-                className="create-circle-input"
-                value={hobyLevel}
-                disabled={props.working}
-                aria-label="Level"
-                onChange={(e) => onLevelChange(e.target.value)}
-              >
-                <option value="">Choose level…</option>
-                {levelsForSubtype.map((lv) => (
-                  <option key={lv.key} value={lv.key}>
-                    {lv.label ?? lv.key}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-        </section>
+        <CreateCircleHobbyStep
+          hobies={hobies}
+          hobySlug={hobySlug}
+          hobySubtype={hobySubtype}
+          hobyLevel={hobyLevel}
+          types={types}
+          levels={levelsForSubtype}
+          showTypes={showSubtypeField}
+          showLevels={showLevelField}
+          disabled={props.working}
+          onHobbyChange={onActivityChange}
+          onTypeChange={onSubtypeChange}
+          onLevelChange={onLevelChange}
+        />
       ) : null}
 
       {step === 2 ? (
@@ -479,6 +507,7 @@ export function CreateCircleWizard(props: {
           onSelectVenue={onSelectVenue}
           onClearMeetingPlace={clearMeetingPlace}
           disabled={props.working}
+          guided
         />
       ) : null}
 
@@ -504,7 +533,7 @@ export function CreateCircleWizard(props: {
               onChange={(e) => setRepeatsWeekly(e.target.checked)}
               disabled={props.working}
             />
-            <span className="create-circle-helper muted">This repeats every week</span>
+            <span className="create-circle-helper muted">{t("createCircle.repeatsWeekly")}</span>
           </label>
         </section>
       ) : null}
@@ -537,69 +566,42 @@ export function CreateCircleWizard(props: {
       ) : null}
 
       {step === 6 ? (
-        <section className="create-circle-step stack" aria-labelledby="create-step-6">
-          <h2 id="create-step-6" className="create-circle-step-title">
-            Your circle
-          </h2>
-          <ul className="create-circle-review">
-            <li>
-              <span className="create-circle-review-icon" aria-hidden>
-                {selectedHoby?.icon || "🎯"}
-              </span>
-              <span>
-                {selectedHoby?.displayName ?? hobySlug}
-                {hobySubtype && !isSubcategoryAny(hobySubtype) ? ` · ${subtypeLabel}` : ""}
-                {hobyLevel ? ` (${levelLabel})` : ""}
-              </span>
-            </li>
-            <li>
-              <span className="create-circle-review-icon" aria-hidden>
-                📅
-              </span>
-              <span>{formatScheduleSummary(meetDate, meetHour, repeatsWeekly, formatHourOnlyDisplay)}</span>
-            </li>
-            <li>
-              <span className="create-circle-review-icon" aria-hidden>
-                📍
-              </span>
-              <div className="create-circle-review-location">
-                <span dir="auto">{meetingPlaceReview.placeName}</span>
-                {meetingPlaceReview.addressLine ? (
-                  <span className="create-circle-review-location-address muted" dir="auto">
-                    {meetingPlaceReview.addressLine}
-                  </span>
-                ) : null}
-              </div>
-            </li>
-            <li>
-              <span className="create-circle-review-icon" aria-hidden>
-                👥
-              </span>
-              <span>{groupSizeSummary}</span>
-            </li>
-            <li>
-              <span className="create-circle-review-icon" aria-hidden>
-                💳
-              </span>
-              <span>{costPaymentSummary}</span>
-            </li>
-            <li>
-              <span className="create-circle-review-icon" aria-hidden>
-                {openCircle ? "🌐" : "🔒"}
-              </span>
-              <span>{openCircle ? "Open circle — anyone can join" : "Invite only — join code required"}</span>
-            </li>
-          </ul>
-          <OpenCircleToggle checked={openCircle} onChange={setOpenCircle} disabled={props.working} />
-        </section>
+        <CreateCircleReviewStep
+          identity={reviewIdentity}
+          hobbyIcon={selectedHoby?.icon ?? ""}
+          typeName={typeSummaryName}
+          levelName={levelSummaryName}
+          placeLine={placeLine}
+          scheduleLine={scheduleSummary}
+          groupSizeLine={groupSizeSummary}
+          costLine={costPaymentSummary}
+          description={circleDescription}
+          circleName={circleName}
+          purpose={circlePurpose}
+          hobbyName={hobbySummaryName}
+          hobbySlug={hobySlug}
+          openCircle={openCircle}
+          activityIncomplete={!step1Complete}
+          placeIncomplete={!step2Complete}
+          meetupIncomplete={!step3Complete}
+          membersIncomplete={!step4Complete}
+          costIncomplete={!step5Complete}
+          detailsIncomplete={!circleNameIsValid(circleName) || !circleDescriptionIsValid(circleDescription)}
+          disabled={props.working}
+          onEditStep={editStep}
+          onNameChange={setCircleName}
+          onDescriptionChange={setCircleDescription}
+          onPurposeChange={setCirclePurpose}
+          onOpenCircleChange={setOpenCircle}
+        />
       ) : null}
 
       {props.error ? <FormError>{props.error}</FormError> : null}
 
-      <div ref={navRef} className="create-circle-nav row create-circle-nav--sticky">
+      <div ref={navRef} className={`create-circle-nav row create-circle-nav--sticky${step === 6 ? " create-circle-nav--review" : ""}`}>
         {step > 1 ? (
           <button type="button" style={{ width: "auto" }} disabled={props.working} onClick={goBack}>
-            ← Back
+            {step === 6 ? t("createCircle.back") : "← Back"}
           </button>
         ) : (
           <span />
@@ -624,10 +626,21 @@ export function CreateCircleWizard(props: {
           <button
             type="button"
             className="primary create-circle-next-btn"
-            disabled={props.working || !step1Complete || !step2Complete || !step3Complete || !step4Complete || !step5Complete}
+            aria-busy={props.working}
+            disabled={
+              props.working ||
+              createLocked ||
+              !circleNameIsValid(circleName) ||
+              !circleDescriptionIsValid(circleDescription) ||
+              !step1Complete ||
+              !step2Complete ||
+              !step3Complete ||
+              !step4Complete ||
+              !step5Complete
+            }
             onClick={() => void create()}
           >
-            {props.working ? "Creating…" : "Create Circle"}
+            {props.working ? t("createCircle.creating") : t("createCircle.createAction")}
           </button>
         )}
       </div>

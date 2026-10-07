@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { CitySuggestItem, VenueSuggestionItem } from "../api/types";
 import { api } from "../api/client";
 import {
@@ -32,6 +33,7 @@ import { FormError } from "./FormError";
 import { geolocationUserMessage } from "../geolocationMessage";
 
 const INITIAL_VISIBLE = 5;
+const NO_VENUE_SUGGESTIONS = "No suggestions — add your own place below.";
 
 function isCityAreaFallbackVenue(v: VenueSuggestionItem): boolean {
   return /\(city area\)/i.test(v.name?.trim() ?? "");
@@ -62,6 +64,60 @@ function VenueSearchProgress(props: {
         Stop searching
       </button>
     </div>
+  );
+}
+
+function GuidedVenueCard(props: {
+  displayName: string;
+  category: string | null;
+  area: string;
+  distanceLabel: string | null;
+  mapsUrl?: string | null;
+  isSelected: boolean;
+  disabled?: boolean;
+  viewOnMapLabel: string;
+  onSelect: () => void;
+}) {
+  return (
+    <li className="create-venue-guided-item">
+      <div className={`create-venue-guided-card${props.isSelected ? " is-selected" : ""}`}>
+        <button
+          type="button"
+          className="create-venue-guided-select"
+          aria-pressed={props.isSelected}
+          disabled={props.disabled}
+          onClick={props.onSelect}
+        >
+          <span className="create-venue-guided-check" aria-hidden>
+            {props.isSelected ? "✓" : "📍"}
+          </span>
+          <span className="create-venue-guided-body">
+            <span className="create-venue-guided-name">{props.displayName}</span>
+            {props.category ? (
+              <span className="create-venue-guided-category">{props.category}</span>
+            ) : null}
+            {props.area ? (
+              <span className="create-venue-guided-area" dir="auto">
+                {props.area}
+              </span>
+            ) : null}
+          </span>
+          {props.distanceLabel ? (
+            <span className="create-venue-guided-distance">{props.distanceLabel}</span>
+          ) : null}
+        </button>
+        {props.mapsUrl ? (
+          <a
+            className="create-venue-map-link"
+            href={props.mapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {props.viewOnMapLabel}
+          </a>
+        ) : null}
+      </div>
+    </li>
   );
 }
 
@@ -137,7 +193,11 @@ export function CreateCircleVenuePicker(props: {
   disabled?: boolean;
   /** When true, venue search does not clear an existing meeting place (edit / adjust flows). */
   keepMeetingPlaceOnSearch?: boolean;
+  /** Create Circle step 2 presentation. Other callers keep the existing layout. */
+  guided?: boolean;
 }) {
+  const { t } = useTranslation();
+  const [editingCity, setEditingCity] = useState(true);
   const [venueLoading, setVenueLoading] = useState(false);
   const [searchIsSlow, setSearchIsSlow] = useState(false);
   const [venues, setVenues] = useState<VenueSuggestionItem[]>([]);
@@ -216,7 +276,7 @@ export function CreateCircleVenuePicker(props: {
       setVenues(list);
       setMapCenter(r.mapCenter ?? null);
       if (!list.length) {
-        setLocalError("No suggestions — add your own place below.");
+        setLocalError(NO_VENUE_SUGGESTIONS);
       }
     } catch (e) {
       if (silentAbortRef.current === ac || abortRef.current !== ac) return;
@@ -351,7 +411,17 @@ export function CreateCircleVenuePicker(props: {
     window.open(GOOGLE_MAPS_OPEN_URL, "_blank", "noopener,noreferrer");
   }
 
+  useEffect(() => {
+    if (!props.guided) return;
+    if (props.citySelected.trim()) setEditingCity(false);
+  }, [props.guided, props.citySelected]);
+
   const showSuggestions = Boolean(props.citySelected.trim());
+  const showGuidedCitySearch = !props.citySelected.trim() || editingCity;
+  const guidedCityLabel =
+    props.citySelected.trim().split(",")[0]?.trim() || props.citySelected.trim();
+  const noSuggestedPlaces =
+    props.guided && !venueLoading && !venues.length && localError === NO_VENUE_SUGGESTIONS;
 
   const activitySearchLabel = [props.ritualType.trim(), props.ritualSubtype.trim()]
     .filter(Boolean)
@@ -368,6 +438,248 @@ export function CreateCircleVenuePicker(props: {
       venueCardAddressLabel(venue.address, displayName, searchCity) ||
       venueCardAddressLabel(venue.address, undefined, searchCity) ||
       searchCity
+    );
+  }
+
+  function focusCityInput() {
+    window.setTimeout(() => document.getElementById("create-circle-city")?.focus(), 0);
+  }
+
+  function searchWithinCity() {
+    document.getElementById("create-venue-results")?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+    if (!venueLoading && venues.length === 0) void runVenueSearch();
+  }
+
+  function guidedArea(venue: VenueSuggestionItem, displayName: string): string {
+    const label = suggestedVenueAddressLabel(venue, displayName).trim();
+    if (/^https?:\/\//i.test(label)) return "";
+    return label;
+  }
+
+  if (props.guided) {
+    return (
+      <section className="create-venue-step create-venue-guided stack" aria-labelledby="create-step-2">
+        <div className="stack" style={{ gap: 6 }}>
+          <h2 id="create-step-2" className="create-circle-step-title">
+            {t("createCircle.placeQuestion")}
+          </h2>
+          <p className="create-venue-guided-subtitle muted">{t("createCircle.placeSubtitle")}</p>
+        </div>
+
+        {showGuidedCitySearch ? (
+          <div className="create-venue-city-field">
+            <CityAutocompleteField
+              id="create-circle-city"
+              value={props.cityQuery}
+              selectedDisplay={props.citySelected}
+              onValueChange={props.onCityQueryChange}
+              onSelect={(item) => {
+                props.onCitySelect(item);
+                setEditingCity(false);
+              }}
+              disabled={props.disabled || props.locateBusy || venueLoading}
+              hideLabel
+              compact
+              placeholder={t("createCircle.citySearch")}
+            />
+          </div>
+        ) : (
+          <div className="create-venue-city-pill">
+            <span aria-hidden>📍</span>
+            <span className="create-venue-city-pill-name" dir="auto">
+              {guidedCityLabel}
+            </span>
+            <button
+              type="button"
+              className="create-venue-city-change"
+              disabled={props.disabled || venueLoading}
+              onClick={() => {
+                setEditingCity(true);
+                focusCityInput();
+              }}
+            >
+              {t("createCircle.cityChange")}
+            </button>
+          </div>
+        )}
+
+        {props.cityQuery.trim().length >= 2 && !props.citySelected.trim() ? (
+          <p className="create-venue-city-hint muted">Pick a city from the list.</p>
+        ) : null}
+
+        {showSuggestions ? (
+          <>
+            <div className="create-venue-assist stack">
+              <h3 className="create-venue-section-title">{t("createCircle.placeAssist")}</h3>
+              <button
+                type="button"
+                className="create-venue-assist-btn"
+                disabled={props.disabled || props.locateBusy || venueLoading}
+                onClick={() => {
+                  void (async () => {
+                    setLocalError(null);
+                    try {
+                      await props.onUseLocation();
+                    } catch (e) {
+                      setLocalError(geolocationUserMessage(e));
+                    }
+                  })();
+                }}
+              >
+                <span aria-hidden>📍</span>
+                <span>{props.locateBusy ? t("createCircle.locating") : t("createCircle.useLocation")}</span>
+              </button>
+              <button
+                type="button"
+                className="create-venue-assist-btn"
+                disabled={props.disabled || venueLoading}
+                onClick={searchWithinCity}
+              >
+                <span aria-hidden>🏙</span>
+                <span>{t("createCircle.searchInCity")}</span>
+              </button>
+            </div>
+
+            <div id="create-venue-results" className="create-venue-results stack">
+              {localError && !venueLoading && !noSuggestedPlaces ? <FormError>{localError}</FormError> : null}
+
+              {venueLoading ? (
+                <VenueSearchProgress
+                  activityLabel={activitySearchLabel}
+                  cityLabel={citySearchLabel}
+                  slow={searchIsSlow}
+                  onCancel={cancelVenueSearch}
+                />
+              ) : null}
+
+              {visible.length ? (
+                <ul className="create-venue-guided-list">
+                  {visible.map((venue, index) => {
+                    const card = venueCardFromItem(venue);
+                    const key = venueSelectionKey(venue, index);
+                    const isSelected =
+                      props.selectedKey === key || props.meetingPlace === meetingPlaceValue(venue);
+                    return (
+                      <GuidedVenueCard
+                        key={key}
+                        displayName={card.displayName}
+                        category={card.category}
+                        area={guidedArea(venue, card.displayName)}
+                        distanceLabel={card.distanceLabel}
+                        mapsUrl={venue.mapsUrl}
+                        isSelected={isSelected}
+                        disabled={props.disabled}
+                        viewOnMapLabel={t("createCircle.viewOnMap")}
+                        onSelect={() => selectVenue(venue, key)}
+                      />
+                    );
+                  })}
+                </ul>
+              ) : null}
+
+              {!showMorePlaces && venues.length > INITIAL_VISIBLE ? (
+                <button
+                  type="button"
+                  className="create-circle-link-btn"
+                  disabled={props.disabled}
+                  onClick={() => setShowMorePlaces(true)}
+                >
+                  Show more
+                </button>
+              ) : null}
+
+              {noSuggestedPlaces ? (
+                <div className="create-venue-guided-empty" role="status">
+                  <p>{t("createCircle.venueEmpty")}</p>
+                  <p className="muted">{t("createCircle.venueEmptyHint")}</p>
+                </div>
+              ) : null}
+
+              {!venueLoading && localError && !noSuggestedPlaces ? (
+                <button
+                  type="button"
+                  className="create-circle-link-btn"
+                  disabled={props.disabled}
+                  onClick={() => void runVenueSearch()}
+                >
+                  Search again
+                </button>
+              ) : null}
+            </div>
+
+            <div className="create-venue-manual stack">
+              <h3 className="create-venue-section-title">Or add your own place</h3>
+              <button
+                type="button"
+                className="create-venue-maps-open-btn"
+                disabled={props.disabled}
+                onClick={openGoogleMaps}
+              >
+                {t("createCircle.viewOnMap")}
+              </button>
+              <p className="create-venue-maps-helper muted">
+                Find a place → click &quot;Share&quot; → paste link here
+              </p>
+              <div className="create-venue-manual-row">
+                <input
+                  id="create-venue-maps-link"
+                  className="create-circle-input"
+                  placeholder="Paste Google Maps link"
+                  value={mapsLinkInput}
+                  onChange={(e) => {
+                    setMapsLinkInput(e.target.value);
+                    setCustomError(null);
+                  }}
+                  disabled={props.disabled || mapsLinkBusy}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void addMapsLinkPlace();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="primary create-venue-add-btn"
+                  disabled={props.disabled || mapsLinkBusy || !mapsLinkInput.trim()}
+                  onClick={() => void addMapsLinkPlace()}
+                >
+                  {mapsLinkBusy ? "…" : "Add"}
+                </button>
+              </div>
+            </div>
+
+            {customError ? <FormError>{customError}</FormError> : null}
+
+            {addedCustom &&
+            addedCustomParsed &&
+            props.selectedKey?.startsWith("custom:") &&
+            props.meetingPlace === meetingPlaceValue(addedCustom) ? (
+              <ul className="create-venue-guided-list">
+                <GuidedVenueCard
+                  displayName={venueCardFromItem(addedCustom).displayName}
+                  category={venueCardFromItem(addedCustom).category}
+                  area={
+                    guidedArea(addedCustom, addedCustom.name) ||
+                    manualPlaceCardLocation(addedCustom, props.citySelected)
+                  }
+                  distanceLabel={null}
+                  mapsUrl={addedCustom.mapsUrl}
+                  isSelected
+                  disabled={props.disabled}
+                  viewOnMapLabel={t("createCircle.viewOnMap")}
+                  onSelect={() => {
+                    selectVenue(addedCustom, customPlaceSelectionKey(addedCustomParsed));
+                  }}
+                />
+              </ul>
+            ) : null}
+          </>
+        ) : null}
+      </section>
     );
   }
 

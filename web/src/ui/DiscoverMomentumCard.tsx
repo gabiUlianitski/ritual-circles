@@ -1,9 +1,12 @@
-import React from "react";
 import { useTranslation } from "react-i18next";
-import type { CircleListItem } from "../api/types";
-import { circleHobyTitle } from "./circleDisplay";
+import type { CircleListItem, Hoby } from "../api/types";
+import { findHobyCatalogue } from "./memberHobbyLevel";
+import { BidiText } from "./BidiText";
+import { circleIdentity, DiscoverSubtitle, discoverDescription, discoverSubtitleParts } from "./circleDisplay";
+import { DiscoverCircleSignals } from "./DiscoverCircleSignals";
 import {
   formatCircleCostChip,
+  formatCircleDetailsVibe,
   formatCircleLocationChip,
   formatCircleScheduleChip,
 } from "./circleDetailsFormat";
@@ -42,6 +45,8 @@ export function DiscoverMomentumCard(props: {
   /** Home variant: no place/cost row and no social-proof line. */
   compact?: boolean;
   showDate?: boolean;
+  /** Hobby catalogue: type/level labels and the description fallback. */
+  hobiesCatalog?: Hoby[];
 }) {
   const { t } = useTranslation();
   const { circle } = props;
@@ -71,6 +76,116 @@ export function DiscoverMomentumCard(props: {
       ? t("discoverPage.proofPeopleJoined", { count: joined })
       : null;
 
+  const identity = circleIdentity(circle);
+  const catalogue = props.hobiesCatalog?.length
+    ? findHobyCatalogue(props.hobiesCatalog, circle.ritualType)
+    : undefined;
+  const subtitleParts = discoverSubtitleParts(circle, catalogue);
+  const description = discoverDescription(
+    circle,
+    catalogue,
+    formatCircleDetailsVibe(circle.ritualType, t),
+  );
+
+  if (!props.compact) {
+    const seats = Array.from({ length: capacity }, (_, i) => i < joined);
+    const activeThisWeek = (circle.messagesLastWeek ?? 0) > 0;
+
+    return (
+      <article
+        className={`discover-community-card${props.featured ? " discover-community-card--featured" : ""}${
+          isNew ? " discover-community-card--new" : ""
+        }`}
+        role="button"
+        tabIndex={0}
+        aria-label={identity.displayTitle}
+        onClick={props.onOpen}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            props.onOpen();
+          }
+        }}
+      >
+        <header className="discover-community-top">
+          <span className="home-hobby-badge discover-community-badge" aria-hidden>
+            {circle.hobyIcon?.trim() || catalogue?.icon?.trim() || ""}
+          </span>
+          {isNew ? (
+            <span className="circle-activity-status-badge discover-momentum-new-badge">
+              <span aria-hidden>✨</span>
+              {t("discoverPage.newCircle")}
+            </span>
+          ) : (
+            <span className={`circle-activity-status-badge circle-progress-status--${status}`}>
+              <span aria-hidden>{activityStatusMark(status)}</span>
+              {t(circleStatusKey(status))}
+            </span>
+          )}
+        </header>
+
+        <div className="discover-community-identity">
+          <BidiText as="h3" className="discover-community-title">
+            {identity.displayTitle}
+          </BidiText>
+          <DiscoverSubtitle parts={subtitleParts} className="discover-community-hobby" />
+        </div>
+
+        {description ? (
+          <p className="discover-community-description">
+            <BidiText>{description}</BidiText>
+          </p>
+        ) : null}
+
+        <DiscoverCircleSignals
+          memberCount={joined}
+          nextSessionAt={circle.nextSessionAt}
+          isRecurring={circle.isRecurring}
+          recurringTime={circle.recurringTime}
+        />
+
+        <div className="discover-community-people">
+          <span className="discover-community-seats" aria-hidden>
+            {seats.map((filled, i) => (
+              <span key={i} className={filled ? "is-filled" : undefined} />
+            ))}
+          </span>
+          <span className={`discover-momentum-spots${scarce ? " discover-momentum-spots--scarce" : ""}`}>
+            {spotsLine}
+          </span>
+        </div>
+
+        <ul className="discover-community-signals" aria-label={t("circleDetails.chipsAria")}>
+          <li>
+            <span aria-hidden>📍</span>
+            <span>
+              {formatCircleLocationChip(circle, t)} · {formatCircleCostChip(circle.costPayment, circle.groupSize, t)}
+            </span>
+          </li>
+          {activeThisWeek ? (
+            <li>
+              <span aria-hidden>💬</span>
+              <span>{t("discoverPage.activeThisWeek")}</span>
+            </li>
+          ) : null}
+        </ul>
+
+        <p className="discover-community-momentum">{t(momentum.key, { count: momentum.count })}</p>
+
+        <button
+          type="button"
+          className="circle-details-primary discover-momentum-action"
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onOpen();
+          }}
+        >
+          {props.actionLabel}
+        </button>
+      </article>
+    );
+  }
+
   return (
     <article
       className={`discover-momentum-card${props.featured ? " discover-momentum-card--featured" : ""}${
@@ -90,7 +205,12 @@ export function DiscoverMomentumCard(props: {
         <span className="home-hobby-badge discover-momentum-badge" aria-hidden>
           {circle.hobyIcon?.trim() ?? ""}
         </span>
-        <h3 className="discover-momentum-title">{circleHobyTitle(circle)}</h3>
+        <div className="discover-momentum-title-wrap">
+          <BidiText as="h3" className="discover-momentum-title circle-title-wrap">
+            {identity.displayTitle}
+          </BidiText>
+          <DiscoverSubtitle parts={subtitleParts} className="discover-momentum-hobby muted" />
+        </div>
         {isNew ? (
           <span className="circle-activity-status-badge discover-momentum-new-badge">
             <span aria-hidden>✨</span>

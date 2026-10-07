@@ -16,6 +16,7 @@ export function CityAutocompleteField(props: {
   id?: string;
   /** Hide helper lines under the field (e.g. create-circle step). */
   compact?: boolean;
+  placeholder?: string;
 }) {
   const autoId = useId();
   const inputId = props.id ?? `city-ac-${autoId}`;
@@ -113,7 +114,8 @@ export function CityAutocompleteField(props: {
             showList && activeIndex >= 0 ? `${inputId}-opt-${activeIndex}` : undefined
           }
           autoComplete="off"
-          placeholder="Start typing — pick from the list"
+          aria-label={props.hideLabel ? (props.placeholder ?? props.label ?? "City") : undefined}
+          placeholder={props.placeholder ?? "Start typing — pick from the list"}
           value={props.value}
           disabled={props.disabled}
           onChange={(e) => {

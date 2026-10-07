@@ -3,7 +3,19 @@ import { dateLocale } from "../dateLocale";
 import { circleHobyTitle } from "./circleDisplay";
 
 export function sessionTitle(item: HomeCalendarSession): string {
-  return item.hobyDisplayName?.trim() || circleHobyTitle({ ritualType: item.ritualType, recurringTime: "" });
+  return (
+    item.displayTitle?.trim() ||
+    item.hobyDisplayName?.trim() ||
+    circleHobyTitle({ ritualType: item.ritualType, recurringTime: "" })
+  );
+}
+
+/** Hobby line under a session title when the parent circle has a custom name. */
+export function sessionHobbySubtitle(item: HomeCalendarSession): string | null {
+  if (!item.hasCustomName) return null;
+  const hobby = item.hobyDisplayName?.trim() || "";
+  if (!hobby || hobby === sessionTitle(item)) return null;
+  return hobby;
 }
 
 export function getUpcomingSessions(sessions: HomeCalendarSession[]): HomeCalendarSession[] {

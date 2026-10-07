@@ -5,23 +5,9 @@ import { humanMemberLevelPhrase } from "./circleDetailsFormat";
 import { dedupeMembers, memberDisplayName } from "./circleMembers";
 import { findHobyCatalogue, memberHobbyLevelLabel } from "./memberHobbyLevel";
 import { formatMemberAvailability } from "./circleMemberDisplay";
-
-function memberInitial(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return (parts[0]?.[0] ?? "?").toUpperCase();
-}
-
-function MemberAvatar(props: { name: string; isYou?: boolean }) {
-  return (
-    <span
-      className={`circle-details-member-avatar${props.isYou ? " circle-details-member-avatar--you" : ""}`}
-      aria-hidden
-    >
-      {memberInitial(props.name)}
-    </span>
-  );
-}
+import { parseHobyTypesNested } from "./hobyMetadata";
+import { CircleMemberAvatar } from "./CircleMemberAvatar";
+import { BidiText } from "./BidiText";
 
 function MemberBadges(props: {
   memberId: string;
@@ -49,6 +35,8 @@ export function CircleDetailsMembersSection(props: {
   maxSize: number;
   selectedMemberId: string | null;
   onSelectMember: (id: string | null) => void;
+  /** Creator-only. Empty seats stay decorative when this is omitted. */
+  onInviteSeat?: () => void;
 }) {
   const { t } = useTranslation();
   const members = dedupeMembers(props.members);
@@ -60,6 +48,9 @@ export function CircleDetailsMembersSection(props: {
   if (selectedMember) {
     const name = memberDisplayName(selectedMember, members);
     const levelRaw = memberHobbyLevelLabel(selectedMember, props.circle, catalogue);
+    const selectedType = parseHobyTypesNested(catalogue?.types).find(
+      (item) => item.key === selectedMember.hobby_subtype?.trim(),
+    );
     return (
       <section className="circle-details-members-section stack">
         <button
@@ -71,7 +62,11 @@ export function CircleDetailsMembersSection(props: {
         </button>
         <div className="circle-details-member-profile card stack">
           <div className="circle-details-member-profile-head row">
-            <MemberAvatar name={name} isYou={selectedMember.id === props.myUserId} />
+            <CircleMemberAvatar
+              name={name}
+              avatarUrl={selectedMember.avatarUrl}
+              isYou={selectedMember.id === props.myUserId}
+            />
             <div>
               <div className="circle-details-member-profile-name">{name}</div>
               <div className="circle-details-member-profile-level muted">
@@ -91,53 +86,104 @@ export function CircleDetailsMembersSection(props: {
           {selectedMember.city?.trim() ? (
             <p className="muted circle-details-member-meta">{selectedMember.city.trim()}</p>
           ) : null}
+          {selectedType ? (
+            <p className="muted circle-details-member-meta">
+              {selectedType.icon ? <span aria-hidden>{selectedType.icon} </span> : null}
+              {selectedType.label ?? selectedType.key.replace(/_/g, " ")}
+            </p>
+          ) : null}
           <p className="muted circle-details-member-meta">{formatMemberAvailability(selectedMember)}</p>
         </div>
       </section>
     );
   }
 
+  const capacity = Math.max(members.length, props.maxSize || 6);
+  const openSeats = Math.max(0, capacity - members.length);
+  const ordered = [...members].sort((a, b) => memberRank(b, props) - memberRank(a, props));
+
   return (
-    <section className="circle-details-members-section stack">
+    <section className="circle-details-members-section">
       <div className="circle-details-members-head">
-        <h3 className="circle-details-members-title">{t("circleDetails.whosComing")}</h3>
+        <div>
+          <p className="circle-details-section-kicker">{t("circleDetails.community")}</p>
+          <h2 className="circle-details-members-title">{t("circleDetails.peopleTitle")}</h2>
+        </div>
+        <span className="circle-details-members-meta">
+          {t("circleDetails.seatsFilled", { joined: members.length, capacity })}
+        </span>
       </div>
       {members.length <= 1 ? (
-        <div className="circle-details-empty-members">
-          {members[0]?.id !== props.myUserId ? (
-            <p className="circle-details-empty-lead">{t("circleDetails.beFirstToJoin")}</p>
-          ) : null}
-          <p>{t("circleDetails.lookingForParticipants")}</p>
-        </div>
+        <p className="circle-details-empty-members">
+          {members[0]?.id !== props.myUserId ? t("circleDetails.beFirstToJoin") : t("circleDetails.lookingForParticipants")}
+        </p>
       ) : null}
 
-      <div className="circle-details-member-list" role="list">
-        {members.map((m) => {
+      <ul className="circle-details-people-grid">
+        {ordered.map((m) => {
           const name = memberDisplayName(m, members);
+          const type = parseHobyTypesNested(catalogue?.types).find((item) => item.key === m.hobby_subtype?.trim());
+          const level = memberHobbyLevelLabel(m, props.circle, catalogue);
+          const details = [
+            type ? `${type.icon ? `${type.icon} ` : ""}${type.label ?? type.key.replace(/_/g, " ")}` : null,
+            level !== "Level not set" && level !== "—" ? humanMemberLevelPhrase(level, t) : null,
+          ].filter(Boolean);
+          const isYou = m.id === props.myUserId;
+          const isOwner = m.id === props.creatorUserId;
           return (
-            <button
-              key={m.id}
-              type="button"
-              className="circle-details-member-card"
-              role="listitem"
-              onClick={() => props.onSelectMember(m.id)}
-            >
-              <MemberAvatar name={name} isYou={m.id === props.myUserId} />
-              <span className="circle-details-member-card-copy">
-                <span className="circle-details-member-card-name">{name}</span>
-                <span className="circle-details-member-badges">
-                  {m.id === props.myUserId ? <span className="pill">{t("circleDetails.you")}</span> : null}
-                  {m.id === props.creatorUserId ? (
-                    <span className="pill pill--owner">{t("circleDetails.owner")}</span>
-                  ) : (
-                    <span className="pill pill--member">{t("circleDetails.member")}</span>
-                  )}
+            <li key={m.id}>
+              <button
+                type="button"
+                className={`circle-details-person${isYou ? " circle-details-person--you" : ""}`}
+                onClick={() => props.onSelectMember(m.id)}
+              >
+                <span className="circle-details-person-avatar">
+                  <CircleMemberAvatar name={name} avatarUrl={m.avatarUrl} isYou={isYou} />
+                  {isOwner ? (
+                    <span className="circle-details-person-crown" aria-hidden>
+                      ★
+                    </span>
+                  ) : null}
                 </span>
-              </span>
-            </button>
+                <BidiText className="circle-details-person-name">{isYou ? t("circleDetails.you") : name}</BidiText>
+                <span className="circle-details-person-role">
+                  {isOwner ? t("circleDetails.owner") : t("circleDetails.member")}
+                </span>
+                {details.length ? <span className="circle-details-person-meta">{details.join(" · ")}</span> : null}
+              </button>
+            </li>
           );
         })}
-      </div>
+        {Array.from({ length: openSeats }, (_, i) =>
+          props.onInviteSeat ? (
+            <li key={`open-${i}`}>
+              <button
+                type="button"
+                className="circle-details-person circle-details-person--open circle-details-person--invite"
+                onClick={props.onInviteSeat}
+              >
+                <span className="circle-details-person-avatar">
+                  <span className="circle-details-open-seat">+</span>
+                </span>
+                <span className="circle-details-person-name">{t("circleDetails.inviteSomeone")}</span>
+              </button>
+            </li>
+          ) : (
+            <li key={`open-${i}`} className="circle-details-person circle-details-person--open" aria-hidden>
+              <span className="circle-details-person-avatar">
+                <span className="circle-details-open-seat">+</span>
+              </span>
+              <span className="circle-details-person-name">{t("circleDetails.openSpot")}</span>
+            </li>
+          ),
+        )}
+      </ul>
     </section>
   );
+}
+
+function memberRank(m: CircleMemberResponse, props: { myUserId: string | null; creatorUserId: string | null }): number {
+  if (m.id === props.creatorUserId) return 2;
+  if (m.id === props.myUserId) return 1;
+  return 0;
 }

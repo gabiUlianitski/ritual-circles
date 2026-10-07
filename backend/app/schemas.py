@@ -3,6 +3,29 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.circle_identity import (
+    CIRCLE_DESCRIPTION_MAX,
+    CIRCLE_NAME_MAX,
+    description_too_long,
+    name_too_long,
+    normalize_circle_description,
+    normalize_circle_name,
+)
+
+
+def _validate_circle_name(value: str | None) -> str | None:
+    name = normalize_circle_name(value)
+    if name_too_long(name):
+        raise ValueError(f"Circle name must be {CIRCLE_NAME_MAX} characters or fewer.")
+    return name
+
+
+def _validate_circle_description(value: str | None) -> str | None:
+    text = normalize_circle_description(value)
+    if description_too_long(text):
+        raise ValueError(f"Circle description must be {CIRCLE_DESCRIPTION_MAX} characters or fewer.")
+    return text
+
 
 Modality = Literal["online", "offline"]
 AttendanceStatus = Literal["attending", "not_attending"]
@@ -97,6 +120,7 @@ class UserMeResponse(BaseModel):
     createdAt: datetime | None = None
     passwordSet: bool = False
     onboardingCompleted: bool = False
+    avatarUrl: str | None = None
 
 
 class UserUpdateRequest(BaseModel):
@@ -118,6 +142,7 @@ class UserUpdateRequest(BaseModel):
     availability_day: str | None = None
     availability_time: str | None = None
     onboardingCompleted: bool | None = None
+    avatarUrl: str | None = None
 
 
 class PasswordChangeRequest(BaseModel):
@@ -222,6 +247,10 @@ class CircleResponse(BaseModel):
     ritualSubtype: str | None = None
     hobyDisplayName: str | None = None
     hobyIcon: str | None = None
+    description: str | None = None
+    name: str | None = None
+    displayTitle: str = ""
+    hasCustomName: bool = False
 
 
 class CircleMemberResponse(BaseModel):
@@ -236,6 +265,7 @@ class CircleMemberResponse(BaseModel):
     """Saved level for this circle's hobby (from user profile hobbies)."""
     hobby_subtype: str | None = None
     hobby_level: str | int | None = None
+    avatarUrl: str | None = None
 
 
 class CircleMemberAttendanceItem(BaseModel):
@@ -249,6 +279,7 @@ class CircleMemberAttendanceItem(BaseModel):
 class CircleNextSessionRoster(BaseModel):
     sessionId: str
     dateTime: datetime
+    locationOrLink: str | None = None
     members: list[CircleMemberAttendanceItem] = Field(default_factory=list)
 
 
@@ -280,6 +311,10 @@ class CircleListItemResponse(BaseModel):
     ritualSubtype: str | None = None
     hobyDisplayName: str | None = None
     hobyIcon: str | None = None
+    description: str | None = None
+    name: str | None = None
+    displayTitle: str = ""
+    hasCustomName: bool = False
     groupSize: GroupSizeSpec | None = None
     costPayment: CirclePaymentSpec | None = None
     nextSessionAt: datetime | None = None
@@ -304,6 +339,9 @@ class CommunityCirclePreview(BaseModel):
     memberCount: int = 0
     hobyDisplayName: str | None = None
     hobyIcon: str | None = None
+    name: str | None = None
+    displayTitle: str = ""
+    hasCustomName: bool = False
     nextSessionAt: datetime | None = None
 
 
@@ -327,6 +365,18 @@ class CircleCreateRequest(BaseModel):
     firstSessionAt: datetime | None = None
     groupSize: GroupSizeSpec | None = None
     costPayment: CirclePaymentSpec | None = None
+    description: str | None = None
+    name: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, value: str | None) -> str | None:
+        return _validate_circle_name(value)
+
+    @field_validator("description")
+    @classmethod
+    def clean_description(cls, value: str | None) -> str | None:
+        return _validate_circle_description(value)
 
 
 class MeetingPlacePatch(BaseModel):
@@ -343,6 +393,18 @@ class CirclePatchRequest(BaseModel):
     recurringTime: str | None = None
     isRecurring: bool | None = None
     meetingPlaceUpdate: MeetingPlacePatch | None = None
+    description: str | None = None
+    name: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, value: str | None) -> str | None:
+        return _validate_circle_name(value)
+
+    @field_validator("description")
+    @classmethod
+    def clean_description(cls, value: str | None) -> str | None:
+        return _validate_circle_description(value)
 
     @model_validator(mode="after")
     def at_least_one_field(self) -> "CirclePatchRequest":
@@ -359,6 +421,8 @@ class CirclePatchRequest(BaseModel):
             or self.costPayment is not None
             or all(schedule_fields)
             or self.meetingPlaceUpdate is not None
+            or "description" in self.model_fields_set
+            or "name" in self.model_fields_set
         )
         if not has_any:
             raise ValueError("at least one field required")
@@ -491,6 +555,8 @@ class HomeCalendarSession(BaseModel):
     ritualType: str
     hobyDisplayName: str | None = None
     hobyIcon: str | None = None
+    displayTitle: str = ""
+    hasCustomName: bool = False
     myAttendance: AttendanceResponse | None
     attendingCount: int = 0
     memberCount: int = 0
@@ -623,6 +689,66 @@ class CircleMessageResponse(BaseModel):
     authorName: str
     body: str
     createdAt: datetime
+
+
+InvitationStatus = Literal["pending", "accepted", "declined", "canceled"]
+
+
+class InvitationCandidateResponse(BaseModel):
+    id: str
+    displayName: str
+    city: str | None = None
+    avatarUrl: str | None = None
+    reasonLabel: str | None = None
+
+
+class CircleInvitationResponse(BaseModel):
+    id: str
+    circleId: str
+    status: InvitationStatus
+    createdAt: datetime
+    circleTitle: str
+    inviterName: str
+    inviteeId: str
+    inviteeName: str
+
+
+class CircleInvitationCreateRequest(BaseModel):
+    inviteeUserId: str
+
+
+class SharedCircleLinkResponse(BaseModel):
+    """Result of opening a shared circle link. No invite code."""
+
+    circleId: str
+    invitationId: str | None = None
+    alreadyMember: bool = False
+
+
+class CircleInvitationPreviewResponse(BaseModel):
+    """Read-only circle facts for the invited person. No invite code and no member identities."""
+
+    id: str
+    circleId: str
+    status: InvitationStatus
+    inviterName: str
+    title: str
+    name: str | None = None
+    hasCustomName: bool = False
+    ritualType: str
+    hobyDisplayName: str | None = None
+    hobyIcon: str | None = None
+    description: str | None = None
+    recurringTime: str
+    isRecurring: bool = True
+    nextSessionAt: datetime | None = None
+    modality: str
+    city: str | None = None
+    cityName: str | None = None
+    meetingPlace: str | None = None
+    memberCount: int
+    maxSize: int
+    matchedHobbyName: str | None = None
 
 
 class DiscoveryRequest(BaseModel):

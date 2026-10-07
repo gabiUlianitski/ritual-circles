@@ -1,13 +1,11 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import type { CircleListItem, Hoby } from "../api/types";
-import { circleHobyTitle } from "./circleDisplay";
-import {
-  formatCircleDetailsTitle,
-  formatCircleDetailsVibe,
-  formatCircleScheduleShort,
-} from "./circleDetailsFormat";
-import { findHobyCatalogue, circleHobyTypeLevelLabels } from "./memberHobbyLevel";
+import { BidiText } from "./BidiText";
+import { circleIdentity, DiscoverSubtitle, discoverDescription, discoverSubtitleParts } from "./circleDisplay";
+import { DiscoverCircleSignals } from "./DiscoverCircleSignals";
+import { formatCircleDetailsVibe, formatCircleScheduleShort } from "./circleDetailsFormat";
+import { findHobyCatalogue } from "./memberHobbyLevel";
 import { formatCompactSchedule, formatCompactLocation, formatParticipantsLabel } from "./circleDiscover";
 import { isCircleJoinable, circleParticipationState } from "./circleParticipation";
 
@@ -33,21 +31,13 @@ export function DiscoverCircleCard(props: DiscoverCircleCardProps) {
     ? findHobyCatalogue(props.hobiesCatalog, circle.ritualType)
     : undefined;
   const full = props.fullDescription === true;
-  const title = full
-    ? formatCircleDetailsTitle(circle, catalogue, t)
-    : circleHobyTitle(circle);
+  const identity = circleIdentity(circle);
+  const title = identity.displayTitle;
+  const subtitleParts = discoverSubtitleParts(circle, catalogue);
+  const description = discoverDescription(circle, catalogue, formatCircleDetailsVibe(circle.ritualType, t));
   const location = formatCompactLocation(circle);
   const time = full ? formatCircleScheduleShort(circle, t) : formatCompactSchedule(circle, t);
   const participants = formatParticipantsLabel(circle, t);
-  const typeLevel = catalogue ? circleHobyTypeLevelLabels(circle, catalogue) : null;
-  const typeLevelLine =
-    full && typeLevel && typeLevel.type !== "—"
-      ? t("discoverPage.typeLevelLine", {
-          type: typeLevel.type,
-          level: typeLevel.level,
-        })
-      : null;
-  const vibeLine = full ? formatCircleDetailsVibe(circle.ritualType, t) : null;
   const participation = circleParticipationState(circle.memberCount, circle.maxSize);
   const joinable = isCircleJoinable(circle.memberCount, circle.maxSize);
   const joinAction =
@@ -71,15 +61,27 @@ export function DiscoverCircleCard(props: DiscoverCircleCardProps) {
     >
       <div className="discover-card-body">
         <div className="discover-card-head">
-          {!full && (
+          {(!full || identity.hasCustomName) && (
             <span className="discover-card-icon" aria-hidden>
               {circle.hobyIcon || "🎯"}
             </span>
           )}
-          <h3 className="discover-card-title">{title}</h3>
+          <BidiText as="h3" className="discover-card-title circle-title-wrap">
+            {title}
+          </BidiText>
         </div>
-        {vibeLine ? <p className="discover-card-vibe muted">{vibeLine}</p> : null}
-        {typeLevelLine ? <p className="discover-card-type-level muted">{typeLevelLine}</p> : null}
+        <DiscoverSubtitle parts={subtitleParts} className="discover-card-type-level muted circle-identity-hobby" />
+        {description ? (
+          <p className="discover-card-vibe muted">
+            <BidiText>{description}</BidiText>
+          </p>
+        ) : null}
+        <DiscoverCircleSignals
+          memberCount={circle.memberCount}
+          nextSessionAt={circle.nextSessionAt}
+          isRecurring={circle.isRecurring}
+          recurringTime={circle.recurringTime}
+        />
         <ul className="discover-card-meta">
           <li>
             <span className="discover-card-meta-icon" aria-hidden>
