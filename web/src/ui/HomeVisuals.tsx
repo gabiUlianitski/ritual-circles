@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { CircleListItem, CommunityStats } from "../api/types";
 import { api } from "../api/client";
 import { BidiText } from "./BidiText";
@@ -7,7 +8,7 @@ import { circleDisplayTitle, circleHobbySubtitle } from "./circleDisplay";
 import { activityStatusMark, circleStatusKey } from "./CircleProgressCard";
 import { FormError } from "./FormError";
 import { formatSessionDateTimeHero, sessionHobbySubtitle, sessionTitle } from "./homeDashboardUtils";
-import { circleStatus, MIN_VISIBLE_COUNT, type HomeInterest, type HomeUpcoming } from "./homeSections";
+import { circleStatus, type HomeInterest, type HomeUpcoming } from "./homeSections";
 
 /** Dark-blue gradients; the hobby slug always maps to the same one. */
 const VISUAL_GRADIENTS = [
@@ -42,6 +43,19 @@ export function HobbyVisual(props: {
       {props.children}
     </div>
   );
+}
+
+/** Real signals only: members, open spots, next meetup, chat activity this week. */
+export function circleSocialProof(c: CircleListItem, t: TFunction): string[] {
+  const spots = Math.max(0, c.maxSize - c.memberCount);
+  return [
+    `👥 ${t("homeFeed.memberCapacity", { joined: c.memberCount, capacity: c.maxSize })}`,
+    spots > 0 && spots <= 2 ? t("homeFeed.proofSpotsLeft", { count: spots }) : null,
+    c.nextSessionAt
+      ? `📅 ${t("homeFeed.proofNextMeetup", { when: formatSessionDateTimeHero(c.nextSessionAt) })}`
+      : null,
+    (c.messagesLastWeek ?? 0) > 0 ? `🔥 ${t("homeFeed.proofActiveWeek")}` : null,
+  ].filter((x): x is string => Boolean(x));
 }
 
 function ProgressBlock(props: { circle: CircleListItem }) {
@@ -215,14 +229,11 @@ export function InterestCarousel(props: { interests: HomeInterest[]; onPick: (sl
   return (
     <section className="home-feed-block" aria-label={t("homeFeed.exploreInterests")}>
       <h2 className="home-section-title">{t("homeFeed.exploreInterests")}</h2>
-      <div className="home-carousel">
-        {props.interests.map(({ hoby, circleCount }) => (
-          <button key={hoby.slug} type="button" className="home-interest-card" onClick={() => props.onPick(hoby.slug)}>
-            <HobbyVisual slug={hoby.slug} icon={hoby.icon} size="sm" />
-            <span className="home-interest-name">{hoby.displayName}</span>
-            <span className="home-interest-count">
-              {circleCount > 0 ? t("homeFeed.circleCount", { count: circleCount }) : t("homeFeed.beTheFirst")}
-            </span>
+      <div className="home-interest-chips">
+        {props.interests.map(({ hoby }) => (
+          <button key={hoby.slug} type="button" className="home-interest-chip" onClick={() => props.onPick(hoby.slug)}>
+            {hoby.icon?.trim() ? <span aria-hidden>{hoby.icon.trim()}</span> : null}
+            <span>{hoby.displayName}</span>
           </button>
         ))}
       </div>
@@ -287,30 +298,26 @@ export function HappeningCarousel(props: { circles: CircleListItem[]; onOpen: (c
 export function CommunityPulse(props: { stats: CommunityStats | null; groupsForming: number }) {
   const { t } = useTranslation();
   const s = props.stats;
-  const line = (count: number, manyKey: string, fewKey: string) =>
-    count >= MIN_VISIBLE_COUNT ? t(manyKey, { count }) : t(fewKey);
   const items = [
-    s && s.members > 0
-      ? { icon: "👋", text: line(s.members, "homeFeed.humanMembersMany", "homeFeed.humanMembersFew") }
+    s && s.meetupsThisWeek > 0
+      ? { value: s.meetupsThisWeek, label: t("homeFeed.communityMeetups") }
       : null,
     props.groupsForming > 0
-      ? { icon: "🌱", text: line(props.groupsForming, "homeFeed.humanFormingMany", "homeFeed.humanFormingFew") }
+      ? { value: props.groupsForming, label: t("homeFeed.communityForming") }
       : null,
-    s && s.meetupsThisWeek > 0
-      ? { icon: "☕", text: line(s.meetupsThisWeek, "homeFeed.humanMeetupsMany", "homeFeed.humanMeetupsFew") }
+    s && s.members > 0
+      ? { value: s.members, label: t("homeFeed.communityMembers") }
       : null,
-  ].filter((x): x is { icon: string; text: string } => x != null);
-  if (items.length === 0) items.push({ icon: "🌱", text: t("homeFeed.humanStartHere") });
+  ].filter((x): x is { value: number; label: string } => x != null);
+  if (items.length === 0) return null;
   return (
     <section className="home-feed-block" aria-label={t("homeFeed.communityPulse")}>
       <h2 className="home-section-title">{t("homeFeed.communityPulse")}</h2>
-      <ul className="home-pulse home-pulse--human">
+      <ul className="home-pulse">
         {items.map((it) => (
-          <li key={it.icon + it.text} className="home-pulse-row">
-            <span className="home-pulse-icon" aria-hidden>
-              {it.icon}
-            </span>
-            <span className="home-pulse-text">{it.text}</span>
+          <li key={it.label} className="home-pulse-item">
+            <strong className="home-pulse-value">{it.value}</strong>
+            <span className="home-pulse-label">{it.label}</span>
           </li>
         ))}
       </ul>

@@ -455,7 +455,7 @@ export function App() {
             </button>
             </>
           ) : null}
-            <div className="app-header-wrap" ref={menuRef}>
+            {!showGreeting ? <div className="app-header-wrap" ref={menuRef}>
               <button
                 ref={menuButtonRef}
                 type="button"
@@ -492,7 +492,7 @@ export function App() {
                   </button>
                 </div>
               ) : null}
-            </div>
+            </div> : null}
         </div>
       </div>
       ) : null}

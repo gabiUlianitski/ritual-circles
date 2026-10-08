@@ -343,7 +343,7 @@ export function CircleChat(props: {
               action: "accept",
               firstSessionAt: schedule.firstSessionAt,
               recurringTime: schedule.recurringTime,
-              isRecurring: circle?.isRecurring !== false && repeatsWeekly,
+              isRecurring: repeatsWeekly,
             }
           : { action: "accept" },
       );
@@ -633,18 +633,16 @@ export function CircleChat(props: {
           onHourChange={setMeetHour}
           disabled={sending}
         />
-        {circle?.isRecurring !== false ? (
-          <label className="create-circle-repeat-row row">
-            <input
-              type="checkbox"
-              className="create-circle-repeat-checkbox"
-              checked={repeatsWeekly}
-              onChange={(e) => setRepeatsWeekly(e.target.checked)}
-              disabled={sending}
-            />
-            <span className="create-circle-helper muted">This repeats every week</span>
-          </label>
-        ) : null}
+        <label className="create-circle-repeat-row row">
+          <input
+            type="checkbox"
+            className="create-circle-repeat-checkbox"
+            checked={repeatsWeekly}
+            onChange={(e) => setRepeatsWeekly(e.target.checked)}
+            disabled={sending}
+          />
+          <span className="create-circle-helper muted">This repeats every week</span>
+        </label>
         <button type="button" className="primary" style={{ width: "auto", alignSelf: "flex-start" }} disabled={sending || !meetDate || meetHour === ""} onClick={() => void sendTimeSuggestion()}>
           {sending ? "Sending…" : "Send time suggestion"}
         </button>

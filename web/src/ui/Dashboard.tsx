@@ -1,37 +1,24 @@
 import React, { useEffect, useMemo, useState } from "react";
-import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import type { CircleListItem, CommunityStats, HomeResponse, Hoby, UserMeResponse } from "../api/types";
 import {
-  dismissChecklist,
-  getChecklistProgress,
-  isChecklistDismissed,
-  shouldShowChecklist,
   shouldShowWelcomeTutorial,
 } from "../onboarding/onboardingState";
 import { CircleDetails } from "./CircleDetails";
 import { circleDisplayTitle, circleHobbySubtitle } from "./circleDisplay";
 import { formatCircleLocationChip } from "./circleDetailsFormat";
 import { hobbiesFromMe } from "./circleJoinHobby";
-import { buildHomeFeed, MIN_VISIBLE_COUNT, socialStatusKey, type HomeUpcoming } from "./homeSections";
-import { CommunityPulse, HobbyVisual, InterestCarousel } from "./HomeVisuals";
-import { formatSessionDateTimeHero, sessionHobbySubtitle, sessionTitle } from "./homeDashboardUtils";
+import { buildHomeFeed, type HomeUpcoming } from "./homeSections";
+import { circleSocialProof, CommunityPulse, HobbyVisual, InterestCarousel } from "./HomeVisuals";
+import { formatSessionDateTimeHero, sessionTitle } from "./homeDashboardUtils";
 import { TodaysDiscovery } from "./TodaysDiscovery";
-import { OnboardingChecklist } from "./onboarding/OnboardingChecklist";
 import { OnboardingFlow } from "./onboarding/OnboardingFlow";
-
-function socialLine(t: TFunction, members: number, confirmed = false): string {
-  if (confirmed) return t(socialStatusKey({ members, confirmed }));
-  if (members >= MIN_VISIBLE_COUNT) return t("homeFeed.peopleJoinedLine", { count: members });
-  return t(socialStatusKey({ members }));
-}
 
 function NextActivity(props: {
   upcoming: HomeUpcoming | undefined;
   onOpen: (circleId: string) => void;
   onFind: () => void;
-  onExplore: () => void;
 }) {
   const { t } = useTranslation();
   const u = props.upcoming;
@@ -44,9 +31,6 @@ function NextActivity(props: {
           <button type="button" className="primary" onClick={props.onFind}>
             {t("homeFeed.findActivities")}
           </button>
-          <button type="button" onClick={props.onExplore}>
-            {t("homeFeed.exploreCircles")}
-          </button>
         </div>
       </section>
     );
@@ -54,17 +38,12 @@ function NextActivity(props: {
   const circleId = u.kind === "session" ? u.item.circleId : u.circle.id;
   const icon = u.kind === "session" ? u.item.hobyIcon : u.circle.hobyIcon;
   const title = u.kind === "session" ? sessionTitle(u.item) : circleDisplayTitle(u.circle);
-  const hobbyLine = u.kind === "session" ? sessionHobbySubtitle(u.item) : circleHobbySubtitle(u.circle);
   const when =
     u.kind === "session" ? formatSessionDateTimeHero(u.item.session.dateTime) : t("homeFeed.readyToChooseDate");
-  const place =
+  const members =
     u.kind === "session"
-      ? u.item.session.locationOrLink
-      : formatCircleLocationChip(u.circle, t);
-  const members = u.kind === "session" ? (u.item.memberCount ?? 0) : u.circle.memberCount;
-  const confirmed =
-    u.kind === "session" &&
-    (u.item.myAttendance?.status === "attending" || (u.item.attendingCount ?? 0) > 0);
+      ? (u.item.attendingCount ?? u.item.memberCount ?? 0)
+      : u.circle.memberCount;
   return (
     <section className="card home-next-compact" aria-label={t("homeFeed.yourNextActivity")}>
       <div className="home-next-compact-row">
@@ -74,10 +53,8 @@ function NextActivity(props: {
         <span className="home-next-compact-copy">
           <span className="home-next-compact-title circle-title-wrap">{title}</span>
           <span className="home-next-compact-meta">
-            {hobbyLine ? `${hobbyLine} · ` : ""}
             {when}
-            {place ? ` · ${place}` : ""}
-            {` · ${socialLine(t, members, confirmed)}`}
+            {` · ${t("homeFeed.participantCount", { count: members })}`}
           </span>
         </span>
         <button type="button" className="primary" onClick={() => props.onOpen(circleId)}>
@@ -92,24 +69,9 @@ function RecommendStrip(props: {
   circles: CircleListItem[];
   onOpen: (c: CircleListItem) => void;
   onFind: () => void;
-  onCreate: () => void;
 }) {
   const { t } = useTranslation();
-  if (props.circles.length === 0) {
-    return (
-      <section className="home-feed-block" aria-label={t("discoverPage.recommendedForYou")}>
-        <h2 className="home-section-title">{t("discoverPage.recommendedForYou")}</h2>
-        <button type="button" className="home-recommend-card home-recommend-card--invite" onClick={props.onCreate}>
-          <HobbyVisual slug="invite" icon="🌱" size="sm" />
-          <span className="home-recommend-body">
-            <span className="home-recommend-name">{t("homeFeed.inviteCardTitle")}</span>
-            <span className="home-recommend-blurb">{t("homeFeed.inviteCardBody")}</span>
-            <span className="home-recommend-cta">{t("homeFeed.startCircleCta")}</span>
-          </span>
-        </button>
-      </section>
-    );
-  }
+  if (props.circles.length === 0) return null;
   return (
     <section className="home-feed-block" aria-label={t("discoverPage.recommendedForYou")}>
       <div className="home-section-head">
@@ -127,9 +89,11 @@ function RecommendStrip(props: {
               {circleHobbySubtitle(c) ? (
                 <span className="home-recommend-meta">{circleHobbySubtitle(c)}</span>
               ) : null}
-              <span className="home-recommend-meta">{formatCircleLocationChip(c, t)}</span>
-              <span className="home-recommend-social">{socialLine(t, c.memberCount)}</span>
-              <span className="home-recommend-cta">{t("homeFeed.viewCircle")}</span>
+              {formatCircleLocationChip(c, t) ? (
+                <span className="home-recommend-meta">📍 {formatCircleLocationChip(c, t)}</span>
+              ) : null}
+              <span className="home-recommend-social">{circleSocialProof(c, t).slice(0, 2).join(" · ")}</span>
+              <span className="home-recommend-cta">{t("discoverPage.join")}</span>
             </span>
           </button>
         ))}
@@ -161,7 +125,6 @@ export function Dashboard(props: {
   const [hobyCatalog, setHobyCatalog] = useState<Hoby[]>([]);
   const [hobyCatalogReady, setHobyCatalogReady] = useState(false);
   const [stats, setStats] = useState<CommunityStats | null>(null);
-  const [checklistDismissed, setChecklistDismissed] = useState(() => isChecklistDismissed());
   const calendarSessions = props.home.calendarSessions ?? [];
 
   useEffect(() => {
@@ -190,7 +153,7 @@ export function Dashboard(props: {
   useEffect(() => {
     let cancelled = false;
     void api
-      .getHobies()
+      .getHobiesSaved()
       .then((list) => {
         if (cancelled) return;
         setHobyCatalog(Array.isArray(list) ? list : []);
@@ -203,11 +166,6 @@ export function Dashboard(props: {
       cancelled = true;
     };
   }, [i18n.language]);
-
-  const checklistProgress = useMemo(
-    () => getChecklistProgress(props.home, me?.userHobies ?? []),
-    [props.home, me?.userHobies],
-  );
 
   const hobbies = useMemo(() => hobbiesFromMe(me), [me]);
 
@@ -273,32 +231,19 @@ export function Dashboard(props: {
   const openHobby = (slug: string) => props.onGoFindCircles(undefined, slug);
   const openDiscover = () => props.onGoFindCircles();
   const nextActivity = feed.upcoming[0];
-
-  function guard(action: () => void) {
-    if (props.guest) {
-      props.onRegisterRequest?.(t("guest.noticeDefault"));
-      return;
-    }
-    action();
-  }
+  const featuredCircle = feed.recommended[0];
+  const carouselCircles =
+    feed.recommended.length > 1 ? feed.recommended.slice(1) : feed.recommended;
 
   return (
     <div className="stack dashboard-home home-feed">
-      {shouldShowChecklist(checklistProgress, checklistDismissed) ? (
-        <OnboardingChecklist
-          progress={checklistProgress}
-          onDismiss={() => {
-            dismissChecklist();
-            setChecklistDismissed(true);
-          }}
-        />
-      ) : null}
-
       <TodaysDiscovery
         hobies={hobyCatalog}
         userSlugs={hobbies.map((h) => h.slug)}
         circleSlugs={(catalog ?? []).filter((c) => c.isYours).map((c) => c.ritualType)}
         userId={me?.id ?? null}
+        featuredCircle={featuredCircle}
+        onOpenCircle={(circle) => openListed(circle)}
         onExplore={openHobby}
       />
 
@@ -306,7 +251,6 @@ export function Dashboard(props: {
         upcoming={nextActivity}
         onOpen={(id) => openMember(id)}
         onFind={openDiscover}
-        onExplore={openDiscover}
       />
 
       {catalog === null ? (
@@ -319,47 +263,15 @@ export function Dashboard(props: {
         </section>
       ) : (
         <RecommendStrip
-          circles={feed.recommended}
+          circles={carouselCircles}
           onOpen={(c) => openListed(c)}
           onFind={openDiscover}
-          onCreate={() => guard(() => props.onGoCreateJoin())}
         />
       )}
 
+      <InterestCarousel interests={feed.interests} onPick={props.onBrowseHobby ?? openHobby} />
+
       <CommunityPulse stats={stats} groupsForming={feed.groupsForming} />
-
-      <section className="home-feed-block" aria-label={t("homeFeed.quickActions")}>
-        <h2 className="home-section-title">{t("homeFeed.quickActions")}</h2>
-        <div className="home-quick-grid">
-          <button type="button" className="home-quick-btn" onClick={() => guard(() => props.onGoCreateJoin())}>
-            <span aria-hidden>＋</span>
-            {t("homeFeed.quickCreate")}
-          </button>
-          <button type="button" className="home-quick-btn" onClick={openDiscover}>
-            <span aria-hidden>🔍</span>
-            {t("homeFeed.quickDiscover")}
-          </button>
-          <button
-            type="button"
-            className="home-quick-btn"
-            onClick={() => {
-              if (!props.guest && hobbies.length === 0) props.onChooseHobbies();
-              else document.getElementById("home-hobbies")?.scrollIntoView({ behavior: "smooth", block: "start" });
-            }}
-          >
-            <span aria-hidden>🎯</span>
-            {t("homeFeed.quickHobbies")}
-          </button>
-          <button type="button" className="home-quick-btn" onClick={() => guard(props.onOpenMessages)}>
-            <span aria-hidden>💬</span>
-            {t("homeFeed.quickMessages")}
-          </button>
-        </div>
-      </section>
-
-      <div id="home-hobbies">
-        <InterestCarousel interests={feed.interests} onPick={props.onBrowseHobby ?? openHobby} />
-      </div>
     </div>
   );
 }

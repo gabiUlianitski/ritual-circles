@@ -451,18 +451,16 @@ export function CircleScheduledTab(props: {
                 onHourChange={onMeetHourChange}
                 disabled={saving}
               />
-              {circle?.isRecurring !== false ? (
-                <label className="create-circle-repeat-row row">
-                  <input
-                    type="checkbox"
-                    className="create-circle-repeat-checkbox"
-                    checked={repeatsWeekly}
-                    onChange={(e) => void onRepeatsWeeklyChange(e.target.checked)}
-                    disabled={saving}
-                  />
-                  <span className="create-circle-helper muted">This repeats every week</span>
-                </label>
-              ) : null}
+              <label className="create-circle-repeat-row row">
+                <input
+                  type="checkbox"
+                  className="create-circle-repeat-checkbox"
+                  checked={repeatsWeekly}
+                  onChange={(e) => void onRepeatsWeeklyChange(e.target.checked)}
+                  disabled={saving}
+                />
+                <span className="create-circle-helper muted">{t("createCircle.repeatsWeekly")}</span>
+              </label>
             </div>
 
             {circle ? (

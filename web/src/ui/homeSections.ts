@@ -8,6 +8,7 @@ const HAPPENING_LIMIT = 8;
 const INTEREST_LIMIT = 10;
 const HERO_CHIP_LIMIT = 5;
 const UPCOMING_LIMIT = 3;
+const RECOMMENDED_LIMIT = 6;
 
 export type HomeUpcoming =
   | { kind: "session"; item: HomeCalendarSession; needsAnswer: boolean }
@@ -18,7 +19,7 @@ export type HomeInterest = { hoby: Hoby; circleCount: number };
 export type HomeFeed = {
   /** Shown in the hero; the rest go to the Upcoming Activity section. */
   upcoming: HomeUpcoming[];
-  /** Personal matches when the user has hobbies; otherwise the fullest joinable circles. */
+  /** Personal matches first, topped up with the fullest joinable circles (max 6). */
   recommended: CircleListItem[];
   interests: HomeInterest[];
   heroChips: HomeInterest[];
@@ -101,11 +102,14 @@ export function buildHomeFeed(input: {
         a.hoby.displayName.localeCompare(b.hoby.displayName),
     );
 
-  const personal = getRecommendedCircles(joinable, hobbies, city, 6);
+  const personal = getRecommendedCircles(joinable, hobbies, city, RECOMMENDED_LIMIT);
   const others = listed.filter((c) => !c.isYours);
   const fallbackPool = joinable.length > 0 ? joinable : others;
-  const recommended =
-    personal.length > 0 ? personal : [...fallbackPool].sort(byMomentum).slice(0, 6);
+  const personalIds = new Set(personal.map((c) => c.id));
+  const recommended = [
+    ...personal,
+    ...[...fallbackPool].filter((c) => !personalIds.has(c.id)).sort(byMomentum),
+  ].slice(0, RECOMMENDED_LIMIT);
 
   const happening = joinable
     .filter((c) => {
