@@ -23,3 +23,14 @@ const INSIGHT_KEY: Record<LibraryInsightType, string> = {
 export function insightFallbackKey(hobbyKey: string, day: string): string {
   return INSIGHT_KEY[insightTypeFor(hobbyKey, day)];
 }
+
+/** Keep the mobile hero compact without cutting through a word. */
+export function compactInsight(text: string, maxLength = 120): string {
+  const clean = text.trim().replace(/\s+/g, " ");
+  if (clean.length <= maxLength) return clean;
+  const firstSentence = clean.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim();
+  if (firstSentence && firstSentence.length >= 45 && firstSentence.length <= maxLength) return firstSentence;
+  const clipped = clean.slice(0, maxLength - 1);
+  const boundary = clipped.lastIndexOf(" ");
+  return `${(boundary >= 45 ? clipped.slice(0, boundary) : clipped).replace(/[,:;\s]+$/, "")}…`;
+}

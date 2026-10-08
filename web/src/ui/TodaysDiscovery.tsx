@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
-import type { CircleListItem, Hoby } from "../api/types";
+import type { CircleListItem, CommunityStats, Hoby } from "../api/types";
+import { circleSignal, dailyMoment } from "./homeMoments";
 import { formatCircleLocationChip } from "./circleDetailsFormat";
 import { circleDisplayTitle } from "./circleDisplay";
 import { formatSessionDateTimeHero } from "./homeDashboardUtils";
@@ -14,7 +15,7 @@ import {
   scenePrompt,
   todayKey,
 } from "./homeDiscovery";
-import { insightFallbackKey } from "./hobbyInsightSelect";
+import { compactInsight, insightFallbackKey } from "./hobbyInsightSelect";
 
 /** One circle for today. The insight comes from the stored library, never from a live AI call. */
 export function TodaysDiscovery(props: {
@@ -23,6 +24,10 @@ export function TodaysDiscovery(props: {
   circleSlugs: string[];
   userId: string | null;
   featuredCircle?: CircleListItem;
+  catalog: CircleListItem[];
+  likedSlugs: string[];
+  city: string | null;
+  stats: CommunityStats | null;
   onOpenCircle: (circle: CircleListItem) => void;
   onExplore: (slug: string) => void;
 }) {
@@ -94,7 +99,19 @@ export function TodaysDiscovery(props: {
 
   const title = featured ? circleDisplayTitle(featured) : visualPick.displayName;
   const location = featured ? formatCircleLocationChip(featured, t) : "";
-  const staticInsight = t(insightFallbackKey(visualPick.slug, today), { name: visualPick.displayName });
+  const libraryInsight = insight ? compactInsight(insight) : null;
+  const heroLine = featured
+    ? dailyMoment({
+        featured,
+        catalog: props.catalog,
+        likedSlugs: props.likedSlugs,
+        city: props.city,
+        stats: props.stats,
+        libraryInsight,
+        dayKey: today,
+        t,
+      })
+    : libraryInsight || compactInsight(t(insightFallbackKey(visualPick.slug, today), { name: visualPick.displayName }));
   const imageUrl = discoveryImageUrl(scenePrompt(visualPick.displayName), `${today}:${visualPick.slug}`);
   const nextActivity = featured?.nextSessionAt
     ? formatSessionDateTimeHero(featured.nextSessionAt)
@@ -119,22 +136,32 @@ export function TodaysDiscovery(props: {
       )}
       <div className="home-discovery-shade" />
       <div className="home-discovery-content">
-        <span className="home-discovery-badge">{`✨ ${t("homeFeed.discoveryBadge")}`}</span>
-        <h2 className="home-discovery-title">
-          {visualPick.icon?.trim() ? <span aria-hidden>{visualPick.icon.trim()} </span> : null}
-          {title}
-        </h2>
-        <p className="home-discovery-insight">{insight || staticInsight}</p>
-        {featured ? (
-          <p className="home-discovery-facts">
-            {location ? <span>{location}</span> : null}
-            <span>{t("homeFeed.memberCount", { count: featured.memberCount })}</span>
-            <span>{nextActivity}</span>
-          </p>
-        ) : null}
-        <button type="button" className="circle-details-primary home-discovery-cta" onClick={open}>
-          {featured ? t("homeFeed.joinCircle") : t("homeFeed.exploreHobby", { name: visualPick.displayName })}
-        </button>
+        <span className="home-discovery-badge">{`✨ ${t("homeMoments.badge")}`}</span>
+        <p className="home-discovery-insight">{heroLine}</p>
+        <div className="home-discovery-pick">
+          <h2 className="home-discovery-circle circle-title-wrap">
+            {visualPick.icon?.trim() ? <span aria-hidden>{visualPick.icon.trim()} </span> : null}
+            {title}
+          </h2>
+          {featured ? (
+            <p className="home-discovery-facts">
+              {location ? <span>📍 {location}</span> : null}
+              <span>📅 {nextActivity}</span>
+            </p>
+          ) : null}
+        </div>
+        <div className="home-discovery-action">
+          {featured ? (
+            <p className="home-discovery-proof">
+              <span>👥 {t("homeFeed.memberCount", { count: featured.memberCount })}</span>
+              <span aria-hidden>·</span>
+              <span>{circleSignal(featured, t)}</span>
+            </p>
+          ) : null}
+          <button type="button" className="circle-details-primary home-discovery-cta" onClick={open}>
+            {featured ? t("homeFeed.joinCircle") : t("homeFeed.exploreHobby", { name: visualPick.displayName })}
+          </button>
+        </div>
       </div>
     </section>
   );

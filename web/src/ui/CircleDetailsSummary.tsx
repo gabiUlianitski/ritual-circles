@@ -19,7 +19,12 @@ export function circleSummaryDescription(
   catalogue: Hoby | undefined,
   fallback: string,
 ): string {
-  return description?.trim() || catalogue?.shortDescription?.trim() || fallback;
+  return (
+    description?.trim() ||
+    catalogue?.discoveryDescription?.trim() ||
+    catalogue?.shortDescription?.trim() ||
+    fallback
+  );
 }
 
 export function CircleDetailsSummary(props: {

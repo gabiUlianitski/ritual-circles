@@ -1,13 +1,15 @@
+import re
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from app.schemas import (
     CircleInvitationPreviewResponse,
     CircleInvitationResponse,
     DeviceTokenRequest,
     PasswordChangeRequest,
+    ForYouIntroResponse,
     UserLanguageItem,
     UserMeResponse,
     UserUpdateRequest,
@@ -22,7 +24,10 @@ from app.services.circle_invitations import (
     list_my_invitations,
     respond_to_invitation,
 )
+from app.services.for_you_intro import daily_for_you_intro
 from app.services.users_service import delete_account, get_user, update_device_token, upsert_user
+
+_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 router = APIRouter(prefix="", tags=["me"])
 
@@ -117,6 +122,20 @@ async def decline_my_invitation(
         raise HTTPException(status_code=400, detail="invalid invitationId") from e
     row = await respond_to_invitation(conn, user_id=user.id, invitation_id=invitation_id, accept=False)
     return CircleInvitationResponse(**row)
+
+
+@router.get("/me/for-you", response_model=ForYouIntroResponse)
+async def for_you_intro(
+    day: str = Query(min_length=10, max_length=10),
+    conn: asyncpg.Connection = Depends(conn_dep),
+    user: CurrentUser = Depends(get_current_user),
+    lang: str = Depends(get_request_lang),
+) -> ForYouIntroResponse:
+    """Stored once per local day. A repeat visit the same day does not call AI."""
+    if not _DAY.match(day):
+        raise HTTPException(status_code=400, detail="day must be YYYY-MM-DD")
+    text = await daily_for_you_intro(conn, user_id=user.id, day=day, lang=lang)
+    return ForYouIntroResponse(text=text, day=day)
 
 
 @router.get("/me", response_model=UserMeResponse)

@@ -190,7 +190,9 @@ export function HobbyDetailPage(props: {
                   ) : null}
                 </div>
               ) : null}
-              {hoby?.shortDescription ? <p>{hoby.shortDescription}</p> : null}
+              {hoby?.discoveryDescription || hoby?.shortDescription ? (
+                <p>{hoby.discoveryDescription || hoby.shortDescription}</p>
+              ) : null}
             </div>
           </header>
 

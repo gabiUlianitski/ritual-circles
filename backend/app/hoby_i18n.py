@@ -51,6 +51,21 @@ def localized_display_name(row: dict[str, Any] | Any, lang: str) -> str | None:
     return base
 
 
+def localized_discovery_description(row: dict[str, Any] | Any, lang: str) -> str | None:
+    base = row.get("discovery_description") if hasattr(row, "get") else None
+    if isinstance(base, str):
+        base = base.strip() or None
+    if lang == "en":
+        return base
+    i18n = parse_i18n_json(row.get("i18n_json") if hasattr(row, "get") else None)
+    block = i18n.get(lang)
+    if isinstance(block, dict):
+        translated = block.get("discovery_description")
+        if isinstance(translated, str) and translated.strip():
+            return translated.strip()
+    return base
+
+
 def localized_short_description(row: dict[str, Any] | Any, lang: str) -> str | None:
     base = row.get("short_description") if hasattr(row, "get") else None
     if lang == "en":

@@ -248,6 +248,12 @@ export function Circles(props: {
     () => hobies.filter((h) => h.slug && h.displayName),
     [hobies],
   );
+  const selectedHobbyStory = useMemo(() => {
+    const slug = filterHobby.trim().toLowerCase();
+    if (!slug) return "";
+    const match = hobies.find((h) => h.slug.trim().toLowerCase() === slug);
+    return match?.discoveryDescription?.trim() || "";
+  }, [filterHobby, hobies]);
 
   const hasDetailFilters = Boolean(filterLevel || filterTime || filterSize);
 
@@ -683,6 +689,8 @@ export function Circles(props: {
                 </span>
               </button>
             </div>
+
+            {selectedHobbyStory ? <p className="discover-hobby-story">{selectedHobbyStory}</p> : null}
 
             {filtersOpen ? (
               <div className="discover-filters-body stack">

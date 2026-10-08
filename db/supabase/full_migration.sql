@@ -209,4 +209,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_circle_invitations_pending
   ON circle_invitations (circle_id, invitee_user_id)
   WHERE status = 'pending';
 
+ALTER TABLE hobies ADD COLUMN IF NOT EXISTS discovery_description TEXT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS for_you_intro_json JSONB NULL;
+
 COMMIT;

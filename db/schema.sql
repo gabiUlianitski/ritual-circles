@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
   preferred_hoby_subtype TEXT NULL,
   user_hobies_json JSONB NOT NULL DEFAULT '[]'::jsonb,
   onboarding_completed BOOLEAN NOT NULL DEFAULT false,
+  for_you_intro_json JSONB NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -73,6 +74,7 @@ CREATE TABLE IF NOT EXISTS hobies (
   slug TEXT NOT NULL UNIQUE,
   display_name TEXT NOT NULL,
   short_description TEXT NULL,
+  discovery_description TEXT NULL,
   icon TEXT NULL,
   levels_json JSONB NULL,
   types_json JSONB NULL,

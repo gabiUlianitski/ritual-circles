@@ -577,6 +577,7 @@ class HobyResponse(BaseModel):
     slug: str
     displayName: str
     shortDescription: str | None = None
+    discoveryDescription: str | None = None
     """English catalogue name. Present even when displayName is localized."""
     canonicalDisplayName: str | None = None
     canonicalShortDescription: str | None = None
@@ -802,5 +803,10 @@ class DailyLibraryInsight(BaseModel):
     hobbyId: str
     insightType: str
     text: str
+    day: str
+
+
+class ForYouIntroResponse(BaseModel):
+    text: str | None = None
     day: str
 

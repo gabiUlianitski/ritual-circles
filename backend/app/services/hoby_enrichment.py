@@ -11,7 +11,7 @@ from app.services.hoby_interest import sanitize_interest_category
 logger = logging.getLogger(__name__)
 
 _SYSTEM = """You enrich "hobies" metadata for a coordination app.
-Return a single JSON object with exactly these keys: "types", "levels", "short_description", "icon", "interest_category", "group_size", "he_display_name", "he_short_description".
+Return a single JSON object with exactly these keys: "types", "levels", "short_description", "discovery_description", "icon", "interest_category", "group_size", "he_display_name", "he_short_description", "he_discovery_description".
 
 "types" — array of modality / equipment / surface / style variants ONLY. Each element MUST be:
 { "key": string, "label": string, "description"?: string, "icon": string }
@@ -31,6 +31,8 @@ If there is only one variant, use one type (e.g. "general") and still provide "l
 
 Also include:
 - "short_description": one plain-text sentence (max ~220 characters) explaining what this hoby is for someone new.
+- "discovery_description": 1 to 3 warm sentences, max 250 characters, about why people enjoy this hobby together. No statistics, no "join now", no emojis.
+- "he_discovery_description": the same discovery description in natural Hebrew, max 250 characters.
 - "icon": exactly one Unicode emoji character (or emoji sequence) that represents the hoby visually. No words, no HTML, no URLs.
 - "interest_category": exactly one of: sports, arts, games, learning, social — the best Discover browse bucket for this hoby.
 - "group_size": how many people naturally take part in one session of this hoby together. Object with "type" one of fixed, max, min, range, and positive integers "min" and/or "max". Every number must be from 1 to 6.
@@ -235,6 +237,24 @@ def _plain_text(raw: Any, limit: int) -> str | None:
     return text[:limit] if text else None
 
 
+def sanitize_discovery_description(raw: Any) -> str | None:
+    """One to three inspiring sentences, capped at 250 characters."""
+    text = _plain_text(raw, 600)
+    if not text:
+        return None
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in {'"', "'", "“", "”"}:
+        text = text[1:-1].strip()
+    parts = [part.strip() for part in re.split(r"(?<=[.!?])\s+", text) if part.strip()]
+    if len(parts) > 3:
+        text = " ".join(parts[:3])
+    if len(text) <= 250:
+        return text
+    clipped = text[:249]
+    boundary = clipped.rfind(" ")
+    kept = clipped[:boundary] if boundary >= 80 else clipped
+    return kept.rstrip(" ,;:") + "…"
+
+
 def enrichment_is_saveable(data: dict[str, Any] | None) -> bool:
     """AI creation may be stored only when every user-facing required field was produced."""
     if not data:
@@ -265,12 +285,12 @@ Hoby display name: {display_name}
 
 1) **types**: equipment / surface / venue / discipline / style variants only (no nested levels inside each type). Every type needs its own unique emoji icon.
 2) **levels**: one shared skill ladder for this hoby (same steps for every type).
-3) **short_description** and **icon** (one emoji) as in the system message.
+3) **short_description**, **discovery_description** (1–3 sentences, max 250 characters), and **icon** (one emoji) as in the system message.
 4) **interest_category**: one of sports, arts, games, learning, social.
 5) **group_size**: how many people take part in one session together (1 to 6), following the rules in the system message. Pair activities are fixed at 2.
-6) **he_display_name** and **he_short_description**: Hebrew name and one Hebrew sentence.
+6) **he_display_name**, **he_short_description**, and **he_discovery_description**: Hebrew name, one Hebrew sentence, and the Hebrew discovery description.
 
-Return only valid JSON with top-level keys "types", "levels", "short_description", "icon", "interest_category", "group_size", "he_display_name", and "he_short_description".
+Return only valid JSON with top-level keys "types", "levels", "short_description", "discovery_description", "icon", "interest_category", "group_size", "he_display_name", "he_short_description", and "he_discovery_description".
 """
     try:
         data = await client.chat_json(system=_SYSTEM, user=prompt)
@@ -305,10 +325,12 @@ Return only valid JSON with top-level keys "types", "levels", "short_description
         "types": types,
         "levels": levels,
         "short_description": short_d,
+        "discovery_description": sanitize_discovery_description(data.get("discovery_description")),
         "icon": icon_s,
         "interest_category": interest_category,
         "group_size": group_size,
         "he_display_name": he_name,
         "he_short_description": he_desc,
+        "he_discovery_description": sanitize_discovery_description(data.get("he_discovery_description")),
     }
 

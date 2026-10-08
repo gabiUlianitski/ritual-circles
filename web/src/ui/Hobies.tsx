@@ -322,7 +322,10 @@ export function Hobies(props: { onBack: () => void }) {
                     ? t("hobbiesPage.statusAttention")
                     : t("hobbiesPage.statusActive");
               return (
-                <article key={h.id} className={`hoby-cat-card${selected.includes(h.slug) ? " is-selected" : ""}`}>
+                <article
+                  key={h.id}
+                  className={`hoby-cat-card${selected.includes(h.slug) ? " is-selected" : ""}${status === "incomplete" ? " is-incomplete" : ""}`}
+                >
                   <label className="hoby-cat-select">
                     <input
                       type="checkbox"

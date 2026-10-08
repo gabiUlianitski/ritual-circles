@@ -40,6 +40,9 @@ $include = @(
     "db/migrations/034_circle_invitations.sql",
     "db/migrations/035_hoby_daily_insight.sql",
     "db/migrations/036_hobby_insights.sql",
+    "db/migrations/037_discovery_description_for_you.sql",
+    "backend/tests/test_discovery_copy.py",
+    "backend/tests/test_hobby_insight_library.py",
     "db/supabase/full_migration.sql",
     "scripts/deploy-production.ps1",
     "web/src"

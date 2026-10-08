@@ -299,6 +299,11 @@ export type InsightLibrarySummary = {
   counts: { hobbyId: string; activeCount: number }[];
 };
 
+export type ForYouIntro = {
+  text: string | null;
+  day: string;
+};
+
 export type DailyLibraryInsight = {
   hobbyId: string;
   insightType: string;
@@ -464,6 +469,8 @@ export type Hoby = {
   slug: string;
   displayName: string;
   shortDescription?: string | null;
+  /** Inspiring hobby story. Not shown on Home recommendation cards. */
+  discoveryDescription?: string | null;
   /** English catalogue name, even when displayName is localized. */
   canonicalDisplayName?: string | null;
   canonicalShortDescription?: string | null;

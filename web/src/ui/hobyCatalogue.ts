@@ -13,6 +13,7 @@ export type AttentionKey =
   | "missingName"
   | "missingCategory"
   | "missingDescription"
+  | "missingDiscovery"
   | "missingIcon"
   | "missingTypes"
   | "missingTypeIcon"
@@ -26,6 +27,7 @@ export function hobbyAttention(h: Hoby): AttentionKey | null {
   if (!(h.canonicalDisplayName || h.displayName || "").trim()) return "missingName";
   if (!stableCategory(h.interestCategory)) return "missingCategory";
   if (!(h.canonicalShortDescription ?? h.shortDescription ?? "").trim()) return "missingDescription";
+  if (!(h.discoveryDescription ?? "").trim()) return "missingDiscovery";
   if (!(h.icon ?? "").trim()) return "missingIcon";
   const types = parseHobyTypesNested(h.types);
   if (types.length === 0) return "missingTypes";

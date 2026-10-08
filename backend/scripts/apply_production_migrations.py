@@ -21,6 +21,7 @@ PENDING = [
     "034_circle_invitations.sql",
     "035_hoby_daily_insight.sql",
     "036_hobby_insights.sql",
+    "037_discovery_description_for_you.sql",
 ]
 
 

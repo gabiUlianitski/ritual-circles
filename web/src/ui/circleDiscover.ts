@@ -77,6 +77,10 @@ function circleMatchesUserHobbySlug(
   return userHobbies.some((h) => norm(h.slug) === slug);
 }
 
+export function circleNearUser(circle: CircleListItem, userCity: string | null | undefined): boolean {
+  return locationClose(circle, userCity);
+}
+
 export function scoreCircleForUser(
   circle: CircleListItem,
   userHobbies: UserHobyPreference[],

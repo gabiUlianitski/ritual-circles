@@ -8,6 +8,7 @@ from app.deps import conn_dep, get_request_lang
 from app.hoby_i18n import (
     localized_display_name,
     localized_levels_types,
+    localized_discovery_description,
     localized_short_description,
     parse_i18n_json,
 )
@@ -96,6 +97,7 @@ def _hoby_response_from_row(r: asyncpg.Record, lang: str = "en") -> HobyResponse
         slug=r["slug"],
         displayName=localized_display_name(r, lang) or r["display_name"],
         shortDescription=localized_short_description(r, lang),
+        discoveryDescription=localized_discovery_description(r, lang),
         canonicalDisplayName=r["display_name"],
         canonicalShortDescription=r["short_description"],
         heDisplayName=str(he_name).strip() if isinstance(he_name, str) and he_name.strip() else None,
@@ -110,7 +112,7 @@ def _hoby_response_from_row(r: asyncpg.Record, lang: str = "en") -> HobyResponse
 
 
 _HOBY_SELECT = """
-    SELECT id, slug, display_name, short_description, icon, levels_json, types_json, interest_category, group_size_json, i18n_json, archived_at
+    SELECT id, slug, display_name, short_description, discovery_description, icon, levels_json, types_json, interest_category, group_size_json, i18n_json, archived_at
     FROM hobies
 """
 
@@ -192,6 +194,7 @@ async def create_hoby(
     levels = payload.levels
     types = payload.types
     short_description: str | None = None
+    discovery_description: str | None = None
     icon: str | None = None
     interest_category = sanitize_interest_category(payload.interestCategory)
     i18n_json: dict | None = None
@@ -207,6 +210,7 @@ async def create_hoby(
         levels = enriched.get("levels")
         types = enriched.get("types")
         short_description = enriched.get("short_description")
+        discovery_description = enriched.get("discovery_description")
         icon = enriched.get("icon")
         if interest_category is None:
             interest_category = sanitize_interest_category(enriched.get("interest_category"))
@@ -218,6 +222,7 @@ async def create_hoby(
             "he": {
                 "display_name": enriched.get("he_display_name"),
                 "short_description": enriched.get("he_short_description"),
+                "discovery_description": enriched.get("he_discovery_description"),
             }
         }
     else:
@@ -231,14 +236,15 @@ async def create_hoby(
     await conn.execute(
         """
         INSERT INTO hobies (
-          id, slug, display_name, short_description, icon, levels_json, types_json, interest_category, group_size_json, i18n_json
+          id, slug, display_name, short_description, discovery_description, icon, levels_json, types_json, interest_category, group_size_json, i18n_json
         )
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9::jsonb, $10::jsonb)
+        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10::jsonb, $11::jsonb)
         """,
         hoby_id,
         slug,
         dn,
         short_description,
+        discovery_description,
         icon,
         _jsonb_bind(levels),
         _jsonb_bind(types),
@@ -364,21 +370,25 @@ async def _apply_enrichment(conn: asyncpg.Connection, row: asyncpg.Record, enric
         he_out["display_name"] = enriched["he_display_name"]
     if enriched.get("he_short_description"):
         he_out["short_description"] = enriched["he_short_description"]
+    if enriched.get("he_discovery_description"):
+        he_out["discovery_description"] = enriched["he_discovery_description"]
     if he_out:
         i18n["he"] = he_out
     await conn.execute(
         """
         UPDATE hobies
         SET short_description = COALESCE($1, short_description),
-            icon = COALESCE($2, icon),
-            levels_json = COALESCE($3::jsonb, levels_json),
-            types_json = COALESCE($4::jsonb, types_json),
-            interest_category = COALESCE($5, interest_category),
-            group_size_json = COALESCE($6::jsonb, group_size_json),
-            i18n_json = $7::jsonb
-        WHERE slug = $8
+            discovery_description = COALESCE($2, discovery_description),
+            icon = COALESCE($3, icon),
+            levels_json = COALESCE($4::jsonb, levels_json),
+            types_json = COALESCE($5::jsonb, types_json),
+            interest_category = COALESCE($6, interest_category),
+            group_size_json = COALESCE($7::jsonb, group_size_json),
+            i18n_json = $8::jsonb
+        WHERE slug = $9
         """,
         short_description,
+        enriched.get("discovery_description"),
         icon,
         _jsonb_bind(levels),
         _jsonb_bind(types),

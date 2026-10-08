@@ -27,6 +27,7 @@ import type {
   HobySpellSuggestResponse,
   HobyUpdateRequest,
   InvitationCandidate,
+  ForYouIntro,
   HomeResponse,
   JoinCircleResponse,
   ReverseLocateResponse,
@@ -279,6 +280,8 @@ export const api = {
   generateInsightLibrary: (hobbyId: string) =>
     request<GenerateInsightLibraryResponse>("POST", "/hobby-insights/generate", { hobbyId }),
   insightSummary: () => request<InsightLibrarySummary>("GET", "/hobby-insights/summary"),
+  forYouIntro: (day: string) =>
+    request<ForYouIntro>("GET", `/me/for-you?day=${encodeURIComponent(day)}`),
   dailyLibraryInsight: (slug: string, day: string) =>
     request<DailyLibraryInsight>(
       "GET",

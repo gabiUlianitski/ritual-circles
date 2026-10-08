@@ -25,10 +25,10 @@ HOBBY_ID = "11111111-1111-1111-1111-111111111111"
 def _line(index: int, insight_type: str) -> str:
     state = index * 104729 + 17
     parts: list[str] = []
-    for _ in range(12):
+    for _ in range(5):
         state = (state * 1103515245 + 12345) & 0x7FFFFFFF
         parts.append(f"w{state % 100000}")
-    return f"{' '.join(parts)} closes {insight_type} item {index} together."
+    return f"{' '.join(parts)} makes {insight_type} item {index} worth noticing together."
 
 
 def _library(**overrides: object) -> dict:

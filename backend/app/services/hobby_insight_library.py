@@ -22,6 +22,7 @@ QUOTA = {
     "interesting_fact": 12,
 }
 LIBRARY_SIZE = 50
+GENERATION_ATTEMPTS = 3
 
 _BANNED = re.compile(
     r"(\bjoin now\b|\bguarante|\bstudies show\b|\bresearch proves\b|\bresearch shows\b|"
@@ -35,7 +36,7 @@ _SYSTEM = """You write short discovery lines about one hobby for a small-group m
 Return JSON only: {"hobbyName":"...","insights":[{"type":"...","contentEn":"...","contentHe":"..."}]}
 
 Rules for every insight:
-- One or two short sentences, under 40 words.
+- One or two short sentences, 45 to 120 characters total.
 - Warm, specific, and human. Curiosity, motivation, or easy conversation.
 - Directly about the hobby. Do not invent statistics, studies, dates, or medical claims.
 - Do not promise friendship or happiness. Do not say "join".
@@ -127,8 +128,8 @@ def _clean_english(value: object) -> str:
         raise InsightValidationError("An insight was empty.")
     count = _sentences(text)
     words = _words(text)
-    if count < 1 or count > 2 or not 8 <= len(words) <= 40 or len(text) > 280:
-        raise InsightValidationError("An insight must be one or two short sentences.")
+    if count < 1 or count > 2 or not 8 <= len(words) <= 30 or not 45 <= len(text) <= 120:
+        raise InsightValidationError("An insight must be one or two short sentences between 45 and 120 characters.")
     if _BANNED.search(text):
         raise InsightValidationError("An insight included a claim or call to action that is not allowed.")
     return text
@@ -187,42 +188,56 @@ def preview_items(items: list[dict], limit_per_type: int = 2) -> list[dict]:
 
 
 async def _generate_type(hobby_name: str, insight_type: str, count: int) -> list[dict]:
-    user = (
-        f"Hobby: {hobby_name}\n"
-        f"Type: {insight_type}\n"
-        f"Write exactly {count} insights of this type.\n"
-        f'Echo hobbyName as "{hobby_name}".'
-    )
-    data = await AIClient().chat_json(system=_SYSTEM, user=user)
-    if not isinstance(data, dict):
-        raise InsightValidationError("The AI response was malformed.")
-    echoed = str(data.get("hobbyName") or "").strip()
-    if echoed and echoed.casefold() != hobby_name.strip().casefold():
-        raise InsightValidationError("The AI response was for a different hobby.")
-    rows = data.get("insights")
-    if not isinstance(rows, list):
-        raise InsightValidationError("The AI response did not include an insight list.")
     kept: list[dict] = []
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        if str(row.get("type") or insight_type).strip() != insight_type:
-            continue
-        try:
-            english = _clean_english(row.get("contentEn"))
-        except InsightValidationError:
-            continue
-        kept.append(
-            {
-                "type": insight_type,
-                "contentEn": english,
-                "contentHe": _clean_hebrew(row.get("contentHe"), english),
-            }
+    seen: list[str] = []
+    client = AIClient()
+    for attempt in range(1, GENERATION_ATTEMPTS + 1):
+        remaining = count - len(kept)
+        user = (
+            f"Hobby: {hobby_name}\n"
+            f"Type: {insight_type}\n"
+            f"Write exactly {remaining} insights. Every item must use type \"{insight_type}\".\n"
+            "Each English line must contain 45 to 120 characters.\n"
+            f'This is validation attempt {attempt} of {GENERATION_ATTEMPTS}. '
+            f'Echo hobbyName as "{hobby_name}".'
         )
+        data = await client.chat_json(system=_SYSTEM, user=user)
+        if not isinstance(data, dict):
+            continue
+        echoed = str(data.get("hobbyName") or "").strip()
+        if echoed and echoed.casefold() != hobby_name.strip().casefold():
+            continue
+        rows = data.get("insights")
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            if str(row.get("type") or insight_type).strip() != insight_type:
+                continue
+            try:
+                english = _clean_english(row.get("contentEn"))
+            except InsightValidationError:
+                continue
+            key = _normalize(english)
+            if not key or key in seen or any(SequenceMatcher(None, key, prev).ratio() >= 0.96 for prev in seen):
+                continue
+            seen.append(key)
+            kept.append(
+                {
+                    "type": insight_type,
+                    "contentEn": english,
+                    "contentHe": _clean_hebrew(row.get("contentHe"), english),
+                }
+            )
+            if len(kept) == count:
+                break
         if len(kept) == count:
             break
     if len(kept) != count:
-        raise InsightValidationError(f"Expected {count} {insight_type} insights, got {len(kept)}.")
+        raise InsightValidationError(
+            f"Expected {count} {insight_type} insights, got {len(kept)} after {GENERATION_ATTEMPTS} attempts."
+        )
     return kept
 
 

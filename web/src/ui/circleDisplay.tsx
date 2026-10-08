@@ -120,13 +120,13 @@ function descriptionRepeatsTitle(text: string, title: string, named: boolean): b
  */
 export function discoverDescription(
   circle: CircleIdentityFields & { description?: string | null },
-  catalogue?: { shortDescription?: string | null } | null,
+  catalogue?: { discoveryDescription?: string | null; shortDescription?: string | null } | null,
   fallback = "",
 ): string {
   const identity = circleIdentity(circle);
   const title = identity.displayTitle;
   const circleText = cleanDescription(circle.description);
-  const hobbyText = cleanDescription(catalogue?.shortDescription);
+  const hobbyText = cleanDescription(catalogue?.discoveryDescription) || cleanDescription(catalogue?.shortDescription);
   const circleEcho = Boolean(circleText) && descriptionRepeatsTitle(circleText, title, identity.hasCustomName);
   const hobbyEcho = Boolean(hobbyText) && descriptionRepeatsTitle(hobbyText, title, identity.hasCustomName);
 

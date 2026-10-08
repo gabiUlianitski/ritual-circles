@@ -65,15 +65,6 @@ export function circleSocialProof(c: CircleListItem, t: TFunction): string[] {
   ].filter((x): x is string => Boolean(x));
 }
 
-/** One activity line for a recommendation card. */
-export function circleActivityLabel(c: CircleListItem, t: TFunction): string | null {
-  if ((c.messagesLastWeek ?? 0) > 0) return t("homeFeed.proofActiveWeek");
-  if (isBeginnerCircle(c.ritualLevel)) return t("homeFeed.beginnerFriendly");
-  const status = circleStatus(c);
-  if (status === "justStarted") return null;
-  return t(circleStatusKey(status));
-}
-
 function ProgressBlock(props: { circle: CircleListItem }) {
   const { t } = useTranslation();
   const joined = Math.max(0, props.circle.memberCount);
@@ -237,26 +228,6 @@ export function HomeHeroEmpty(props: { chips: HomeInterest[]; onPickHobby: (slug
   );
 }
 
-/* ---------- 3. Explore Interests ---------- */
-
-export function InterestCarousel(props: { interests: HomeInterest[]; onPick: (slug: string) => void }) {
-  const { t } = useTranslation();
-  if (props.interests.length === 0) return null;
-  return (
-    <section className="home-feed-block" aria-label={t("homeFeed.exploreInterests")}>
-      <h2 className="home-section-title">{t("homeFeed.exploreInterests")}</h2>
-      <div className="home-interest-chips">
-        {props.interests.map(({ hoby }) => (
-          <button key={hoby.slug} type="button" className="home-interest-chip" onClick={() => props.onPick(hoby.slug)}>
-            {hoby.icon?.trim() ? <span aria-hidden>{hoby.icon.trim()}</span> : null}
-            <span>{hoby.displayName}</span>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 /* ---------- 4. What's Happening This Week ---------- */
 
 export function HappeningCarousel(props: { circles: CircleListItem[]; onOpen: (c: CircleListItem) => void; onSeeAll: () => void }) {
@@ -310,32 +281,6 @@ export function HappeningCarousel(props: { circles: CircleListItem[]; onOpen: (c
 }
 
 /* ---------- 5. Community Pulse ---------- */
-
-/** Today's motion, from chat activity and open circles already loaded on Home. */
-export function JoiningPulse(props: { circles: CircleListItem[]; openCircles: number }) {
-  const { t } = useTranslation();
-  const chatted = props.circles.filter((c) => (c.messagesToday ?? 0) > 0).length;
-  const active = props.circles.filter((c) => (c.messagesLastWeek ?? 0) > 0).length;
-  const items = [
-    chatted > 0 ? { icon: "💬", label: t("homeFeed.chattedToday", { count: chatted }) } : null,
-    props.openCircles > 0 ? { icon: "🔥", label: t("homeFeed.openCircles", { count: props.openCircles }) } : null,
-    active > 0 ? { icon: "🎉", label: t("homeFeed.activeCirclesWeek", { count: active }) } : null,
-  ].filter((x): x is { icon: string; label: string } => x != null);
-  if (items.length === 0) return null;
-  return (
-    <section className="home-feed-block" aria-label={t("homeFeed.peopleAreJoining")}>
-      <h2 className="home-section-title">{t("homeFeed.peopleAreJoining")}</h2>
-      <div className="home-joining">
-        {items.map((it) => (
-          <span key={it.label} className="home-joining-pill">
-            <span aria-hidden>{it.icon}</span>
-            {it.label}
-          </span>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 export function CommunityPulse(props: { stats: CommunityStats | null; groupsForming: number }) {
   const { t } = useTranslation();

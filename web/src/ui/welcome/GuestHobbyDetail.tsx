@@ -13,9 +13,9 @@ import {
 } from "../hobyMetadata";
 import { formatGroupSizeSummary } from "../groupSize";
 
-function hobySubtitle(h: { slug: string; shortDescription?: string | null }) {
-  const d = h.shortDescription?.trim();
-  return d || h.slug;
+function hobySubtitle(h: { slug: string; discoveryDescription?: string | null; shortDescription?: string | null }) {
+  const story = h.discoveryDescription?.trim() || h.shortDescription?.trim();
+  return story || h.slug;
 }
 
 export function GuestHobbyDetail(props: {

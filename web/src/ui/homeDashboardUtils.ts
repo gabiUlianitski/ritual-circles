@@ -70,6 +70,35 @@ export function formatSessionDateTimeHero(iso: string): string {
   return `${day} • ${time}`;
 }
 
+/** Month and time only, e.g. Oct 14 • 17:00. */
+export function formatUpcomingDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const locale = dateLocale();
+  const date = d.toLocaleDateString(locale, { month: "short", day: "numeric" });
+  const time = d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${date} • ${time}`;
+}
+
+export function upcomingBadge(daysAway: number): { key: string; count?: number } {
+  if (daysAway <= 0) return { key: "homeMoments.badgeToday" };
+  if (daysAway === 1) return { key: "homeMoments.badgeTomorrow" };
+  if (daysAway >= 7 && daysAway < 14) return { key: "homeMoments.badgeNextWeek" };
+  return { key: "homeMoments.badgeInDays", count: daysAway };
+}
+
+export function formatSessionEventParts(iso: string): { date: string; time: string; daysAway: number } {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { date: iso, time: "", daysAway: 0 };
+  const locale = dateLocale();
+  const date = d.toLocaleDateString(locale, { weekday: "short", month: "short", day: "numeric" });
+  const time = d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12: false });
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return { date, time, daysAway: Math.max(0, Math.round((target.getTime() - today.getTime()) / 86_400_000)) };
+}
+
 /** Compact social line, e.g. "2 members joined • 4 spots available". */
 export function formatJoinedLine(
   memberCount: number,

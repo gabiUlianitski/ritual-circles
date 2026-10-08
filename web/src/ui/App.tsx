@@ -725,6 +725,13 @@ export function App() {
             setCirclesVisitKey((k) => k + 1);
             navigate("circles");
           }}
+          onSeeAllActivities={() => {
+            if (guest) {
+              requestRegister(t("guest.noticeDefault"));
+              return;
+            }
+            navigate("activity");
+          }}
           onBrowseHobby={(slug) => {
             setDiscoverDateFilter(null);
             setDiscoverHobbyFilter(slug);
