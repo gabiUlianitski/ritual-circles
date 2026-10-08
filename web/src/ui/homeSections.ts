@@ -92,15 +92,26 @@ export function buildHomeFeed(input: {
     countBySlug.set(k, (countBySlug.get(k) ?? 0) + 1);
   }
   const userSlugs = new Set(hobbies.map((h) => slugKey(h.slug)));
-  const interests: HomeInterest[] = hobyCatalog
-    .filter((h) => h.slug && h.displayName)
-    .map((hoby) => ({ hoby, circleCount: countBySlug.get(slugKey(hoby.slug)) ?? 0 }))
-    .sort(
-      (a, b) =>
-        Number(userSlugs.has(slugKey(b.hoby.slug))) - Number(userSlugs.has(slugKey(a.hoby.slug))) ||
-        b.circleCount - a.circleCount ||
-        a.hoby.displayName.localeCompare(b.hoby.displayName),
-    );
+  const bySlug = new Map<string, HomeInterest>();
+  for (const hoby of hobyCatalog) {
+    if (!hoby.slug?.trim() || !hoby.displayName?.trim()) continue;
+    bySlug.set(slugKey(hoby.slug), { hoby, circleCount: countBySlug.get(slugKey(hoby.slug)) ?? 0 });
+  }
+  for (const c of catalog) {
+    const slug = slugKey(c.ritualType);
+    const displayName = (c.hobyDisplayName ?? "").trim();
+    if (!slug || !displayName || bySlug.has(slug)) continue;
+    bySlug.set(slug, {
+      hoby: { id: slug, slug: c.ritualType.trim(), displayName, icon: c.hobyIcon ?? null, levels: [], types: [] },
+      circleCount: countBySlug.get(slug) ?? 1,
+    });
+  }
+  const interests: HomeInterest[] = [...bySlug.values()].sort(
+    (a, b) =>
+      Number(userSlugs.has(slugKey(b.hoby.slug))) - Number(userSlugs.has(slugKey(a.hoby.slug))) ||
+      b.circleCount - a.circleCount ||
+      a.hoby.displayName.localeCompare(b.hoby.displayName),
+  );
 
   const personal = getRecommendedCircles(joinable, hobbies, city, RECOMMENDED_LIMIT);
   const others = listed.filter((c) => !c.isYours);

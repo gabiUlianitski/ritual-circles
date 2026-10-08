@@ -45,17 +45,33 @@ export function HobbyVisual(props: {
   );
 }
 
-/** Real signals only: members, open spots, next meetup, chat activity this week. */
+const BEGINNER_LEVELS = new Set(["beginner", "1", "novice", "starter", "casual"]);
+
+export function isBeginnerCircle(level: string | number | null | undefined): boolean {
+  return BEGINNER_LEVELS.has(String(level ?? "").trim().toLowerCase());
+}
+
+/** Real signals only: headcount, level, chat this week, and the next meetup. */
 export function circleSocialProof(c: CircleListItem, t: TFunction): string[] {
   const spots = Math.max(0, c.maxSize - c.memberCount);
   return [
-    `👥 ${t("homeFeed.memberCapacity", { joined: c.memberCount, capacity: c.maxSize })}`,
-    spots > 0 && spots <= 2 ? t("homeFeed.proofSpotsLeft", { count: spots }) : null,
+    t("homeFeed.memberCount", { count: c.memberCount }),
+    isBeginnerCircle(c.ritualLevel) ? t("homeFeed.beginnerFriendly") : null,
+    (c.messagesLastWeek ?? 0) > 0 ? t("homeFeed.proofActiveWeek") : null,
     c.nextSessionAt
-      ? `📅 ${t("homeFeed.proofNextMeetup", { when: formatSessionDateTimeHero(c.nextSessionAt) })}`
+      ? t("homeFeed.proofNextMeetup", { when: formatSessionDateTimeHero(c.nextSessionAt) })
       : null,
-    (c.messagesLastWeek ?? 0) > 0 ? `🔥 ${t("homeFeed.proofActiveWeek")}` : null,
+    spots > 0 && spots <= 2 ? t("homeFeed.proofSpotsLeft", { count: spots }) : null,
   ].filter((x): x is string => Boolean(x));
+}
+
+/** One activity line for a recommendation card. */
+export function circleActivityLabel(c: CircleListItem, t: TFunction): string | null {
+  if ((c.messagesLastWeek ?? 0) > 0) return t("homeFeed.proofActiveWeek");
+  if (isBeginnerCircle(c.ritualLevel)) return t("homeFeed.beginnerFriendly");
+  const status = circleStatus(c);
+  if (status === "justStarted") return null;
+  return t(circleStatusKey(status));
 }
 
 function ProgressBlock(props: { circle: CircleListItem }) {
@@ -295,20 +311,44 @@ export function HappeningCarousel(props: { circles: CircleListItem[]; onOpen: (c
 
 /* ---------- 5. Community Pulse ---------- */
 
+/** Today's motion, from chat activity and open circles already loaded on Home. */
+export function JoiningPulse(props: { circles: CircleListItem[]; openCircles: number }) {
+  const { t } = useTranslation();
+  const chatted = props.circles.filter((c) => (c.messagesToday ?? 0) > 0).length;
+  const active = props.circles.filter((c) => (c.messagesLastWeek ?? 0) > 0).length;
+  const items = [
+    chatted > 0 ? { icon: "💬", label: t("homeFeed.chattedToday", { count: chatted }) } : null,
+    props.openCircles > 0 ? { icon: "🔥", label: t("homeFeed.openCircles", { count: props.openCircles }) } : null,
+    active > 0 ? { icon: "🎉", label: t("homeFeed.activeCirclesWeek", { count: active }) } : null,
+  ].filter((x): x is { icon: string; label: string } => x != null);
+  if (items.length === 0) return null;
+  return (
+    <section className="home-feed-block" aria-label={t("homeFeed.peopleAreJoining")}>
+      <h2 className="home-section-title">{t("homeFeed.peopleAreJoining")}</h2>
+      <div className="home-joining">
+        {items.map((it) => (
+          <span key={it.label} className="home-joining-pill">
+            <span aria-hidden>{it.icon}</span>
+            {it.label}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function CommunityPulse(props: { stats: CommunityStats | null; groupsForming: number }) {
   const { t } = useTranslation();
   const s = props.stats;
   const items = [
     s && s.meetupsThisWeek > 0
-      ? { value: s.meetupsThisWeek, label: t("homeFeed.communityMeetups") }
+      ? { icon: "🎉", value: s.meetupsThisWeek, label: t("homeFeed.communityMeetups") }
       : null,
-    props.groupsForming > 0
-      ? { value: props.groupsForming, label: t("homeFeed.communityForming") }
+    s && s.activeCircles > 0
+      ? { icon: "📅", value: s.activeCircles, label: t("homeFeed.communityCircles") }
       : null,
-    s && s.members > 0
-      ? { value: s.members, label: t("homeFeed.communityMembers") }
-      : null,
-  ].filter((x): x is { value: number; label: string } => x != null);
+    s && s.members > 0 ? { icon: "👥", value: s.members, label: t("homeFeed.communityMembers") } : null,
+  ].filter((x): x is { icon: string; value: number; label: string } => x != null);
   if (items.length === 0) return null;
   return (
     <section className="home-feed-block" aria-label={t("homeFeed.communityPulse")}>
@@ -316,6 +356,9 @@ export function CommunityPulse(props: { stats: CommunityStats | null; groupsForm
       <ul className="home-pulse">
         {items.map((it) => (
           <li key={it.label} className="home-pulse-item">
+            <span className="home-pulse-icon" aria-hidden>
+              {it.icon}
+            </span>
             <strong className="home-pulse-value">{it.value}</strong>
             <span className="home-pulse-label">{it.label}</span>
           </li>

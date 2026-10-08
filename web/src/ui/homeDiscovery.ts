@@ -156,9 +156,22 @@ export function pickTodaysHobby(opts: {
   return pick;
 }
 
-export function discoveryImageUrl(prompt: string, seed: string): string {
+export const INSIGHT_CATEGORIES = ["discovery", "motivation", "social", "funFact"] as const;
+export type InsightCategory = (typeof INSIGHT_CATEGORIES)[number];
+
+/** Matches the API rotation, so the static line is the same kind as the stored one. */
+export function insightCategoryFor(day: string, slug: string): InsightCategory {
+  const key = `${day}:${slug.trim().toLowerCase()}`;
+  let total = 0;
+  for (let i = 0; i < key.length; i++) total = (total + key.charCodeAt(i)) >>> 0;
+  return INSIGHT_CATEGORIES[total % INSIGHT_CATEGORIES.length];
+}
+
+export function discoveryImageUrl(prompt: string, seed: string, size?: { w: number; h: number }): string {
+  const w = size?.w ?? 960;
+  const h = size?.h ?? 640;
   const q = encodeURIComponent(prompt);
-  return `https://image.pollinations.ai/prompt/${q}?width=960&height=640&nologo=true&seed=${hash(seed)}`;
+  return `https://image.pollinations.ai/prompt/${q}?width=${w}&height=${h}&nologo=true&seed=${hash(seed)}`;
 }
 
 export function scenePrompt(name: string): string {

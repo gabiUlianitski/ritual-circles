@@ -4,32 +4,19 @@ import { api } from "../api/client";
 import type { CircleListItem, Hoby } from "../api/types";
 import { formatCircleLocationChip } from "./circleDetailsFormat";
 import { circleDisplayTitle } from "./circleDisplay";
-import { circleSocialProof, HobbyVisual } from "./HomeVisuals";
+import { formatSessionDateTimeHero } from "./homeDashboardUtils";
+import { HobbyVisual } from "./HomeVisuals";
 import {
   discoveryImageUrl,
   discoveryCategory,
   pickTodaysHobby,
-  readDiscoveryCopy,
   rememberDiscovery,
-  saveDiscoveryCopy,
   scenePrompt,
   todayKey,
-  type DiscoveryCategory,
-  type DiscoveryCopy,
 } from "./homeDiscovery";
+import { insightFallbackKey } from "./hobbyInsightSelect";
 
-const FALLBACK_BODY: Record<DiscoveryCategory, string> = {
-  food: "homeFeed.discoveryBodyFood",
-  sports: "homeFeed.discoveryBodySports",
-  outdoor: "homeFeed.discoveryBodyOutdoor",
-  creativity: "homeFeed.discoveryBodyCreativity",
-  games: "homeFeed.discoveryBodyGames",
-  learning: "homeFeed.discoveryBodyLearning",
-  wellness: "homeFeed.discoveryBodyWellness",
-  social: "homeFeed.discoveryBodySocial",
-};
-
-/** One magazine-style hobby spotlight for the day. AI copy upgrades a catalog fallback; the card is never empty. */
+/** One circle for today. The insight comes from the stored library, never from a live AI call. */
 export function TodaysDiscovery(props: {
   hobies: Hoby[];
   userSlugs: string[];
@@ -52,42 +39,34 @@ export function TodaysDiscovery(props: {
       }),
     [props.hobies, props.userSlugs, props.circleSlugs, props.userId, today],
   );
-  const [copy, setCopy] = useState<DiscoveryCopy | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
+  const [insight, setInsight] = useState<string | null>(null);
+
+  const featured = props.featuredCircle;
+  const insightSlug = (featured?.ritualType || pick?.slug || "").trim();
 
   useEffect(() => {
-    if (!pick) return;
-    rememberDiscovery(props.userId, today, pick);
+    if (pick) rememberDiscovery(props.userId, today, pick);
     setImageFailed(false);
-    const cached = readDiscoveryCopy(props.userId, today, pick.slug);
-    if (cached) {
-      setCopy(cached);
-      return;
-    }
-    setCopy(null);
+  }, [pick, props.userId, today]);
+
+  useEffect(() => {
+    if (!insightSlug) return;
+    setInsight(null);
     let cancelled = false;
     void api
-      .todaysDiscovery({ displayName: pick.displayName, category: pick.category, lang: i18n.language })
+      .dailyLibraryInsight(insightSlug, today)
       .then((res) => {
-        if (cancelled || !res.title?.trim() || !res.body?.trim()) return;
-        const next: DiscoveryCopy = {
-          title: res.title.trim(),
-          body: res.body.trim(),
-          imagePrompt: res.imagePrompt?.trim() || scenePrompt(pick.displayName),
-          source: "ai",
-        };
-        saveDiscoveryCopy(props.userId, today, pick.slug, next);
-        setCopy(next);
+        if (!cancelled && res.text?.trim()) setInsight(res.text.trim());
       })
       .catch(() => {
-        /* catalog fallback stays on screen */
+        /* static hobby insight stays on screen */
       });
     return () => {
       cancelled = true;
     };
-  }, [pick, props.userId, today, i18n.language]);
+  }, [insightSlug, today, i18n.language]);
 
-  const featured = props.featuredCircle;
   if (!pick && !featured) return null;
 
   const featuredHobby = featured
@@ -113,22 +92,14 @@ export function TodaysDiscovery(props: {
       : pick;
   if (!visualPick) return null;
 
-  const name = visualPick.displayName;
-  const fallbackTitle = t(`homeFeed.discoveryTitle_${visualPick.category}`, {
-    name,
-    defaultValue: t("homeFeed.discoveryTitle", { name }),
-  });
-  const fallbackBody = t(FALLBACK_BODY[visualPick.category], { name, defaultValue: "" });
-  const title = featured ? circleDisplayTitle(featured) : copy?.title || fallbackTitle;
-  const body = featured ? formatCircleLocationChip(featured, t) : copy?.body || fallbackBody;
-  const proof = featured ? circleSocialProof(featured, t) : [];
-  const matchesYou =
-    featured != null &&
-    props.userSlugs.some((s) => s.trim().toLowerCase() === featured.ritualType.trim().toLowerCase());
-  const imageUrl = discoveryImageUrl(
-    featured ? scenePrompt(visualPick.displayName) : copy?.imagePrompt || scenePrompt(visualPick.displayName),
-    `${today}:${visualPick.slug}`,
-  );
+  const title = featured ? circleDisplayTitle(featured) : visualPick.displayName;
+  const location = featured ? formatCircleLocationChip(featured, t) : "";
+  const staticInsight = t(insightFallbackKey(visualPick.slug, today), { name: visualPick.displayName });
+  const imageUrl = discoveryImageUrl(scenePrompt(visualPick.displayName), `${today}:${visualPick.slug}`);
+  const nextActivity = featured?.nextSessionAt
+    ? formatSessionDateTimeHero(featured.nextSessionAt)
+    : t("homeFeed.readyToChooseDate");
+
   const open = () => {
     if (featured) props.onOpenCircle(featured);
     else props.onExplore(visualPick.slug);
@@ -148,20 +119,21 @@ export function TodaysDiscovery(props: {
       )}
       <div className="home-discovery-shade" />
       <div className="home-discovery-content">
-        <span className="home-discovery-badge">
-          {matchesYou ? `✨ ${t("homeFeed.pickedForYou")}` : t("homeFeed.discoveryBadge")}
-        </span>
-        <h2 className="home-discovery-title">{title}</h2>
-        {body ? <p className="home-discovery-body">{featured ? `📍 ${body}` : body}</p> : null}
-        {proof.length > 0 ? (
-          <p className="home-proof-line">
-            {proof.map((p) => (
-              <span key={p}>{p}</span>
-            ))}
+        <span className="home-discovery-badge">{`✨ ${t("homeFeed.discoveryBadge")}`}</span>
+        <h2 className="home-discovery-title">
+          {visualPick.icon?.trim() ? <span aria-hidden>{visualPick.icon.trim()} </span> : null}
+          {title}
+        </h2>
+        <p className="home-discovery-insight">{insight || staticInsight}</p>
+        {featured ? (
+          <p className="home-discovery-facts">
+            {location ? <span>{location}</span> : null}
+            <span>{t("homeFeed.memberCount", { count: featured.memberCount })}</span>
+            <span>{nextActivity}</span>
           </p>
         ) : null}
         <button type="button" className="circle-details-primary home-discovery-cta" onClick={open}>
-          {featured ? t("discoverPage.join") : t("homeFeed.exploreHobby", { name: visualPick.displayName })}
+          {featured ? t("homeFeed.joinCircle") : t("homeFeed.exploreHobby", { name: visualPick.displayName })}
         </button>
       </div>
     </section>

@@ -38,6 +38,10 @@ import type {
   VenueSuggestionsResponse,
   CommunityPreviewResponse,
   DiscoveryResponse,
+  DailyInsightResponse,
+  DailyLibraryInsight,
+  GenerateInsightLibraryResponse,
+  InsightLibrarySummary,
 } from "./types";
 
 const TOKEN_KEY = "auth_token";
@@ -269,4 +273,15 @@ export const api = {
   getCommunityPreview: () => request<CommunityPreviewResponse>("GET", "/community/preview"),
   todaysDiscovery: (payload: { displayName: string; category?: string; lang?: string }) =>
     request<DiscoveryResponse>("POST", "/discoveries/today", payload),
+  /** Stored daily insight. The server generates it once per hobby per language per day. */
+  dailyInsight: (slug: string) =>
+    request<DailyInsightResponse>("GET", `/discoveries/today?slug=${encodeURIComponent(slug)}`),
+  generateInsightLibrary: (hobbyId: string) =>
+    request<GenerateInsightLibraryResponse>("POST", "/hobby-insights/generate", { hobbyId }),
+  insightSummary: () => request<InsightLibrarySummary>("GET", "/hobby-insights/summary"),
+  dailyLibraryInsight: (slug: string, day: string) =>
+    request<DailyLibraryInsight>(
+      "GET",
+      `/hobby-insights/daily?slug=${encodeURIComponent(slug)}&day=${encodeURIComponent(day)}`,
+    ),
 };

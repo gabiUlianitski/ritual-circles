@@ -20,6 +20,7 @@ from app.routers.community import router as community_router
 from app.routers.circles import router as circles_router
 from app.routers.discovery import router as discovery_router
 from app.routers.hobies import router as hobies_router
+from app.routers.hobby_insights import router as hobby_insights_router
 from app.routers.geo import router as geo_router
 from app.routers.home import router as home_router
 from app.routers.me import router as me_router
@@ -134,6 +135,7 @@ def create_app() -> FastAPI:
     app.include_router(home_router)
     app.include_router(me_router)
     app.include_router(hobies_router)
+    app.include_router(hobby_insights_router)
     app.include_router(community_router)
     app.include_router(circles_router)
     app.include_router(discovery_router)

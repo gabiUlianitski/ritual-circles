@@ -38,6 +38,8 @@ $include = @(
     "db/migrations/032_user_avatar_url.sql",
     "db/migrations/033_circle_name.sql",
     "db/migrations/034_circle_invitations.sql",
+    "db/migrations/035_hoby_daily_insight.sql",
+    "db/migrations/036_hobby_insights.sql",
     "db/supabase/full_migration.sql",
     "scripts/deploy-production.ps1",
     "web/src"

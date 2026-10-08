@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -761,4 +762,45 @@ class DiscoveryResponse(BaseModel):
     title: str
     body: str
     imagePrompt: str
+
+
+class DailyInsightResponse(BaseModel):
+    slug: str
+    category: str
+    text: str
+    day: str
+
+
+class GenerateInsightLibraryRequest(BaseModel):
+    hobbyId: UUID
+
+
+class InsightLibraryPreview(BaseModel):
+    type: str
+    contentEn: str
+    contentHe: str | None = None
+
+
+class GenerateInsightLibraryResponse(BaseModel):
+    hobbyId: str
+    hobbyName: str
+    activeCount: int
+    batchId: str
+    preview: list[InsightLibraryPreview]
+
+
+class InsightCount(BaseModel):
+    hobbyId: str
+    activeCount: int
+
+
+class InsightLibrarySummary(BaseModel):
+    counts: list[InsightCount]
+
+
+class DailyLibraryInsight(BaseModel):
+    hobbyId: str
+    insightType: str
+    text: str
+    day: str
 

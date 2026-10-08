@@ -274,6 +274,38 @@ export type DiscoveryResponse = {
   imagePrompt: string;
 };
 
+export type DailyInsightResponse = {
+  slug: string;
+  category: string;
+  text: string;
+  day: string;
+};
+
+export type InsightLibraryPreview = {
+  type: string;
+  contentEn: string;
+  contentHe: string | null;
+};
+
+export type GenerateInsightLibraryResponse = {
+  hobbyId: string;
+  hobbyName: string;
+  activeCount: number;
+  batchId: string;
+  preview: InsightLibraryPreview[];
+};
+
+export type InsightLibrarySummary = {
+  counts: { hobbyId: string; activeCount: number }[];
+};
+
+export type DailyLibraryInsight = {
+  hobbyId: string;
+  insightType: string;
+  text: string;
+  day: string;
+};
+
 export type CommunityPreviewResponse = {
   stats: CommunityStats;
   featuredCircles: CommunityCirclePreview[];

@@ -1,7 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
-import type { Hoby, HobyPrecheckResponse, HobyRegeneratePreview, HobyRegenField } from "../api/types";
+import type {
+  GenerateInsightLibraryResponse,
+  Hoby,
+  HobyPrecheckResponse,
+  HobyRegeneratePreview,
+  HobyRegenField,
+} from "../api/types";
 import { CreateCircleGroupSizeStep } from "./CreateCircleGroupSizeStep";
 import { FormError } from "./FormError";
 import {
@@ -61,6 +67,11 @@ export function Hobies(props: { onBack: () => void }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkNote, setBulkNote] = useState<string | null>(null);
+  const [insightCounts, setInsightCounts] = useState<Record<string, number>>({});
+  const [insightBusy, setInsightBusy] = useState(false);
+  const [insightNote, setInsightNote] = useState<string | null>(null);
+  const [insightConfirm, setInsightConfirm] = useState(false);
+  const [insightPreview, setInsightPreview] = useState<GenerateInsightLibraryResponse | null>(null);
   const [blockedSlugs, setBlockedSlugs] = useState<string[]>([]);
   const [translation, setTranslation] = useState<"all" | "en" | "he" | "missingHe">("all");
   const [screen, setScreen] = useState<"list" | "review" | "edit">("list");
@@ -72,7 +83,12 @@ export function Hobies(props: { onBack: () => void }) {
     setLoading(true);
     setError(null);
     try {
-      setHobies(await api.getHobiesCanonical());
+      const [list, summary] = await Promise.all([
+        api.getHobiesCanonical(),
+        api.insightSummary().catch(() => ({ counts: [] })),
+      ]);
+      setHobies(list);
+      setInsightCounts(Object.fromEntries(summary.counts.map((row) => [row.hobbyId, row.activeCount])));
     } catch (e) {
       setError(friendlyError(e, t("hobbiesPage.loadError")));
     } finally {
@@ -144,6 +160,34 @@ export function Hobies(props: { onBack: () => void }) {
   }
 
   const editing = hobies.find((h) => h.slug === editSlug) ?? null;
+  const selectedHobby = selected.length === 1 ? hobies.find((h) => h.slug === selected[0]) : undefined;
+  const selectedInsightCount = selectedHobby ? (insightCounts[selectedHobby.id] ?? 0) : 0;
+
+  async function generateInsights() {
+    if (!selectedHobby || insightBusy) return;
+    setInsightConfirm(false);
+    setInsightBusy(true);
+    setError(null);
+    setInsightNote(null);
+    try {
+      const result = await api.generateInsightLibrary(selectedHobby.id);
+      setInsightCounts((prev) => ({ ...prev, [result.hobbyId]: result.activeCount }));
+      setInsightNote(t("hobbiesPage.insightGenerated"));
+      setInsightPreview(result);
+    } catch (e) {
+      setInsightNote(t("hobbiesPage.insightPreserved"));
+      setError(friendlyError(e, t("hobbiesPage.insightFailed")));
+    } finally {
+      setInsightBusy(false);
+    }
+  }
+
+  const insightTypeLabel = (type: string) => {
+    if (type === "motivation") return t("hobbiesPage.insightTypeMotivation");
+    if (type === "social_connection") return t("hobbiesPage.insightTypeSocial");
+    if (type === "interesting_fact") return t("hobbiesPage.insightTypeFact");
+    return t("hobbiesPage.insightTypeDiscovery");
+  };
   const titleFor = (h: Hoby) => (i18n.language.startsWith("he") && h.heDisplayName?.trim() ? h.heDisplayName : h.displayName);
 
   return (
@@ -219,6 +263,21 @@ export function Hobies(props: { onBack: () => void }) {
             <div className="hoby-cat-bulk" role="toolbar" aria-label={t("hobbiesPage.bulkActions")}>
               <span className="hoby-cat-bulk-count">{t("hobbiesPage.selectedCount", { count: selected.length })}</span>
               <div className="hoby-cat-bulk-actions">
+                {selectedHobby ? (
+                  <button
+                    type="button"
+                    className="hoby-cat-bulk-btn"
+                    disabled={insightBusy}
+                    onClick={() => setInsightConfirm(true)}
+                  >
+                    <span aria-hidden>✨ </span>
+                    {insightBusy
+                      ? t("hobbiesPage.generatingInsights")
+                      : selectedInsightCount > 0
+                        ? t("hobbiesPage.regenerate50")
+                        : t("hobbiesPage.generate50")}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="hoby-cat-bulk-btn"
@@ -238,6 +297,7 @@ export function Hobies(props: { onBack: () => void }) {
               </div>
             </div>
           ) : null}
+          {insightNote ? <p className="hoby-cat-insight-note">{insightNote}</p> : null}
           {bulkNote ? (
             <div className="hoby-cat-warning">
               <span>{bulkNote}</span>
@@ -295,6 +355,19 @@ export function Hobies(props: { onBack: () => void }) {
                     <span className="hoby-cat-facts">
                       <span>{t("hobbiesPage.typesCount", { count: parseHobyTypesNested(h.types).length })}</span>
                       <span>{t("hobbiesPage.levelsCount", { count: parseHobyLevelsFlat(h.levels).length })}</span>
+                      <span
+                        className={
+                          (insightCounts[h.id] ?? 0) > 0 && (insightCounts[h.id] ?? 0) < 50
+                            ? "hoby-cat-insight is-warning"
+                            : "hoby-cat-insight"
+                        }
+                      >
+                        {(insightCounts[h.id] ?? 0) <= 0
+                          ? t("hobbiesPage.insightsNone")
+                          : (insightCounts[h.id] ?? 0) >= 50
+                            ? t("hobbiesPage.insightsReady", { count: insightCounts[h.id] })
+                            : t("hobbiesPage.insightsPartial", { count: insightCounts[h.id] })}
+                      </span>
                       <span>
                         {h.groupSize
                           ? t("hobbiesPage.groupFact", { summary: formatGroupSizeSummary(h.groupSize, t) })
@@ -312,6 +385,69 @@ export function Hobies(props: { onBack: () => void }) {
               );
             })}
           </div>
+          {insightConfirm && selectedHobby ? (
+            <div className="hoby-insight-backdrop" role="presentation" onClick={() => setInsightConfirm(false)}>
+              <div
+                className="hoby-insight-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="hoby-insight-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <h2 id="hoby-insight-title">
+                  {selectedInsightCount > 0 ? t("hobbiesPage.regenerateTitle") : t("hobbiesPage.generateTitle")}
+                </h2>
+                <p>
+                  {selectedInsightCount > 0
+                    ? t("hobbiesPage.regenerateMessage", { name: titleFor(selectedHobby) })
+                    : t("hobbiesPage.generateMessage", { name: titleFor(selectedHobby) })}
+                </p>
+                <p className="hoby-insight-support">
+                  {selectedInsightCount > 0 ? t("hobbiesPage.regenerateSupport") : t("hobbiesPage.generateSupport")}
+                </p>
+                <div className="hoby-insight-actions">
+                  <button type="button" className="hoby-cat-bulk-btn" onClick={() => setInsightConfirm(false)}>
+                    {t("common.cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    className={selectedInsightCount > 0 ? "hoby-cat-bulk-btn is-danger" : "primary"}
+                    onClick={() => void generateInsights()}
+                  >
+                    {selectedInsightCount > 0 ? t("hobbiesPage.generateAndReplace") : t("hobbiesPage.generate50")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {insightPreview ? (
+            <div className="hoby-insight-backdrop" role="presentation" onClick={() => setInsightPreview(null)}>
+              <div
+                className="hoby-insight-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="hoby-insight-preview-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <h2 id="hoby-insight-preview-title">{insightPreview.hobbyName}</h2>
+                <p>{t("hobbiesPage.insightPreviewCount", { count: insightPreview.activeCount })}</p>
+                <p className="hoby-insight-support">{t("hobbiesPage.insightGenerated")}</p>
+                <ul className="hoby-insight-preview">
+                  {insightPreview.preview.map((item) => (
+                    <li key={`${item.type}-${item.contentEn}`}>
+                      <span>{insightTypeLabel(item.type)}</span>
+                      {item.contentEn}
+                    </li>
+                  ))}
+                </ul>
+                <div className="hoby-insight-actions">
+                  <button type="button" className="primary" onClick={() => setInsightPreview(null)}>
+                    {t("common.close")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </>
       ) : null}
 

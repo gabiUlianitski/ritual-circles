@@ -19,6 +19,8 @@ PENDING = [
     "032_user_avatar_url.sql",
     "033_circle_name.sql",
     "034_circle_invitations.sql",
+    "035_hoby_daily_insight.sql",
+    "036_hobby_insights.sql",
 ]
 
 
