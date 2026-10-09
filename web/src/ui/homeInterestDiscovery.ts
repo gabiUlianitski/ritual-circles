@@ -78,7 +78,7 @@ export function discoverNewInterests(input: {
 
   const scored = input.hobbies
     .filter((hobby) => !hobby.archived && !selected.has(key(hobby.slug)))
-    .map((hobby): (NewInterestMatch & { interestScore: number; locationScore: number }) | null => {
+    .map((hobby): (NewInterestMatch & { interestScore: number; locationScore: number; hasCircle: boolean }) | null => {
       const slug = key(hobby.slug);
       const available = input.circles.filter(
         (circle) =>
