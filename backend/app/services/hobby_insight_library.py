@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
@@ -9,6 +10,7 @@ from difflib import SequenceMatcher
 from uuid import UUID, uuid4
 
 import asyncpg
+import httpx
 
 from app.ai.client import AIClient
 
@@ -23,6 +25,11 @@ QUOTA = {
 }
 LIBRARY_SIZE = 50
 GENERATION_ATTEMPTS = 3
+# Larger bilingual batches get truncated by the model and come back as invalid JSON.
+BATCH_SIZE = 5
+# Groq's free tier allows only a few thousand tokens per minute.
+RATE_LIMIT_WAITS = 8
+MAX_RATE_LIMIT_SLEEP = 30.0
 
 _BANNED = re.compile(
     r"(\bjoin now\b|\bguarante|\bstudies show\b|\bresearch proves\b|\bresearch shows\b|"
@@ -191,54 +198,91 @@ async def _generate_type(hobby_name: str, insight_type: str, count: int) -> list
     kept: list[dict] = []
     seen: list[str] = []
     client = AIClient()
-    for attempt in range(1, GENERATION_ATTEMPTS + 1):
-        remaining = count - len(kept)
+    failures = 0
+    rate_limit_waits = 0
+    while len(kept) < count and failures < GENERATION_ATTEMPTS:
+        batch = min(BATCH_SIZE, count - len(kept))
+        avoid = " | ".join(item["contentEn"] for item in kept)
         user = (
             f"Hobby: {hobby_name}\n"
             f"Type: {insight_type}\n"
-            f"Write exactly {remaining} insights. Every item must use type \"{insight_type}\".\n"
+            f"Write exactly {batch} insights. Every item must use type \"{insight_type}\".\n"
             "Each English line must contain 45 to 120 characters.\n"
-            f'This is validation attempt {attempt} of {GENERATION_ATTEMPTS}. '
-            f'Echo hobbyName as "{hobby_name}".'
+            + (f"Do not repeat these lines: {avoid}\n" if avoid else "")
+            + f'Echo hobbyName as "{hobby_name}".'
         )
-        data = await client.chat_json(system=_SYSTEM, user=user)
-        if not isinstance(data, dict):
+        try:
+            data = await client.chat_json(system=_SYSTEM, user=user)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 429 and rate_limit_waits < RATE_LIMIT_WAITS:
+                rate_limit_waits += 1
+                await asyncio.sleep(_retry_after_seconds(exc.response))
+                continue
+            logger.warning("hobby_insight_ai_reply_failed type=%s error=%s", insight_type, exc)
+            failures += 1
             continue
-        echoed = str(data.get("hobbyName") or "").strip()
-        if echoed and echoed.casefold() != hobby_name.strip().casefold():
+        except (ValueError, KeyError, httpx.HTTPError) as exc:
+            logger.warning("hobby_insight_ai_reply_failed type=%s error=%s", insight_type, exc)
+            failures += 1
             continue
-        rows = data.get("insights")
-        if not isinstance(rows, list):
-            continue
-        for row in rows:
-            if not isinstance(row, dict):
-                continue
-            if str(row.get("type") or insight_type).strip() != insight_type:
-                continue
-            try:
-                english = _clean_english(row.get("contentEn"))
-            except InsightValidationError:
-                continue
-            key = _normalize(english)
-            if not key or key in seen or any(SequenceMatcher(None, key, prev).ratio() >= 0.96 for prev in seen):
-                continue
-            seen.append(key)
-            kept.append(
-                {
-                    "type": insight_type,
-                    "contentEn": english,
-                    "contentHe": _clean_hebrew(row.get("contentHe"), english),
-                }
-            )
-            if len(kept) == count:
-                break
-        if len(kept) == count:
-            break
+        if not _absorb(data, hobby_name, insight_type, count, kept, seen):
+            failures += 1
     if len(kept) != count:
         raise InsightValidationError(
-            f"Expected {count} {insight_type} insights, got {len(kept)} after {GENERATION_ATTEMPTS} attempts."
+            f"Expected {count} {insight_type} insights, got {len(kept)} after {GENERATION_ATTEMPTS} failed attempts."
         )
     return kept
+
+
+def _retry_after_seconds(response: httpx.Response) -> float:
+    try:
+        seconds = float(response.headers.get("retry-after", ""))
+    except ValueError:
+        seconds = 10.0
+    return max(1.0, min(MAX_RATE_LIMIT_SLEEP, seconds))
+
+
+def _absorb(
+    data: object,
+    hobby_name: str,
+    insight_type: str,
+    count: int,
+    kept: list[dict],
+    seen: list[str],
+) -> bool:
+    """Add valid unique lines from one AI reply. Returns whether any line was kept."""
+    if not isinstance(data, dict):
+        return False
+    echoed = str(data.get("hobbyName") or "").strip()
+    if echoed and echoed.casefold() != hobby_name.strip().casefold():
+        return False
+    rows = data.get("insights")
+    if not isinstance(rows, list):
+        return False
+    before = len(kept)
+    for row in rows:
+        if len(kept) == count:
+            break
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("type") or insight_type).strip() != insight_type:
+            continue
+        try:
+            english = _clean_english(row.get("contentEn"))
+        except InsightValidationError:
+            continue
+        key = _normalize(english)
+        if not key or key in seen or any(SequenceMatcher(None, key, prev).ratio() >= 0.96 for prev in seen):
+            continue
+        seen.append(key)
+        kept.append(
+            {
+                "type": insight_type,
+                "contentEn": english,
+                "contentHe": _clean_hebrew(row.get("contentHe"), english),
+            }
+        )
+    return len(kept) > before
 
 
 async def generate_raw_library(hobby_name: str) -> dict:
