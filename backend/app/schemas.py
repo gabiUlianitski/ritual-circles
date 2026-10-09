@@ -793,6 +793,7 @@ class GenerateInsightLibraryResponse(BaseModel):
 class InsightCount(BaseModel):
     hobbyId: str
     activeCount: int
+    generatedAt: datetime | None = None
 
 
 class InsightLibrarySummary(BaseModel):

@@ -22,21 +22,38 @@ export type AttentionKey =
   | "missingHebrewName"
   | "missingHebrewDescription";
 
+export const INSIGHT_LIBRARY_SIZE = 50;
+export const INSIGHT_LIFE_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Every missing required field, in the order an editor should fix them. */
+export function hobbyGaps(h: Hoby): AttentionKey[] {
+  const gaps: AttentionKey[] = [];
+  if (!(h.canonicalDisplayName || h.displayName || "").trim()) gaps.push("missingName");
+  if (!stableCategory(h.interestCategory)) gaps.push("missingCategory");
+  if (!(h.canonicalShortDescription ?? h.shortDescription ?? "").trim()) gaps.push("missingDescription");
+  if (!(h.discoveryDescription ?? "").trim()) gaps.push("missingDiscovery");
+  if (!(h.icon ?? "").trim()) gaps.push("missingIcon");
+  const types = parseHobyTypesNested(h.types);
+  if (types.length === 0) gaps.push("missingTypes");
+  else if (types.some((row) => !(row.icon ?? "").trim())) gaps.push("missingTypeIcon");
+  if (parseHobyLevelsFlat(h.levels).length === 0) gaps.push("missingLevels");
+  if (!h.groupSize) gaps.push("missingGroupSize");
+  if (!(h.heDisplayName ?? "").trim()) gaps.push("missingHebrewName");
+  if (!(h.heShortDescription ?? "").trim()) gaps.push("missingHebrewDescription");
+  return gaps;
+}
+
 /** First missing required field. A hobby icon and an icon on every type are required. */
 export function hobbyAttention(h: Hoby): AttentionKey | null {
-  if (!(h.canonicalDisplayName || h.displayName || "").trim()) return "missingName";
-  if (!stableCategory(h.interestCategory)) return "missingCategory";
-  if (!(h.canonicalShortDescription ?? h.shortDescription ?? "").trim()) return "missingDescription";
-  if (!(h.discoveryDescription ?? "").trim()) return "missingDiscovery";
-  if (!(h.icon ?? "").trim()) return "missingIcon";
-  const types = parseHobyTypesNested(h.types);
-  if (types.length === 0) return "missingTypes";
-  if (types.some((row) => !(row.icon ?? "").trim())) return "missingTypeIcon";
-  if (parseHobyLevelsFlat(h.levels).length === 0) return "missingLevels";
-  if (!h.groupSize) return "missingGroupSize";
-  if (!(h.heDisplayName ?? "").trim()) return "missingHebrewName";
-  if (!(h.heShortDescription ?? "").trim()) return "missingHebrewDescription";
-  return null;
+  return hobbyGaps(h)[0] ?? null;
+}
+
+/** The day the stored library should be replaced. Null when it was never generated. */
+export function insightExpiresAt(generatedAt: string | null | undefined): Date | null {
+  if (!generatedAt) return null;
+  const start = new Date(generatedAt);
+  if (Number.isNaN(start.getTime())) return null;
+  return new Date(start.getTime() + INSIGHT_LIFE_MS);
 }
 
 export function hobbyIsComplete(h: Hoby): boolean {

@@ -18,7 +18,15 @@ import {
   validateGroupSize,
   type GroupSizeState,
 } from "./groupSize";
-import { hobbyAttention, hobbyHasHebrew, hobbyStatus, hobbyWasPrepared, stableCategory } from "./hobyCatalogue";
+import {
+  hobbyGaps,
+  hobbyHasHebrew,
+  hobbyStatus,
+  hobbyWasPrepared,
+  INSIGHT_LIBRARY_SIZE,
+  insightExpiresAt,
+  stableCategory,
+} from "./hobyCatalogue";
 import {
   emptyManualRow,
   HobyManualMetadataEditor,
@@ -67,7 +75,7 @@ export function Hobies(props: { onBack: () => void }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkNote, setBulkNote] = useState<string | null>(null);
-  const [insightCounts, setInsightCounts] = useState<Record<string, number>>({});
+  const [insightCounts, setInsightCounts] = useState<Record<string, { count: number; generatedAt: string | null }>>({});
   const [insightBusy, setInsightBusy] = useState(false);
   const [insightNote, setInsightNote] = useState<string | null>(null);
   const [insightConfirm, setInsightConfirm] = useState(false);
@@ -88,7 +96,11 @@ export function Hobies(props: { onBack: () => void }) {
         api.insightSummary().catch(() => ({ counts: [] })),
       ]);
       setHobies(list);
-      setInsightCounts(Object.fromEntries(summary.counts.map((row) => [row.hobbyId, row.activeCount])));
+      setInsightCounts(
+        Object.fromEntries(
+          summary.counts.map((row) => [row.hobbyId, { count: row.activeCount, generatedAt: row.generatedAt ?? null }]),
+        ),
+      );
     } catch (e) {
       setError(friendlyError(e, t("hobbiesPage.loadError")));
     } finally {
@@ -161,7 +173,7 @@ export function Hobies(props: { onBack: () => void }) {
 
   const editing = hobies.find((h) => h.slug === editSlug) ?? null;
   const selectedHobby = selected.length === 1 ? hobies.find((h) => h.slug === selected[0]) : undefined;
-  const selectedInsightCount = selectedHobby ? (insightCounts[selectedHobby.id] ?? 0) : 0;
+  const selectedInsightCount = selectedHobby ? (insightCounts[selectedHobby.id]?.count ?? 0) : 0;
 
   async function generateInsights() {
     if (!selectedHobby || insightBusy) return;
@@ -171,7 +183,10 @@ export function Hobies(props: { onBack: () => void }) {
     setInsightNote(null);
     try {
       const result = await api.generateInsightLibrary(selectedHobby.id);
-      setInsightCounts((prev) => ({ ...prev, [result.hobbyId]: result.activeCount }));
+      setInsightCounts((prev) => ({
+        ...prev,
+        [result.hobbyId]: { count: result.activeCount, generatedAt: new Date().toISOString() },
+      }));
       setInsightNote(t("hobbiesPage.insightGenerated"));
       setInsightPreview(result);
     } catch (e) {
@@ -312,7 +327,16 @@ export function Hobies(props: { onBack: () => void }) {
           <div className="hoby-cat-grid">
             {filtered.map((h) => {
               const status = hobbyStatus(h);
-              const attention = status === "incomplete" ? hobbyAttention(h) : null;
+              const gaps = status === "incomplete" ? hobbyGaps(h) : [];
+              const library = insightCounts[h.id];
+              const insightCount = library?.count ?? 0;
+              const expires = insightExpiresAt(library?.generatedAt);
+              const insightExpired = expires != null && expires.getTime() <= Date.now();
+              const insightDate = expires?.toLocaleDateString(i18n.language, {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              });
               const cat = stableCategory(h.interestCategory);
               const badgeClass = status === "incomplete" ? " is-warning" : status === "archived" ? " is-archived" : "";
               const badgeLabel =
@@ -354,22 +378,36 @@ export function Hobies(props: { onBack: () => void }) {
                         : h.canonicalShortDescription || h.shortDescription || t("hobbiesPage.noDescription")
                       )?.trim() || t("hobbiesPage.noDescription")}
                     </span>
-                    {attention ? <span className="hoby-cat-gap">{t(`hobbiesPage.${attention}`)}</span> : null}
+                    {gaps.length > 0 ? (
+                      <span className="hoby-cat-gaps">
+                        <span className="hoby-cat-gap">{t("hobbiesPage.missingCount", { count: gaps.length })}</span>
+                        {gaps.map((gap) => (
+                          <span key={gap} className="hoby-cat-gap">
+                            {t(`hobbiesPage.${gap}`)}
+                          </span>
+                        ))}
+                      </span>
+                    ) : null}
                     <span className="hoby-cat-facts">
                       <span>{t("hobbiesPage.typesCount", { count: parseHobyTypesNested(h.types).length })}</span>
                       <span>{t("hobbiesPage.levelsCount", { count: parseHobyLevelsFlat(h.levels).length })}</span>
                       <span
-                        className={
-                          (insightCounts[h.id] ?? 0) > 0 && (insightCounts[h.id] ?? 0) < 50
-                            ? "hoby-cat-insight is-warning"
-                            : "hoby-cat-insight"
-                        }
+                        className={`hoby-cat-insight${
+                          insightExpired || insightCount < INSIGHT_LIBRARY_SIZE ? " is-warning" : ""
+                        }`}
                       >
-                        {(insightCounts[h.id] ?? 0) <= 0
-                          ? t("hobbiesPage.insightsNone")
-                          : (insightCounts[h.id] ?? 0) >= 50
-                            ? t("hobbiesPage.insightsReady", { count: insightCounts[h.id] })
-                            : t("hobbiesPage.insightsPartial", { count: insightCounts[h.id] })}
+                        {insightCount <= 0
+                          ? t("hobbiesPage.insightsPartial", { count: 0, missing: INSIGHT_LIBRARY_SIZE })
+                          : insightExpired
+                            ? t("hobbiesPage.insightsExpired", { date: insightDate })
+                            : insightCount >= INSIGHT_LIBRARY_SIZE && insightDate
+                              ? t("hobbiesPage.insightsReadyUntil", { count: insightCount, date: insightDate })
+                              : insightCount >= INSIGHT_LIBRARY_SIZE
+                                ? t("hobbiesPage.insightsReady", { count: insightCount })
+                                : t("hobbiesPage.insightsPartial", {
+                                    count: insightCount,
+                                    missing: INSIGHT_LIBRARY_SIZE - insightCount,
+                                  })}
                       </span>
                       <span>
                         {h.groupSize

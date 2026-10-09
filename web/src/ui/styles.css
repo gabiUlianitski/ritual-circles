@@ -10523,6 +10523,12 @@ a.create-venue-map-link {
   line-height: 1.4;
 }
 
+.hoby-cat-gaps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .hoby-cat-gap {
   color: #ffd7a1;
   font-size: 13px;

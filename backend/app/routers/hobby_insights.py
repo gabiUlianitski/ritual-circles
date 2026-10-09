@@ -73,7 +73,9 @@ async def insight_summary(
     try:
         rows = await conn.fetch(
             """
-            SELECT hobby_id::text AS "hobbyId", COUNT(*)::int AS "activeCount"
+            SELECT hobby_id::text AS "hobbyId",
+                   COUNT(*)::int AS "activeCount",
+                   MAX(created_at) AS "generatedAt"
             FROM hobby_insights
             WHERE is_active = true
             GROUP BY hobby_id
@@ -82,7 +84,14 @@ async def insight_summary(
     except asyncpg.UndefinedTableError:
         return InsightLibrarySummary(counts=[])
     return InsightLibrarySummary(
-        counts=[{"hobbyId": row["hobbyId"], "activeCount": int(row["activeCount"])} for row in rows]
+        counts=[
+            {
+                "hobbyId": row["hobbyId"],
+                "activeCount": int(row["activeCount"]),
+                "generatedAt": row["generatedAt"],
+            }
+            for row in rows
+        ]
     )
 
 
