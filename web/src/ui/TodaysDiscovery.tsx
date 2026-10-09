@@ -24,6 +24,8 @@ export function TodaysDiscovery(props: {
   circleSlugs: string[];
   userId: string | null;
   featuredCircle?: CircleListItem;
+  /** Circles to try, in order, until one hobby has an active insight library. */
+  libraryCircles?: CircleListItem[];
   catalog: CircleListItem[];
   likedSlugs: string[];
   city: string | null;
@@ -45,37 +47,62 @@ export function TodaysDiscovery(props: {
     [props.hobies, props.userSlugs, props.circleSlugs, props.userId, today],
   );
   const [imageFailed, setImageFailed] = useState(false);
-  const [insight, setInsight] = useState<string | null>(null);
+  const [insight, setInsight] = useState<{ slug: string; text: string } | null>(null);
 
   const featured = props.featuredCircle;
-  const insightSlug = (featured?.ritualType || pick?.slug || "").trim();
+  const libraryChoices = useMemo(() => {
+    const seen = new Set<string>();
+    const circles: CircleListItem[] = [];
+    for (const circle of [...(props.libraryCircles ?? []), ...(featured ? [featured] : [])]) {
+      const slug = circle.ritualType.trim().toLowerCase();
+      if (!slug || seen.has(slug)) continue;
+      seen.add(slug);
+      circles.push(circle);
+    }
+    return circles;
+  }, [props.libraryCircles, featured]);
+  const insightSlug = (libraryChoices[0]?.ritualType || featured?.ritualType || pick?.slug || "").trim();
 
   useEffect(() => {
     if (pick) rememberDiscovery(props.userId, today, pick);
     setImageFailed(false);
   }, [pick, props.userId, today]);
 
+  const choiceKey = libraryChoices.map((circle) => `${circle.id}:${circle.ritualType}`).join("|");
   useEffect(() => {
-    if (!insightSlug) return;
+    const slugs = libraryChoices.map((circle) => circle.ritualType.trim()).filter(Boolean);
+    if (slugs.length === 0 && insightSlug) slugs.push(insightSlug);
+    if (slugs.length === 0) return;
     setInsight(null);
     let cancelled = false;
-    void api
-      .dailyLibraryInsight(insightSlug, today)
-      .then((res) => {
-        if (!cancelled && res.text?.trim()) setInsight(res.text.trim());
-      })
-      .catch(() => {
-        /* static hobby insight stays on screen */
-      });
+    void (async () => {
+      for (const slug of slugs) {
+        try {
+          const res = await api.dailyLibraryInsight(slug, today);
+          if (cancelled) return;
+          if (res.text?.trim()) {
+            setInsight({ slug: slug.toLowerCase(), text: res.text.trim() });
+            return;
+          }
+        } catch {
+          /* This hobby has no active library. Try the next circle. */
+        }
+      }
+    })();
     return () => {
       cancelled = true;
     };
-  }, [insightSlug, today, i18n.language]);
+  }, [choiceKey, insightSlug, today, i18n.language]);
 
-  if (!pick && !featured) return null;
+  const shown =
+    (insight
+      ? libraryChoices.find((circle) => circle.ritualType.trim().toLowerCase() === insight.slug)
+      : null) ?? featured;
 
-  const featuredHobby = featured
-    ? props.hobies.find((h) => h.slug.trim().toLowerCase() === featured.ritualType.trim().toLowerCase())
+  if (!pick && !shown) return null;
+
+  const featuredHobby = shown
+    ? props.hobies.find((h) => h.slug.trim().toLowerCase() === shown.ritualType.trim().toLowerCase())
     : null;
   const visualPick = featuredHobby
     ? {
@@ -84,25 +111,25 @@ export function TodaysDiscovery(props: {
         icon: featuredHobby.icon ?? null,
         category: discoveryCategory(featuredHobby),
       }
-    : featured
+    : shown
       ? {
-          slug: featured.ritualType,
-          displayName: featured.hobyDisplayName || featured.ritualType,
-          icon: featured.hobyIcon ?? null,
+          slug: shown.ritualType,
+          displayName: shown.hobyDisplayName || shown.ritualType,
+          icon: shown.hobyIcon ?? null,
           category: discoveryCategory({
-            slug: featured.ritualType,
-            displayName: featured.hobyDisplayName || featured.ritualType,
+            slug: shown.ritualType,
+            displayName: shown.hobyDisplayName || shown.ritualType,
           }),
         }
       : pick;
   if (!visualPick) return null;
 
-  const title = featured ? circleDisplayTitle(featured) : visualPick.displayName;
-  const location = featured ? formatCircleLocationChip(featured, t) : "";
-  const libraryInsight = insight ? compactInsight(insight) : null;
-  const heroLine = featured
+  const title = shown ? circleDisplayTitle(shown) : visualPick.displayName;
+  const location = shown ? formatCircleLocationChip(shown, t) : "";
+  const libraryInsight = insight?.text ? compactInsight(insight.text) : null;
+  const heroLine = shown
     ? dailyMoment({
-        featured,
+        featured: shown,
         catalog: props.catalog,
         likedSlugs: props.likedSlugs,
         city: props.city,
@@ -113,12 +140,12 @@ export function TodaysDiscovery(props: {
       })
     : libraryInsight || compactInsight(t(insightFallbackKey(visualPick.slug, today), { name: visualPick.displayName }));
   const imageUrl = discoveryImageUrl(scenePrompt(visualPick.displayName), `${today}:${visualPick.slug}`);
-  const nextActivity = featured?.nextSessionAt
-    ? formatSessionDateTimeHero(featured.nextSessionAt)
+  const nextActivity = shown?.nextSessionAt
+    ? formatSessionDateTimeHero(shown.nextSessionAt)
     : t("homeFeed.readyToChooseDate");
 
   const open = () => {
-    if (featured) props.onOpenCircle(featured);
+    if (shown) props.onOpenCircle(shown);
     else props.onExplore(visualPick.slug);
   };
 
@@ -143,7 +170,7 @@ export function TodaysDiscovery(props: {
             {visualPick.icon?.trim() ? <span aria-hidden>{visualPick.icon.trim()} </span> : null}
             {title}
           </h2>
-          {featured ? (
+          {shown ? (
             <p className="home-discovery-facts">
               {location ? <span>📍 {location}</span> : null}
               <span>📅 {nextActivity}</span>
@@ -151,15 +178,15 @@ export function TodaysDiscovery(props: {
           ) : null}
         </div>
         <div className="home-discovery-action">
-          {featured ? (
+          {shown ? (
             <p className="home-discovery-proof">
-              <span>👥 {t("homeFeed.memberCount", { count: featured.memberCount })}</span>
+              <span>👥 {t("homeFeed.memberCount", { count: shown.memberCount })}</span>
               <span aria-hidden>·</span>
-              <span>{circleSignal(featured, t)}</span>
+              <span>{circleSignal(shown, t)}</span>
             </p>
           ) : null}
           <button type="button" className="circle-details-primary home-discovery-cta" onClick={open}>
-            {featured ? t("homeFeed.joinCircle") : t("homeFeed.exploreHobby", { name: visualPick.displayName })}
+            {shown ? t("homeFeed.joinCircle") : t("homeFeed.exploreHobby", { name: visualPick.displayName })}
           </button>
         </div>
       </div>

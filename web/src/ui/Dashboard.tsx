@@ -429,6 +429,12 @@ export function Dashboard(props: {
         circleSlugs={(catalog ?? []).filter((c) => c.isYours).map((c) => c.ritualType)}
         userId={me?.id ?? null}
         featuredCircle={featuredCircle}
+        libraryCircles={[
+          ...joinedUpcoming
+            .map((session) => (catalog ?? []).find((circle) => circle.id === session.circleId))
+            .filter((circle): circle is NonNullable<typeof circle> => Boolean(circle)),
+          ...feed.recommended,
+        ]}
         catalog={catalog ?? []}
         likedSlugs={likedSlugs}
         city={me?.city ?? null}

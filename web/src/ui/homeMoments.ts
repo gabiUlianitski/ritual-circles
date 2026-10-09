@@ -72,6 +72,7 @@ export function dailyMoment(input: {
   dayKey: string;
   t: TFunction;
 }): string {
+  if (input.libraryInsight?.trim()) return input.libraryInsight.trim();
   const { featured, catalog, t } = input;
   const hobby = hobbyName(featured, t);
   const sameHobbyNear = catalog.filter(
@@ -103,7 +104,6 @@ export function dailyMoment(input: {
     (input.stats?.meetupsThisWeek ?? 0) >= 2
       ? t("homeMoments.momentCommunityWeek", { count: input.stats?.meetupsThisWeek ?? 0 })
       : null,
-    input.libraryInsight,
   ].filter((x): x is string => Boolean(x && x.trim()));
 
   if (candidates.length === 0) return t("homeMoments.momentDefault", { hobby });
