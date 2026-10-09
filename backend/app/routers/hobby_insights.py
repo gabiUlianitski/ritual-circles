@@ -75,6 +75,10 @@ async def insight_summary(
             """
             SELECT hobby_id::text AS "hobbyId",
                    COUNT(*)::int AS "activeCount",
+                   COUNT(*) FILTER (WHERE insight_type = 'discovery')::int AS discovery,
+                   COUNT(*) FILTER (WHERE insight_type = 'motivation')::int AS motivation,
+                   COUNT(*) FILTER (WHERE insight_type = 'social_connection')::int AS social,
+                   COUNT(*) FILTER (WHERE insight_type = 'interesting_fact')::int AS fact,
                    MAX(created_at) AS "generatedAt"
             FROM hobby_insights
             WHERE is_active = true
@@ -89,6 +93,10 @@ async def insight_summary(
                 "hobbyId": row["hobbyId"],
                 "activeCount": int(row["activeCount"]),
                 "generatedAt": row["generatedAt"],
+                "discovery": int(row["discovery"]),
+                "motivation": int(row["motivation"]),
+                "social": int(row["social"]),
+                "fact": int(row["fact"]),
             }
             for row in rows
         ]

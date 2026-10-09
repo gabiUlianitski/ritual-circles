@@ -296,7 +296,15 @@ export type GenerateInsightLibraryResponse = {
 };
 
 export type InsightLibrarySummary = {
-  counts: { hobbyId: string; activeCount: number; generatedAt?: string | null }[];
+  counts: {
+    hobbyId: string;
+    activeCount: number;
+    generatedAt?: string | null;
+    discovery?: number;
+    motivation?: number;
+    social?: number;
+    fact?: number;
+  }[];
 };
 
 export type ForYouIntro = {

@@ -608,6 +608,8 @@
     "insightsReadyUntil": "Insights: {{count}} ready · expires {{date}}",
     "insightsExpired": "Insights expired {{date}} · replace",
     "insightsPartial": "Insights: {{count}} of 50 · {{missing}} missing",
+    "insightTypeReady": "{{name}}: {{count}} of {{expected}}",
+    "insightTypeMissing": "{{name}}: {{count}} of {{expected}} · {{missing}} missing",
     "missingCount_one": "1 thing missing",
     "missingCount_other": "{{count}} things missing",
     "insightGenerated": "Generation succeeded",

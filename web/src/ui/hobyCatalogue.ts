@@ -13,7 +13,6 @@ export type AttentionKey =
   | "missingName"
   | "missingCategory"
   | "missingDescription"
-  | "missingDiscovery"
   | "missingIcon"
   | "missingTypes"
   | "missingTypeIcon"
@@ -23,6 +22,13 @@ export type AttentionKey =
   | "missingHebrewDescription";
 
 export const INSIGHT_LIBRARY_SIZE = 50;
+/** Active rows expected in hobby_insights for each insight_type. */
+export const INSIGHT_TYPE_QUOTA = {
+  discovery: 13,
+  motivation: 13,
+  social_connection: 12,
+  interesting_fact: 12,
+} as const;
 export const INSIGHT_LIFE_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** Every missing required field, in the order an editor should fix them. */
@@ -31,7 +37,6 @@ export function hobbyGaps(h: Hoby): AttentionKey[] {
   if (!(h.canonicalDisplayName || h.displayName || "").trim()) gaps.push("missingName");
   if (!stableCategory(h.interestCategory)) gaps.push("missingCategory");
   if (!(h.canonicalShortDescription ?? h.shortDescription ?? "").trim()) gaps.push("missingDescription");
-  if (!(h.discoveryDescription ?? "").trim()) gaps.push("missingDiscovery");
   if (!(h.icon ?? "").trim()) gaps.push("missingIcon");
   const types = parseHobyTypesNested(h.types);
   if (types.length === 0) gaps.push("missingTypes");

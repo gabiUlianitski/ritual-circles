@@ -13,6 +13,7 @@ import asyncpg
 import httpx
 
 from app.ai.client import AIClient
+from app.services.hoby_enrichment import ensure_discovery_description
 
 logger = logging.getLogger(__name__)
 
@@ -353,7 +354,7 @@ async def create_insight_library(
     generate_fn=None,
 ) -> dict:
     row = await conn.fetchrow(
-        "SELECT id, slug, display_name FROM hobies WHERE id = $1",
+        "SELECT id, slug, display_name, discovery_description, i18n_json FROM hobies WHERE id = $1",
         hobby_id,
     )
     if row is None:
@@ -384,6 +385,16 @@ async def create_insight_library(
         _log("database", hobby_id=str(hobby_id), batch_id=str(batch_id), validated=len(items), result="failed")
         raise RuntimeError("Could not store insights. Existing insights were preserved.") from exc
     _log("database", hobby_id=str(hobby_id), batch_id=str(batch_id), validated=len(items), result="success")
+    try:
+        await ensure_discovery_description(
+            conn,
+            hobby_id=row["id"],
+            display_name=hobby_name,
+            current=row["discovery_description"],
+            i18n_raw=row["i18n_json"],
+        )
+    except Exception as exc:
+        logger.warning("discovery_description_fill_failed hobby_id=%s error=%s", hobby_id, exc)
     return {
         "hobbyId": str(row["id"]),
         "hobbyName": hobby_name,

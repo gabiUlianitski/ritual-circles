@@ -634,6 +634,8 @@
     "insightsReadyUntil": "תובנות: {{count}} מוכנות · בתוקף עד {{date}}",
     "insightsExpired": "התובנות פגו ב־{{date}} · צריך להחליף",
     "insightsPartial": "תובנות: {{count}} מתוך 50 · חסרות {{missing}}",
+    "insightTypeReady": "{{name}}: {{count}} מתוך {{expected}}",
+    "insightTypeMissing": "{{name}}: {{count}} מתוך {{expected}} · חסרות {{missing}}",
     "missingCount_one": "חסר פריט אחד",
     "missingCount_two": "חסרים 2 פריטים",
     "missingCount_other": "חסרים {{count}} פריטים",

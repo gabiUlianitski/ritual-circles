@@ -10540,6 +10540,12 @@ a.create-venue-map-link {
   gap: 8px 12px;
 }
 
+.hoby-cat-insight-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .hoby-cat-insight.is-warning {
   color: #ffd7a1;
 }

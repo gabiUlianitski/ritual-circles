@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import json
 import logging
 import re
 from typing import Any
+from uuid import UUID
+
+import asyncpg
 
 from app.ai.client import AIClient
+from app.hoby_i18n import parse_i18n_json
 from app.schemas import GroupSizeSpec
 from app.services.hoby_interest import sanitize_interest_category
 
@@ -333,4 +338,67 @@ Return only valid JSON with top-level keys "types", "levels", "short_description
         "he_short_description": he_desc,
         "he_discovery_description": sanitize_discovery_description(data.get("he_discovery_description")),
     }
+
+
+_DISCOVERY_SYSTEM = """You write one discovery description for a hobby in a small-group meeting app.
+Return JSON only: {"discovery_description":"...","he_discovery_description":"..."}
+discovery_description: 1 to 3 warm sentences, max 250 characters, about why people enjoy this hobby together. No statistics, no "join now", no emojis.
+he_discovery_description: the same description in natural Hebrew, max 250 characters.
+"""
+
+
+async def generate_discovery_description(display_name: str) -> tuple[str, str | None] | None:
+    client = AIClient()
+    if not client.enabled:
+        return None
+    try:
+        data = await client.chat_json(
+            system=_DISCOVERY_SYSTEM,
+            user=f'Hobby: {display_name}\nEcho nothing except the JSON object.',
+        )
+    except Exception as exc:
+        logger.warning("discovery_description_ai_failed hobby=%s error=%s", display_name, exc)
+        return None
+    if not isinstance(data, dict):
+        return None
+    english = sanitize_discovery_description(data.get("discovery_description"))
+    if not english:
+        return None
+    return english, sanitize_discovery_description(data.get("he_discovery_description"))
+
+
+async def ensure_discovery_description(
+    conn: asyncpg.Connection,
+    *,
+    hobby_id: UUID,
+    display_name: str,
+    current: str | None,
+    i18n_raw: Any,
+) -> str | None:
+    """Store a discovery description when the hobby does not have one yet."""
+    if isinstance(current, str) and current.strip():
+        return current.strip()
+    filled = await generate_discovery_description(display_name)
+    if filled is None:
+        return None
+    english, hebrew = filled
+    i18n = parse_i18n_json(i18n_raw)
+    if hebrew:
+        he = i18n.get("he")
+        he_out = dict(he) if isinstance(he, dict) else {}
+        he_out["discovery_description"] = hebrew
+        i18n["he"] = he_out
+    await conn.execute(
+        """
+        UPDATE hobies
+        SET discovery_description = $2,
+            i18n_json = $3::jsonb
+        WHERE id = $1
+          AND (discovery_description IS NULL OR btrim(discovery_description) = '')
+        """,
+        hobby_id,
+        english,
+        json.dumps(i18n),
+    )
+    return english
 

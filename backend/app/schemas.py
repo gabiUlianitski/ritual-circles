@@ -794,6 +794,10 @@ class InsightCount(BaseModel):
     hobbyId: str
     activeCount: int
     generatedAt: datetime | None = None
+    discovery: int = 0
+    motivation: int = 0
+    social: int = 0
+    fact: int = 0
 
 
 class InsightLibrarySummary(BaseModel):

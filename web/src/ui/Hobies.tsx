@@ -24,6 +24,7 @@ import {
   hobbyStatus,
   hobbyWasPrepared,
   INSIGHT_LIBRARY_SIZE,
+  INSIGHT_TYPE_QUOTA,
   insightExpiresAt,
   stableCategory,
 } from "./hobyCatalogue";
@@ -75,7 +76,9 @@ export function Hobies(props: { onBack: () => void }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkNote, setBulkNote] = useState<string | null>(null);
-  const [insightCounts, setInsightCounts] = useState<Record<string, { count: number; generatedAt: string | null }>>({});
+  const [insightCounts, setInsightCounts] = useState<
+    Record<string, { count: number; generatedAt: string | null; discovery: number; motivation: number; social: number; fact: number }>
+  >({});
   const [insightBusy, setInsightBusy] = useState(false);
   const [insightNote, setInsightNote] = useState<string | null>(null);
   const [insightConfirm, setInsightConfirm] = useState(false);
@@ -98,7 +101,17 @@ export function Hobies(props: { onBack: () => void }) {
       setHobies(list);
       setInsightCounts(
         Object.fromEntries(
-          summary.counts.map((row) => [row.hobbyId, { count: row.activeCount, generatedAt: row.generatedAt ?? null }]),
+          summary.counts.map((row) => [
+            row.hobbyId,
+            {
+              count: row.activeCount,
+              generatedAt: row.generatedAt ?? null,
+              discovery: row.discovery ?? 0,
+              motivation: row.motivation ?? 0,
+              social: row.social ?? 0,
+              fact: row.fact ?? 0,
+            },
+          ]),
         ),
       );
     } catch (e) {
@@ -185,10 +198,19 @@ export function Hobies(props: { onBack: () => void }) {
       const result = await api.generateInsightLibrary(selectedHobby.id);
       setInsightCounts((prev) => ({
         ...prev,
-        [result.hobbyId]: { count: result.activeCount, generatedAt: new Date().toISOString() },
+        [result.hobbyId]: {
+          count: result.activeCount,
+          generatedAt: new Date().toISOString(),
+          discovery: INSIGHT_TYPE_QUOTA.discovery,
+          motivation: INSIGHT_TYPE_QUOTA.motivation,
+          social: INSIGHT_TYPE_QUOTA.social_connection,
+          fact: INSIGHT_TYPE_QUOTA.interesting_fact,
+        },
       }));
       setInsightNote(t("hobbiesPage.insightGenerated"));
       setInsightPreview(result);
+      const list = await api.getHobiesCanonical().catch(() => null);
+      if (list) setHobies(list);
     } catch (e) {
       setInsightNote(t("hobbiesPage.insightPreserved"));
       setError(friendlyError(e, t("hobbiesPage.insightFailed")));
@@ -391,23 +413,48 @@ export function Hobies(props: { onBack: () => void }) {
                     <span className="hoby-cat-facts">
                       <span>{t("hobbiesPage.typesCount", { count: parseHobyTypesNested(h.types).length })}</span>
                       <span>{t("hobbiesPage.levelsCount", { count: parseHobyLevelsFlat(h.levels).length })}</span>
-                      <span
-                        className={`hoby-cat-insight${
-                          insightExpired || insightCount < INSIGHT_LIBRARY_SIZE ? " is-warning" : ""
-                        }`}
-                      >
-                        {insightCount <= 0
-                          ? t("hobbiesPage.insightsPartial", { count: 0, missing: INSIGHT_LIBRARY_SIZE })
-                          : insightExpired
-                            ? t("hobbiesPage.insightsExpired", { date: insightDate })
-                            : insightCount >= INSIGHT_LIBRARY_SIZE && insightDate
-                              ? t("hobbiesPage.insightsReadyUntil", { count: insightCount, date: insightDate })
-                              : insightCount >= INSIGHT_LIBRARY_SIZE
-                                ? t("hobbiesPage.insightsReady", { count: insightCount })
-                                : t("hobbiesPage.insightsPartial", {
-                                    count: insightCount,
-                                    missing: INSIGHT_LIBRARY_SIZE - insightCount,
-                                  })}
+                      <span className="hoby-cat-insight-block">
+                        <span
+                          className={`hoby-cat-insight${
+                            insightExpired || insightCount < INSIGHT_LIBRARY_SIZE ? " is-warning" : ""
+                          }`}
+                        >
+                          {insightCount <= 0
+                            ? t("hobbiesPage.insightsPartial", { count: 0, missing: INSIGHT_LIBRARY_SIZE })
+                            : insightExpired
+                              ? t("hobbiesPage.insightsExpired", { date: insightDate })
+                              : insightCount >= INSIGHT_LIBRARY_SIZE && insightDate
+                                ? t("hobbiesPage.insightsReadyUntil", { count: insightCount, date: insightDate })
+                                : insightCount >= INSIGHT_LIBRARY_SIZE
+                                  ? t("hobbiesPage.insightsReady", { count: insightCount })
+                                  : t("hobbiesPage.insightsPartial", {
+                                      count: insightCount,
+                                      missing: INSIGHT_LIBRARY_SIZE - insightCount,
+                                    })}
+                        </span>
+                        {(
+                          [
+                            ["discovery", library?.discovery ?? 0, INSIGHT_TYPE_QUOTA.discovery, "insightTypeDiscovery"],
+                            ["motivation", library?.motivation ?? 0, INSIGHT_TYPE_QUOTA.motivation, "insightTypeMotivation"],
+                            ["social", library?.social ?? 0, INSIGHT_TYPE_QUOTA.social_connection, "insightTypeSocial"],
+                            ["fact", library?.fact ?? 0, INSIGHT_TYPE_QUOTA.interesting_fact, "insightTypeFact"],
+                          ] as const
+                        ).map(([key, count, expected, label]) => (
+                          <span key={key} className={`hoby-cat-insight${count < expected ? " is-warning" : ""}`}>
+                            {count < expected
+                              ? t("hobbiesPage.insightTypeMissing", {
+                                  name: t(`hobbiesPage.${label}`),
+                                  count,
+                                  expected,
+                                  missing: expected - count,
+                                })
+                              : t("hobbiesPage.insightTypeReady", {
+                                  name: t(`hobbiesPage.${label}`),
+                                  count,
+                                  expected,
+                                })}
+                          </span>
+                        ))}
                       </span>
                       <span>
                         {h.groupSize
