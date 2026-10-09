@@ -66,61 +66,11 @@ function slugKey(s: string | null | undefined): string {
 function mixForYou(input: {
   joinable: CircleListItem[];
   hobbies: UserHobyPreference[];
-  hobyCatalog: Hoby[];
   city: string | null;
-  others: CircleListItem[];
   rotationKey?: string;
 }): CircleListItem[] {
-  const { joinable, hobbies, hobyCatalog, city } = input;
-  const liked = new Set(hobbies.map((h) => slugKey(h.slug)));
-  const categoryBySlug = new Map(
-    hobyCatalog.map((h) => [slugKey(h.slug), (h.interestCategory ?? "").trim().toLowerCase()]),
-  );
-  const likedCategories = new Set(
-    [...liked].map((slug) => categoryBySlug.get(slug)).filter((category): category is string => Boolean(category)),
-  );
-  const spin = <T,>(items: T[], tier: string) =>
-    input.rotationKey ? rotateDaily(items, `${input.rotationKey}:${tier}`) : items;
-  const personal = getRecommendedCircles(joinable, hobbies, city, RECOMMENDED_LIMIT);
-  const personalIds = new Set(personal.map((c) => c.id));
-  const similar = joinable.filter((c) => {
-    const category = categoryBySlug.get(slugKey(c.ritualType));
-    return Boolean(category && likedCategories.has(category) && !personalIds.has(c.id));
-  });
-  const active = joinable.filter((c) => (c.messagesToday ?? 0) > 0 || (c.messagesLastWeek ?? 0) > 0);
-  const fresh = joinable.filter((c) => c.memberCount <= 1);
-  const popular = [...joinable].sort(byMomentum);
-  const queues = [
-    spin(personal, "personal"),
-    spin(similar, "similar"),
-    spin(active, "active"),
-    spin(fresh, "fresh"),
-    spin(popular, "popular"),
-  ].map((items) => [...items]);
-  const seen = new Set<string>();
-  const mixed: CircleListItem[] = [];
-  let progressed = true;
-  while (mixed.length < RECOMMENDED_LIMIT && progressed) {
-    progressed = false;
-    for (const queue of queues) {
-      while (queue.length > 0 && seen.has(queue[0].id)) queue.shift();
-      const next = queue.shift();
-      if (!next) continue;
-      seen.add(next.id);
-      mixed.push(next);
-      progressed = true;
-      if (mixed.length >= RECOMMENDED_LIMIT) break;
-    }
-  }
-  if (mixed.length < RECOMMENDED_LIMIT) {
-    for (const circle of spin([...input.others].sort(byMomentum), "more")) {
-      if (seen.has(circle.id)) continue;
-      seen.add(circle.id);
-      mixed.push(circle);
-      if (mixed.length >= RECOMMENDED_LIMIT) break;
-    }
-  }
-  return mixed;
+  const personal = getRecommendedCircles(input.joinable, input.hobbies, input.city, RECOMMENDED_LIMIT);
+  return input.rotationKey ? rotateDaily(personal, `${input.rotationKey}:personal`) : personal;
 }
 
 function byMomentum(a: CircleListItem, b: CircleListItem): number {
@@ -216,9 +166,7 @@ export function buildHomeFeed(input: {
   const recommended = mixForYou({
     joinable,
     hobbies: joinedHobbies,
-    hobyCatalog,
     city,
-    others: listed.filter((c) => !c.isYours),
     rotationKey: input.rotationKey,
   });
 

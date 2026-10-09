@@ -407,15 +407,10 @@ export function Dashboard(props: {
     ...carouselPool.filter((circle) => circle.ritualType.trim().toLowerCase() === featuredSlug),
   ];
   if (diverseCircles.length === 0 && featuredCircle) diverseCircles.push(featuredCircle);
-  const alreadyProposed = [
-    ...likedSlugs,
-    featuredCircle?.ritualType ?? "",
-    ...diverseCircles.map((circle) => circle.ritualType),
-  ];
   const newInterests = discoverNewInterests({
     hobbies: hobyCatalog,
     circles: catalog ?? [],
-    selectedSlugs: alreadyProposed,
+    selectedSlugs: likedSlugs,
     city: me?.city ?? null,
     dayKey,
     limit: 2,

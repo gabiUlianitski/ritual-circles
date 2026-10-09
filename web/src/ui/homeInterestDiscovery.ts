@@ -133,10 +133,7 @@ export function discoverNewInterests(input: {
     })
     .filter((match): match is NewInterestMatch & { interestScore: number; locationScore: number; hasCircle: boolean } => match != null);
 
-  const withCircles = scored.filter((match) => match.hasCircle);
-  const source = withCircles.length > 0 ? withCircles : scored;
-  const interestMatches = source.filter((match) => match.interestScore > 0);
-  const pool = interestMatches.length > 0 ? interestMatches : source;
+  const pool = scored.filter((match) => match.hasCircle && match.interestScore > 0);
   return pool
     .sort(
       (a, b) =>
