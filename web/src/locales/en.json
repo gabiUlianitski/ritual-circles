@@ -235,8 +235,9 @@
   "homeNewInterests": {
     "title": "Discover New Interests",
     "match": "{{score}}% Match",
-    "relatedReason": "A natural next step from your interest in {{hobby}}.",
-    "opportunityReason": "Popular locally with real opportunities to try it.",
+    "relatedReason": "You like {{hobby}}, so {{name}} may interest you too. It is a similar kind of experience.",
+    "nearbyReason": "Hi, maybe you will try something new that is near you.",
+    "newReason": "Hi, maybe you will try something new.",
     "activeNearby_one": "1 active circle nearby",
     "activeNearby_other": "{{count}} active circles nearby",
     "activeAvailable_one": "1 active circle available",

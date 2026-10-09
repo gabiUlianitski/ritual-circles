@@ -255,8 +255,9 @@
   "homeNewInterests": {
     "title": "גילוי תחומי עניין חדשים",
     "match": "{{score}}% התאמה",
-    "relatedReason": "המשך טבעי לעניין שלך ב{{hobby}}.",
-    "opportunityReason": "פופולרי באזור עם הזדמנויות אמיתיות להתנסות.",
+    "relatedReason": "אתם אוהבים {{hobby}}, אז גם {{name}} יכול להתאים לכם. זו חוויה מאותו הסוג.",
+    "nearbyReason": "היי, אולי תנסו משהו חדש שנמצא קרוב אליכם.",
+    "newReason": "היי, אולי תנסו משהו חדש.",
     "activeNearby_one": "מעגל פעיל אחד בקרבת מקום",
     "activeNearby_two": "2 מעגלים פעילים בקרבת מקום",
     "activeNearby_other": "{{count}} מעגלים פעילים בקרבת מקום",

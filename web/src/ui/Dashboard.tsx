@@ -11,7 +11,7 @@ import { circleDisplayTitle } from "./circleDisplay";
 import { formatCircleLocationChip } from "./circleDetailsFormat";
 import { hobbiesFromMe } from "./circleJoinHobby";
 import { buildHomeFeed } from "./homeSections";
-import { CommunityPulse, HobbyVisual } from "./HomeVisuals";
+import { HobbyVisual } from "./HomeVisuals";
 import { formatSessionEventParts, formatUpcomingDateTime, getUpcomingSessions, sessionTitle, upcomingBadge } from "./homeDashboardUtils";
 import { todayKey } from "./homeDiscovery";
 import { discoverNewInterests, type NewInterestMatch } from "./homeInterestDiscovery";
@@ -192,7 +192,6 @@ function RecommendStrip(props: {
 
 function NewInterestDiscovery(props: {
   matches: NewInterestMatch[];
-  nearby: boolean;
   onExplore: (slug: string) => void;
 }) {
   const { t } = useTranslation();
@@ -220,21 +219,34 @@ function NewInterestDiscovery(props: {
               </span>
             </span>
             <span className="home-new-interest-reason">
-              {match.relatedHobby
-                ? t("homeNewInterests.relatedReason", { hobby: match.relatedHobby })
-                : t("homeNewInterests.opportunityReason")}
+              {match.reason === "interest" && match.relatedHobby
+                ? t("homeNewInterests.relatedReason", {
+                    hobby: match.relatedHobby,
+                    name: match.hobby.displayName,
+                  })
+                : t(match.nearby ? "homeNewInterests.nearbyReason" : "homeNewInterests.newReason")}
             </span>
-            <span className="home-new-interest-description">{match.hobby.discoveryDescription}</span>
-            <span className="home-new-interest-opportunities">
-              <span>
-                {props.nearby
-                  ? t("homeNewInterests.activeNearby", { count: match.activeCircles })
-                  : t("homeNewInterests.activeAvailable", { count: match.activeCircles })}
+            {match.hobby.discoveryDescription?.trim() || match.hobby.shortDescription?.trim() ? (
+              <span className="home-new-interest-description">
+                {match.hobby.discoveryDescription?.trim() || match.hobby.shortDescription}
               </span>
-              <span>
-                {t("homeNewInterests.upcomingActivities", { count: match.upcomingActivities })}
+            ) : null}
+            {match.activeCircles > 0 || match.upcomingActivities > 0 ? (
+              <span className="home-new-interest-opportunities">
+                {match.activeCircles > 0 ? (
+                  <span>
+                    {match.nearby
+                      ? t("homeNewInterests.activeNearby", { count: match.activeCircles })
+                      : t("homeNewInterests.activeAvailable", { count: match.activeCircles })}
+                  </span>
+                ) : null}
+                {match.upcomingActivities > 0 ? (
+                  <span>
+                    {t("homeNewInterests.upcomingActivities", { count: match.upcomingActivities })}
+                  </span>
+                ) : null}
               </span>
-            </span>
+            ) : null}
             <span className="home-new-interest-cta">
               {t("homeNewInterests.explore", { hobby: match.hobby.displayName })}
             </span>
@@ -395,10 +407,15 @@ export function Dashboard(props: {
     ...carouselPool.filter((circle) => circle.ritualType.trim().toLowerCase() === featuredSlug),
   ];
   if (diverseCircles.length === 0 && featuredCircle) diverseCircles.push(featuredCircle);
+  const alreadyProposed = [
+    ...likedSlugs,
+    featuredCircle?.ritualType ?? "",
+    ...diverseCircles.map((circle) => circle.ritualType),
+  ];
   const newInterests = discoverNewInterests({
     hobbies: hobyCatalog,
     circles: catalog ?? [],
-    selectedSlugs: likedSlugs,
+    selectedSlugs: alreadyProposed,
     city: me?.city ?? null,
     dayKey,
     limit: 2,
@@ -447,11 +464,8 @@ export function Dashboard(props: {
 
       <NewInterestDiscovery
         matches={newInterests}
-        nearby={Boolean(me?.city?.trim())}
         onExplore={props.onBrowseHobby ?? openHobby}
       />
-
-      <CommunityPulse stats={stats} groupsForming={feed.groupsForming} />
     </div>
   );
 }

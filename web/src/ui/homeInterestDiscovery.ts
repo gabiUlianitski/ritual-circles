@@ -8,6 +8,31 @@ export type NewInterestMatch = {
   activeCircles: number;
   upcomingActivities: number;
   relatedHobby: string | null;
+  nearby: boolean;
+  /** Interest affinity, or a nearby suggestion when nothing shares an interest. */
+  reason: "interest" | "nearby";
+};
+
+/** Adjacent hobbies. Coffee can lead to wine; tennis can lead to padel. */
+const NEIGHBORS: Record<string, string[]> = {
+  coffee: ["wine", "tea", "beer", "cooking"],
+  wine: ["coffee", "beer", "cooking"],
+  tea: ["coffee"],
+  beer: ["wine", "coffee"],
+  cooking: ["coffee", "wine", "baking"],
+  baking: ["cooking"],
+  tennis: ["padel", "pickleball", "squash", "badminton"],
+  padel: ["tennis", "pickleball", "squash"],
+  pickleball: ["padel", "tennis"],
+  squash: ["tennis", "padel"],
+  badminton: ["tennis"],
+  cycling: ["bicycle", "walking", "running", "hiking"],
+  bicycle: ["cycling", "walking", "running", "hiking"],
+  running: ["walking", "cycling", "hiking", "fitness"],
+  walking: ["hiking", "cycling", "running"],
+  hiking: ["walking", "cycling"],
+  baseball: ["softball", "cricket"],
+  photography: ["walking", "hiking", "travel"],
 };
 
 function key(value: string | null | undefined): string {
@@ -26,6 +51,14 @@ function dailyTieBreak(slug: string, dayKey: string): number {
   return hash;
 }
 
+function relatedTo(slug: string, selected: Hoby[]): Hoby | null {
+  const neighbors = new Set(NEIGHBORS[slug] ?? []);
+  for (const [known, adjacent] of Object.entries(NEIGHBORS)) {
+    if (adjacent.includes(slug)) neighbors.add(known);
+  }
+  return selected.find((hobby) => neighbors.has(key(hobby.slug))) ?? null;
+}
+
 /**
  * Hobby-level discovery using only real catalogue and circle data.
  * Existing user interests are excluded, and every result has a local/available opportunity.
@@ -40,20 +73,12 @@ export function discoverNewInterests(input: {
 }): NewInterestMatch[] {
   const selected = new Set(input.selectedSlugs.map(key).filter(Boolean));
   const selectedHobbies = input.hobbies.filter((hobby) => selected.has(key(hobby.slug)));
-  const selectedCategories = new Set(
-    selectedHobbies.map((hobby) => key(hobby.interestCategory)).filter(Boolean),
-  );
   const now = Date.now();
-  const useNearby = Boolean(input.city?.trim());
+  const mine = input.circles.filter((circle) => circle.isYours);
 
-  return input.hobbies
-    .filter(
-      (hobby) =>
-        !hobby.archived &&
-        !selected.has(key(hobby.slug)) &&
-        Boolean(hobby.discoveryDescription?.trim()),
-    )
-    .map((hobby): NewInterestMatch | null => {
+  const scored = input.hobbies
+    .filter((hobby) => !hobby.archived && !selected.has(key(hobby.slug)))
+    .map((hobby): (NewInterestMatch & { interestScore: number; locationScore: number }) | null => {
       const slug = key(hobby.slug);
       const available = input.circles.filter(
         (circle) =>
@@ -61,9 +86,12 @@ export function discoverNewInterests(input: {
           key(circle.ritualType) === slug &&
           isCircleJoinable(circle.memberCount, circle.maxSize),
       );
-      const opportunities = useNearby
-        ? available.filter((circle) => circleNearUser(circle, input.city))
-        : available;
+      const nearby = available.filter(
+        (circle) =>
+          circleNearUser(circle, input.city) ||
+          mine.some((own) => circleNearUser(circle, own.cityName || own.city)),
+      );
+      const opportunities = nearby.length > 0 ? nearby : available;
       const active = opportunities.filter(
         (circle) =>
           circle.memberCount > 0 ||
@@ -72,35 +100,48 @@ export function discoverNewInterests(input: {
           isFuture(circle.nextSessionAt, now),
       );
       const upcoming = opportunities.filter((circle) => isFuture(circle.nextSessionAt, now));
-      if (active.length === 0 && upcoming.length === 0) return null;
-
       const category = key(hobby.interestCategory);
-      const related = category
+      const neighbor = relatedTo(slug, selectedHobbies);
+      const sameCategory = category
         ? selectedHobbies.find((item) => key(item.interestCategory) === category) ?? null
         : null;
+      const related = neighbor ?? sameCategory;
+      const interestScore = neighbor ? 40 : sameCategory ? 25 : 0;
       const memberMomentum = active.reduce((total, circle) => total + circle.memberCount, 0);
+      const locationScore = nearby.length > 0 ? 20 : 0;
       const score = Math.min(
         97,
-        45 +
-          (selectedCategories.has(category) ? 25 : 0) +
-          Math.min(12, active.length * 4) +
-          Math.min(10, upcoming.length * 5) +
-          Math.min(5, memberMomentum) +
-          (useNearby ? 5 : 0),
+        (interestScore > 0 ? 50 : 35) +
+          interestScore +
+          locationScore +
+          Math.min(8, active.length * 2) +
+          Math.min(5, memberMomentum),
       );
 
       return {
         hobby,
-        score,
-        activeCircles: active.length,
+        score: interestScore > 0 ? score : Math.min(55, 35 + locationScore),
+        activeCircles: Math.max(active.length, opportunities.length),
         upcomingActivities: upcoming.length,
         relatedHobby: related?.displayName ?? null,
+        nearby: nearby.length > 0,
+        reason: interestScore > 0 ? "interest" : "nearby",
+        interestScore,
+        locationScore,
+        hasCircle: available.length > 0,
       };
     })
-    .filter((match): match is NewInterestMatch => match != null)
+    .filter((match): match is NewInterestMatch & { interestScore: number; locationScore: number; hasCircle: boolean } => match != null);
+
+  const withCircles = scored.filter((match) => match.hasCircle);
+  const source = withCircles.length > 0 ? withCircles : scored;
+  const interestMatches = source.filter((match) => match.interestScore > 0);
+  const pool = interestMatches.length > 0 ? interestMatches : source;
+  return pool
     .sort(
       (a, b) =>
-        b.score - a.score ||
+        b.interestScore - a.interestScore ||
+        b.locationScore - a.locationScore ||
         b.upcomingActivities - a.upcomingActivities ||
         b.activeCircles - a.activeCircles ||
         dailyTieBreak(a.hobby.slug, input.dayKey) - dailyTieBreak(b.hobby.slug, input.dayKey),
