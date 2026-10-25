@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { HomeCalendarSession } from "../api/types";
+import type { HomeActivityItem } from "../api/types";
 import { dateLocale, weekdayLabelsByGetDay } from "../dateLocale";
-import { isSessionPending, sessionTitle } from "./homeDashboardUtils";
+import { needsReconfirmation } from "./homeActivities";
 
 function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -21,7 +21,7 @@ function ymdKey(d: Date): string {
 }
 
 export function HomeCalendar(props: {
-  sessions: HomeCalendarSession[];
+  items: HomeActivityItem[];
   expanded: boolean;
   selectedDay: Date | null;
   onSelectDay: (day: Date) => void;
@@ -31,16 +31,16 @@ export function HomeCalendar(props: {
   const dowLabels = useMemo(() => weekdayLabelsByGetDay("narrow"), [i18n.language]);
 
   const sessionsByDay = useMemo(() => {
-    const map = new Map<string, HomeCalendarSession[]>();
-    for (const item of props.sessions) {
-      const d = new Date(item.session.dateTime);
+    const map = new Map<string, HomeActivityItem[]>();
+    for (const item of props.items) {
+      const d = new Date(item.startAt);
       const key = ymdKey(d);
       const list = map.get(key) ?? [];
       list.push(item);
       map.set(key, list);
     }
     return map;
-  }, [props.sessions]);
+  }, [props.items]);
 
   const year = viewMonth.getFullYear();
   const month = viewMonth.getMonth();
@@ -99,7 +99,7 @@ export function HomeCalendar(props: {
                 const key = ymdKey(date);
                 const daySessions = sessionsByDay.get(key) ?? [];
                 const hasSession = daySessions.length > 0;
-                const hasPending = daySessions.some(isSessionPending);
+                const hasPending = daySessions.some(needsReconfirmation);
                 const isToday = sameDay(date, today);
                 const isSelected = props.selectedDay != null && sameDay(date, props.selectedDay);
 
@@ -120,7 +120,7 @@ export function HomeCalendar(props: {
                     onClick={() => props.onSelectDay(date)}
                     aria-label={`${date.toLocaleDateString(dateLocale())}${
                       hasSession
-                        ? `, ${daySessions.map((s) => sessionTitle(s)).join(", ")}`
+                        ? `, ${daySessions.map((s) => s.title).join(", ")}`
                         : ""
                     }`}
                   >

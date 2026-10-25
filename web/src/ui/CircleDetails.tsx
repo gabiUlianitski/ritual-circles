@@ -9,11 +9,14 @@ import { markCircleLeftBySelf } from "../notificationInbox";
 import { FormError } from "./FormError";
 import { CircleDetailsSummary } from "./CircleDetailsSummary";
 import { CircleDetailsMembersSection } from "./CircleDetailsMembersSection";
-import { CircleDetailsNextActivity } from "./CircleDetailsNextActivity";
 import { CircleDetailsInformation } from "./CircleDetailsInformation";
 import { CircleDetailsConversationPreview } from "./CircleDetailsConversationPreview";
 import { CircleInviteModal } from "./CircleInviteModal";
 import { formatCircleLocationShort } from "./circleDetailsFormat";
+import { findHobyCatalogue } from "./memberHobbyLevel";
+import { CreateActivity } from "./CreateActivity";
+import { CircleActivities } from "./CircleActivities";
+import { ActivityDetails } from "./ActivityDetails";
 
 type DetailsTab = "details" | "scheduled";
 type DetailsTabInput = DetailsTab | "chat";
@@ -61,6 +64,10 @@ export function CircleDetails(props: {
   onBack: () => void;
   initialTab?: DetailsTabInput;
   initialDraft?: string;
+  /** Opens this Activity first; going back from it returns to the caller. */
+  initialActivityId?: string;
+  /** With initialActivityId: the one date of a recurring Activity to bring into view. */
+  initialOccurrenceId?: string | null;
   onLeftCircle?: () => void | Promise<void>;
 }) {
   const { t, i18n } = useTranslation();
@@ -79,6 +86,10 @@ export function CircleDetails(props: {
   const [messages, setMessages] = useState<CircleMessage[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(true);
   const [messagesFailed, setMessagesFailed] = useState(false);
+  const [plannedNotice, setPlannedNotice] = useState<null | "draft" | "published">(null);
+  const [planning, setPlanning] = useState(false);
+  const [activityId, setActivityId] = useState<string | null>(props.initialActivityId ?? null);
+  const [activityRefresh, setActivityRefresh] = useState(0);
   const optionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -87,7 +98,10 @@ export function CircleDetails(props: {
     setOptionsOpen(false);
     setInviteSheetOpen(false);
     setChatFocus(props.initialTab === "chat");
-  }, [props.circleId, props.initialTab]);
+    setPlanning(false);
+    setActivityId(props.initialActivityId ?? null);
+    setPlannedNotice(null);
+  }, [props.circleId, props.initialTab, props.initialActivityId]);
 
   useEffect(() => {
     if (!optionsOpen) return;
@@ -145,10 +159,9 @@ export function CircleDetails(props: {
 
   const circle = data?.circle ?? null;
   const isCreator = Boolean(data?.isCreator);
+  const canPlan = Boolean(circle);
   const creatorUserId = data?.creatorUserId ?? null;
   const activeTab: DetailsTab = isCreator ? tab : "details";
-  const nextSessionAt = data?.nextSessionRoster?.dateTime ?? null;
-
   function openChat() {
     setChatFocus(true);
   }
@@ -198,6 +211,48 @@ export function CircleDetails(props: {
     setOptionsOpen(false);
     setTab("scheduled");
     setScheduledEditTrigger((n) => n + 1);
+  }
+
+  if (activityId && circle) {
+    return (
+      <div className="card stack circle-details-page">
+        <ActivityDetails
+          activityId={activityId}
+          circle={circle}
+          hobby={findHobyCatalogue(hobies, circle.ritualType)}
+          myUserId={myUserId}
+          ownerId={creatorUserId}
+          focusOccurrenceId={activityId === props.initialActivityId ? props.initialOccurrenceId : null}
+          onBack={() => {
+            if (props.initialActivityId && activityId === props.initialActivityId) {
+              props.onBack();
+              return;
+            }
+            setActivityId(null);
+            setActivityRefresh((n) => n + 1);
+          }}
+          onChanged={() => setActivityRefresh((n) => n + 1)}
+        />
+      </div>
+    );
+  }
+
+  if (planning && circle) {
+    return (
+      <div className="card stack circle-details-page">
+        <CreateActivity
+          circleId={props.circleId}
+          circle={circle}
+          hobby={findHobyCatalogue(hobies, circle.ritualType)}
+          onBack={() => setPlanning(false)}
+          onPlanned={(result) => {
+            setPlanning(false);
+            setPlannedNotice(result);
+            setActivityRefresh((n) => n + 1);
+          }}
+        />
+      </div>
+    );
   }
 
   return (
@@ -281,7 +336,6 @@ export function CircleDetails(props: {
                     hobiesCatalog={hobies}
                     myUserId={myUserId}
                     creatorUserId={creatorUserId}
-                    maxSize={circle.maxSize}
                     selectedMemberId={selectedMemberId}
                     onSelectMember={setSelectedMemberId}
                   />
@@ -291,12 +345,9 @@ export function CircleDetails(props: {
                   embedded
                   aboutEmbedded
                   memberCount={members.length}
-                  maxSize={circle.maxSize}
-                  nextSessionAt={nextSessionAt}
                   members={members}
                   creatorUserId={creatorUserId}
                   onOpenMember={setSelectedMemberId}
-                  onViewMeeting={() => setChatFocus(false)}
                   onInvite={isCreator ? openInviteSheet : undefined}
                   onEditSchedule={() => {
                     setChatFocus(false);
@@ -320,8 +371,6 @@ export function CircleDetails(props: {
                   members={members}
                   myUserId={myUserId}
                   memberCount={members.length}
-                  maxSize={circle.maxSize}
-                  hasNextSession={Boolean(nextSessionAt)}
                 />
                 <div className="circle-details-primary-area">
                   <button type="button" className="circle-details-primary" onClick={isCreator ? modifyCircle : openChat}>
@@ -333,16 +382,20 @@ export function CircleDetails(props: {
                     </button>
                   ) : null}
                 </div>
+                {plannedNotice ? (
+                  <p className="activity-form-success" role="status">
+                    {plannedNotice === "draft" ? t("activityDetails.savedDraft") : t("activityForm.success")}
+                  </p>
+                ) : null}
 
                 <div className="circle-details-content-grid">
                   <main className="circle-details-main-column">
-                    <CircleDetailsNextActivity
-                      circle={circle}
-                      roster={data?.nextSessionRoster}
-                      myUserId={myUserId}
-                      isCreator={isCreator}
-                      onManage={modifyCircle}
-                      onRefresh={load}
+                    <CircleActivities
+                      circleId={props.circleId}
+                      canPlan={canPlan}
+                      refreshKey={activityRefresh}
+                      onPlan={() => setPlanning(true)}
+                      onOpen={setActivityId}
                     />
                     <CircleDetailsMembersSection
                       members={members}
@@ -350,7 +403,6 @@ export function CircleDetails(props: {
                       hobiesCatalog={hobies}
                       myUserId={myUserId}
                       creatorUserId={creatorUserId}
-                      maxSize={circle.maxSize}
                       selectedMemberId={selectedMemberId}
                       onSelectMember={setSelectedMemberId}
                       onInviteSeat={isCreator ? openInviteSheet : undefined}
@@ -405,8 +457,6 @@ export function CircleDetails(props: {
             isOpen={inviteSheetOpen}
             circle={circle}
             joined={members.length}
-            capacity={Math.max(members.length, circle.maxSize || 6)}
-            meetingAt={nextSessionAt}
             location={formatCircleLocationShort(circle, t)}
             canInviteMembers={isCreator}
             onClose={() => setInviteSheetOpen(false)}

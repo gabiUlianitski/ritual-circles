@@ -11,6 +11,8 @@ from fastapi import HTTPException
 
 from app.circle_identity import circle_identity
 from app.hoby_i18n import localized_display_name
+from app.schemas import CircleNextActivity
+from app.services.circle_next_activity import public_next_activities
 from app.services.circles_service import _complete_join_transaction, _optional_text
 
 
@@ -128,10 +130,10 @@ async def search_invitation_candidates(
                ) AS listed_hobby,
                EXISTS (
                  SELECT 1
-                 FROM attendance a
-                 JOIN sessions s ON s.id = a."sessionId"
-                 JOIN circles other ON other.id = s."circleId"
-                 WHERE a."userId" = u.id
+                 FROM circle_members m
+                 JOIN circles other ON other.id = m.circle_id
+                 WHERE m.user_id = u.id
+                   AND m.status = 'active'
                    AND other.id <> $1
                    AND lower(trim(other."ritualType")) = $3
                ) AS played_hobby,
@@ -148,21 +150,20 @@ async def search_invitation_candidates(
             )
             OR EXISTS (
               SELECT 1
-              FROM attendance a
-              JOIN sessions s ON s.id = a."sessionId"
-              JOIN circles other ON other.id = s."circleId"
-              WHERE a."userId" = u.id
+              FROM circle_members m
+              JOIN circles other ON other.id = m.circle_id
+              WHERE m.user_id = u.id
+                AND m.status = 'active'
                 AND other.id <> $1
                 AND lower(trim(other."ritualType")) = $3
             )
           )
           AND NOT EXISTS (
             SELECT 1
-            FROM attendance a
-            JOIN sessions s ON s.id = a."sessionId"
-            WHERE s."circleId" = $1
-              AND a."userId" = u.id
-              AND s."dateTime" >= NOW()
+            FROM circle_members m
+            WHERE m.circle_id = $1
+              AND m.user_id = u.id
+              AND m.status = 'active'
           )
           AND NOT EXISTS (
             SELECT 1
@@ -269,7 +270,7 @@ def invitee_listed_hobby(preferred: object, hobbies_json: object, ritual: str) -
     return False
 
 
-def _preview_payload(row: Any, lang: str) -> dict[str, object]:
+def _preview_payload(row: Any, lang: str, next_activity: CircleNextActivity | None) -> dict[str, object]:
     hoby_row = {"display_name": row.get("hoby_display_name_raw"), "i18n_json": row.get("hoby_i18n_json")}
     hoby_name = localized_display_name(hoby_row, lang) if row.get("hoby_display_name_raw") else None
     ritual = str(row.get("ritualType") or "")
@@ -293,7 +294,7 @@ def _preview_payload(row: Any, lang: str) -> dict[str, object]:
         "description": _optional_text(row.get("description")),
         "recurringTime": str(row.get("recurringTime") or ""),
         "isRecurring": bool(row.get("is_recurring", True)),
-        "nextSessionAt": row.get("next_session_at"),
+        "nextActivity": next_activity,
         "modality": str(row.get("modality") or "offline"),
         "city": city,
         "cityName": city_name,
@@ -326,20 +327,13 @@ SELECT i.id, i.circle_id, i.status, i.invitee_user_id,
        h.i18n_json AS hoby_i18n_json,
        COALESCE(
            (
-               SELECT COUNT(DISTINCT a."userId")::int
-               FROM sessions s
-               JOIN attendance a ON a."sessionId" = s.id
-               WHERE s."circleId" = c.id
-                 AND s."dateTime" >= NOW()
+               SELECT COUNT(*)::int
+               FROM circle_members m
+               WHERE m.circle_id = c.id
+                 AND m.status = 'active'
            ),
            0
-       ) AS member_count,
-       (
-           SELECT MIN(s4."dateTime")
-           FROM sessions s4
-           WHERE s4."circleId" = c.id
-             AND s4."dateTime" >= NOW()
-       ) AS next_session_at
+       ) AS member_count
 FROM circle_invitations i
 JOIN circles c ON c.id = i.circle_id
 JOIN users inviter ON inviter.id = i.inviter_user_id
@@ -359,7 +353,8 @@ async def get_invitation_preview(
     row = await conn.fetchrow(_PREVIEW_SELECT + " WHERE i.id = $1", invitation_id)
     if not row or row["invitee_user_id"] != user_id or row["status"] != "pending":
         raise HTTPException(status_code=404, detail="invitation not found")
-    return _preview_payload(row, lang)
+    next_activities = await public_next_activities(conn, [row["circle_id"]])
+    return _preview_payload(row, lang, next_activities.get(row["circle_id"]))
 
 
 async def list_my_invitations(conn: asyncpg.Connection, *, user_id: UUID) -> list[dict[str, object]]:
@@ -384,23 +379,11 @@ async def create_invitation(
         invitee = await conn.fetchrow("SELECT id FROM users WHERE id = $1", invitee_id)
         if not invitee:
             raise HTTPException(status_code=404, detail="person not found")
-        member_count = await conn.fetchval(
-            """
-            SELECT COUNT(DISTINCT a."userId")::int
-            FROM attendance a
-            JOIN sessions s ON s.id = a."sessionId"
-            WHERE s."circleId" = $1 AND s."dateTime" >= NOW()
-            """,
-            circle_id,
-        )
-        if int(member_count or 0) >= int(circle["maxSize"]):
-            raise HTTPException(status_code=409, detail="circle is full")
         already = await conn.fetchval(
             """
             SELECT EXISTS (
-              SELECT 1 FROM attendance a
-              JOIN sessions s ON s.id = a."sessionId"
-              WHERE s."circleId" = $1 AND a."userId" = $2 AND s."dateTime" >= NOW()
+              SELECT 1 FROM circle_members m
+              WHERE m.circle_id = $1 AND m.user_id = $2 AND m.status = 'active'
             )
             """,
             circle_id,
@@ -446,9 +429,8 @@ async def open_shared_circle_link(
     already_member = await conn.fetchval(
         """
         SELECT EXISTS (
-          SELECT 1 FROM attendance a
-          JOIN sessions s ON s.id = a."sessionId"
-          WHERE s."circleId" = $1 AND a."userId" = $2 AND s."dateTime" >= NOW()
+          SELECT 1 FROM circle_members m
+          WHERE m.circle_id = $1 AND m.user_id = $2 AND m.status = 'active'
         )
         """,
         circle_id,
@@ -467,18 +449,6 @@ async def open_shared_circle_link(
     )
     if pending:
         return {"circleId": str(circle_id), "invitationId": str(pending["id"]), "alreadyMember": False}
-
-    member_count = await conn.fetchval(
-        """
-        SELECT COUNT(DISTINCT a."userId")::int
-        FROM attendance a
-        JOIN sessions s ON s.id = a."sessionId"
-        WHERE s."circleId" = $1 AND s."dateTime" >= NOW()
-        """,
-        circle_id,
-    )
-    if int(member_count or 0) >= int(circle["maxSize"]):
-        raise HTTPException(status_code=409, detail="circle is full")
 
     invitation_id = uuid4()
     try:

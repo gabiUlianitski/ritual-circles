@@ -26,7 +26,6 @@ class InvitationPreviewTests(unittest.TestCase):
                 "description": "Sunday games",
                 "recurringTime": "Sun 10:00",
                 "is_recurring": True,
-                "next_session_at": None,
                 "modality": "offline",
                 "city": "Tel Aviv",
                 "city_name": "Tel Aviv",
@@ -38,7 +37,10 @@ class InvitationPreviewTests(unittest.TestCase):
                 "inviteCode": "SECRET",
             },
             "en",
+            None,
         )
+        self.assertIsNone(payload["nextActivity"])
+        self.assertNotIn("nextSessionAt", payload)
         self.assertEqual(payload["title"], "Weekly Baseball Meetup")
         self.assertEqual(payload["hobyDisplayName"], "Baseball")
         self.assertEqual(payload["matchedHobbyName"], "Baseball")

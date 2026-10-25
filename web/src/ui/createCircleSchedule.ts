@@ -31,12 +31,6 @@ export function recurringFromDateAndHour(dateIso: string, hour: string): string 
   return `${day} ${hourToHm(hour)}`;
 }
 
-export function buildFirstSessionIso(dateIso: string, hour: string): string {
-  const [y, m, day] = dateIso.split("-").map(Number);
-  const h = Math.min(23, Math.max(0, parseInt(hour, 10) || 0));
-  return new Date(y, m - 1, day, h, 0, 0, 0).toISOString();
-}
-
 export function formatMeetDateLong(iso: string): string {
   const [y, m, day] = iso.split("-").map(Number);
   if (!y || !m || !day) return iso;

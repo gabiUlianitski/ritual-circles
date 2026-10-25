@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import secrets
-from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 import asyncpg
@@ -18,11 +17,10 @@ from app.schemas import (
 )
 from app.circle_identity import circle_identity
 from app.hoby_i18n import localized_display_name
-from app.services.session_replenish import ensure_future_sessions_for_circle, ensure_future_sessions_for_user
+from app.services.circle_members import activate_member, is_active_member, leave_member
+from app.services.circle_next_activity import public_next_activities
 from app.user_hobbies import user_can_join_circle
 from app.services.users_service import ensure_user_hobby
-from app.services.time_utils import next_occurrence_utc, next_session_datetime_after
-
 
 def _ritual_level_for_db(value: str | int | None) -> str | None:
     """PostgreSQL ritual_level is TEXT; clients may send numeric level keys (1, 2, …)."""
@@ -213,39 +211,10 @@ async def _complete_join_transaction(
     conn: asyncpg.Connection, *, user_id: UUID, circle: asyncpg.Record
 ) -> None:
     circle_id: UUID = circle["id"]
-    await ensure_future_sessions_for_circle(conn, circle_id=circle_id)
-
-    already_member = await conn.fetchval(
-        """
-        SELECT EXISTS (
-          SELECT 1
-          FROM attendance a
-          JOIN sessions s ON s.id = a."sessionId"
-          WHERE s."circleId" = $1
-            AND a."userId" = $2
-            AND s."dateTime" >= NOW()
-        )
-        """,
-        circle_id,
-        user_id,
-    )
+    already_member = await is_active_member(conn, user_id=user_id, circle_id=circle_id)
     if already_member:
+        await activate_member(conn, user_id=user_id, circle_id=circle_id)
         return
-
-    member_count_row = await conn.fetchrow(
-        """
-        SELECT COUNT(DISTINCT a."userId") AS ct
-        FROM attendance a
-        JOIN sessions s ON s.id = a."sessionId"
-        WHERE s."circleId" = $1
-          AND s."dateTime" >= NOW()
-        """,
-        circle_id,
-    )
-    member_count = int(member_count_row["ct"] or 0)
-    max_size = int(circle["maxSize"])
-    if member_count >= max_size:
-        raise HTTPException(status_code=409, detail="circle is full")
 
     user_row = await conn.fetchrow(
         """
@@ -268,39 +237,12 @@ async def _complete_join_transaction(
             subtype=circle.get("ritual_subtype"),
         )
 
-    future_sessions = await conn.fetch(
-        """
-        SELECT id
-        FROM sessions
-        WHERE "circleId" = $1
-          AND "dateTime" >= NOW()
-        ORDER BY "dateTime" ASC
-        """,
-        circle_id,
-    )
-    if not future_sessions:
-        raise HTTPException(status_code=409, detail="circle has no upcoming sessions")
-
-    for srow in future_sessions:
-        await conn.execute(
-            """
-            INSERT INTO attendance ("userId", "sessionId", status)
-            VALUES ($1, $2, 'not_attending')
-            ON CONFLICT ("userId", "sessionId") DO NOTHING
-            """,
-            user_id,
-            srow["id"],
-        )
+    await activate_member(conn, user_id=user_id, circle_id=circle_id)
 
 
 async def _join_circle_response(conn: asyncpg.Connection, circle: asyncpg.Record, lang: str = "en") -> JoinCircleResponse:
     hoby_name, hoby_icon = await hoby_meta_for_ritual_type(conn, circle["ritualType"], lang)
     return JoinCircleResponse(circle=_circle_response_from_row(circle, hoby_name=hoby_name, hoby_icon=hoby_icon))
-
-
-def initial_creator_attendance_status(session_index: int) -> str:
-    """The meeting the creator just scheduled is a yes. Later weeks stay unset."""
-    return "attending" if session_index == 0 else "not_attending"
 
 
 async def create_circle(
@@ -385,45 +327,7 @@ async def create_circle(
                 ) from e
             raise
 
-        if payload.firstSessionAt is not None:
-            first_dt = payload.firstSessionAt
-            if first_dt.tzinfo is None:
-                first_dt = first_dt.replace(tzinfo=timezone.utc)
-            else:
-                first_dt = first_dt.astimezone(timezone.utc)
-        else:
-            first_dt = next_occurrence_utc(payload.recurringTime)
-        session_ids: list[UUID] = []
-        dt = first_dt
-        loc_offline = line if payload.modality == "offline" else None
-        session_count = 6 if payload.isRecurring else 1
-        for _ in range(session_count):
-            session_id = uuid4()
-            session_ids.append(session_id)
-            location_or_link = "https://example.com/meeting" if payload.modality == "online" else (loc_offline or "TBD")
-            await conn.execute(
-                """
-                INSERT INTO sessions (id, "circleId", "dateTime", "locationOrLink")
-                VALUES ($1, $2, $3, $4)
-                """,
-                session_id,
-                circle_id,
-                dt.astimezone(timezone.utc),
-                location_or_link,
-            )
-            if payload.isRecurring:
-                dt = next_session_datetime_after(dt, payload.recurringTime)
-
-        for index, session_id in enumerate(session_ids):
-            await conn.execute(
-                """
-                INSERT INTO attendance ("userId", "sessionId", status)
-                VALUES ($1, $2, $3)
-                """,
-                user_id,
-                session_id,
-                initial_creator_attendance_status(index),
-            )
+        await activate_member(conn, user_id=user_id, circle_id=circle_id)
 
     hoby_name, hoby_icon = await hoby_meta_for_ritual_type(conn, payload.ritualType, lang)
     return CircleResponse(
@@ -494,14 +398,12 @@ async def join_circle_open(conn: asyncpg.Connection, *, user_id: UUID, circle_id
 
 
 async def _delete_circle_if_no_future_members(conn: asyncpg.Connection, *, circle_id: UUID) -> None:
-    """Remove circle (and cascaded sessions/messages) when nobody is on future sessions."""
+    """Remove the circle when nobody belongs to it anymore."""
     remaining = await conn.fetchval(
         """
-        SELECT COUNT(DISTINCT a."userId")::int
-        FROM sessions s
-        JOIN attendance a ON a."sessionId" = s.id
-        WHERE s."circleId" = $1
-          AND s."dateTime" >= NOW()
+        SELECT COUNT(*)::int
+        FROM circle_members
+        WHERE circle_id = $1 AND status = 'active'
         """,
         circle_id,
     )
@@ -517,9 +419,6 @@ async def patch_circle(
     invite_only: bool | None = None,
     group_size: GroupSizeSpec | None = None,
     cost_payment: CirclePaymentSpec | None = None,
-    first_session_at: datetime | None = None,
-    recurring_time: str | None = None,
-    is_recurring: bool | None = None,
     meeting_place_update: MeetingPlacePatch | None = None,
     description: str | None = None,
     update_description: bool = False,
@@ -541,26 +440,7 @@ async def patch_circle(
         )
 
     if group_size is not None:
-        member_count_row = await conn.fetchrow(
-            """
-            SELECT COUNT(DISTINCT a."userId") AS ct
-            FROM attendance a
-            JOIN sessions s ON s.id = a."sessionId"
-            WHERE s."circleId" = $1
-              AND s."dateTime" >= NOW()
-            """,
-            circle_id,
-        )
-        member_count = int(member_count_row["ct"] or 0)
         max_size = _max_size_from_group_size(group_size)
-        if member_count > max_size:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Group size allows at most {max_size} people, "
-                    f"but {member_count} have already joined"
-                ),
-            )
         group_size_json = _group_size_to_json(group_size)
         await conn.execute(
             'UPDATE circles SET group_size_json = $1::jsonb, "maxSize" = $2 WHERE id = $3',
@@ -576,20 +456,6 @@ async def patch_circle(
             json.dumps(cost_payment_json) if cost_payment_json is not None else None,
             circle_id,
         )
-
-    schedule_updated = False
-    if first_session_at is not None and recurring_time is not None and is_recurring is not None:
-        from app.services.circle_suggestions import apply_circle_time_schedule
-
-        async with conn.transaction():
-            await apply_circle_time_schedule(
-                conn,
-                circle_id=circle_id,
-                anchor=first_session_at,
-                recurring_time=recurring_time,
-                is_recurring=is_recurring,
-            )
-        schedule_updated = True
 
     if update_description:
         await conn.execute(
@@ -617,9 +483,6 @@ async def patch_circle(
                 address=meeting_place_update.address,
             )
 
-    if schedule_updated and is_recurring:
-        await ensure_future_sessions_for_circle(conn, circle_id=circle_id)
-
     updated = await conn.fetchrow("SELECT * FROM circles WHERE id = $1", circle_id)
     hoby_name, hoby_icon = await hoby_meta_for_ritual_type(conn, updated["ritualType"], lang)
     return _circle_response_from_row(updated, hoby_name=hoby_name, hoby_icon=hoby_icon)
@@ -636,20 +499,7 @@ async def drop_circle(conn: asyncpg.Connection, *, user_id: UUID, circle_id: UUI
     if circle["created_by"] != user_id:
         raise HTTPException(status_code=403, detail="Only the circle creator can delete this circle")
 
-    member = await conn.fetchval(
-        """
-        SELECT EXISTS (
-          SELECT 1
-          FROM attendance a
-          JOIN sessions s ON s.id = a."sessionId"
-          WHERE s."circleId" = $1
-            AND a."userId" = $2
-            AND s."dateTime" >= NOW()
-        )
-        """,
-        circle_id,
-        user_id,
-    )
+    member = await is_active_member(conn, user_id=user_id, circle_id=circle_id)
     if not member:
         raise HTTPException(status_code=404, detail="not a member of this circle")
 
@@ -666,31 +516,14 @@ async def leave_circle(conn: asyncpg.Connection, *, user_id: UUID, circle_id: UU
             detail="Circle creators must delete the circle instead of leaving",
         )
 
-    deleted = await conn.fetchval(
-        """
-        WITH del AS (
-          DELETE FROM attendance a
-          USING sessions s
-          WHERE a."sessionId" = s.id
-            AND a."userId" = $1
-            AND s."circleId" = $2
-            AND s."dateTime" >= NOW()
-          RETURNING 1
-        )
-        SELECT COUNT(*)::int FROM del
-        """,
-        user_id,
-        circle_id,
-    )
-    if not deleted:
+    left = await leave_member(conn, user_id=user_id, circle_id=circle_id)
+    if not left:
         raise HTTPException(status_code=404, detail="not a member of this circle")
 
     await _delete_circle_if_no_future_members(conn, circle_id=circle_id)
 
 
 async def get_circle_me(conn: asyncpg.Connection, *, user_id: UUID, circle_id: UUID | None = None):
-    await ensure_future_sessions_for_user(conn, user_id=user_id)
-
     if circle_id is not None:
         circle_row = await conn.fetchrow(
             """
@@ -699,11 +532,10 @@ async def get_circle_me(conn: asyncpg.Connection, *, user_id: UUID, circle_id: U
             WHERE c.id = $1
               AND EXISTS (
                 SELECT 1
-                FROM attendance a
-                JOIN sessions s ON s.id = a."sessionId"
-                WHERE a."userId" = $2
-                  AND s."circleId" = c.id
-                  AND s."dateTime" >= NOW()
+                FROM circle_members m
+                WHERE m.user_id = $2
+                  AND m.circle_id = c.id
+                  AND m.status = 'active'
               )
             """,
             circle_id,
@@ -713,12 +545,11 @@ async def get_circle_me(conn: asyncpg.Connection, *, user_id: UUID, circle_id: U
         circle_row = await conn.fetchrow(
             """
             WITH my_circle AS (
-              SELECT s."circleId" AS circle_id
-              FROM attendance a
-              JOIN sessions s ON s.id = a."sessionId"
-              WHERE a."userId" = $1
-                AND s."dateTime" >= NOW()
-              ORDER BY s."dateTime" ASC
+              SELECT m.circle_id
+              FROM circle_members m
+              WHERE m.user_id = $1
+                AND m.status = 'active'
+              ORDER BY m.joined_at ASC
               LIMIT 1
             )
             SELECT c.*
@@ -749,11 +580,10 @@ async def get_circle_me(conn: asyncpg.Connection, *, user_id: UUID, circle_id: U
                u.avatar_url
         FROM users u
         WHERE u.id IN (
-            SELECT DISTINCT a."userId"
-            FROM attendance a
-            JOIN sessions s ON s.id = a."sessionId"
-            WHERE s."circleId" = $1
-              AND s."dateTime" >= NOW()
+            SELECT m.user_id
+            FROM circle_members m
+            WHERE m.circle_id = $1
+              AND m.status = 'active'
         )
         ORDER BY u.first_name ASC, u.last_name ASC, u.user_name ASC
         """,
@@ -771,58 +601,11 @@ async def get_circle_me(conn: asyncpg.Connection, *, user_id: UUID, circle_id: U
     return circle_row, members
 
 
-async def get_next_session_attendance_roster(
-    conn: asyncpg.Connection,
-    *,
-    circle_id: UUID,
-) -> dict[str, object] | None:
-    rows = await conn.fetch(
-        """
-        WITH next_s AS (
-            SELECT s.id, s."dateTime", s."locationOrLink"
-            FROM sessions s
-            WHERE s."circleId" = $1
-              AND s."dateTime" >= NOW()
-            ORDER BY s."dateTime" ASC
-            LIMIT 1
-        )
-        SELECT
-            ns.id AS session_id,
-            ns."dateTime" AS session_datetime,
-            ns."locationOrLink" AS session_location,
-            u.id AS user_id,
-            u.user_name,
-            u.first_name,
-            u.last_name,
-            a.status
-        FROM next_s ns
-        JOIN attendance a ON a."sessionId" = ns.id
-        JOIN users u ON u.id = a."userId"
-        ORDER BY u.first_name ASC, u.last_name ASC, u.user_name ASC
-        """,
-        circle_id,
-    )
-    if not rows:
-        return None
-    return {
-        "sessionId": str(rows[0]["session_id"]),
-        "dateTime": rows[0]["session_datetime"],
-        "locationOrLink": rows[0]["session_location"],
-        "members": [
-            {
-                "userId": str(r["user_id"]),
-                "user_name": r["user_name"],
-                "first_name": r["first_name"],
-                "last_name": r["last_name"],
-                "status": r["status"],
-            }
-            for r in rows
-        ],
-    }
-
-
 async def list_circles_catalog(conn: asyncpg.Connection, *, user_id: UUID, lang: str = "en") -> list[dict[str, object]]:
-    """Circles that still have future sessions, with member counts. Invite codes omitted."""
+    """Every circle, with member counts and its next Activity. Invite codes omitted.
+
+    A circle is listed whether or not it has Sessions or Activities.
+    """
     rows = await conn.fetch(
         """
         SELECT c.id,
@@ -846,29 +629,21 @@ async def list_circles_catalog(conn: asyncpg.Connection, *, user_id: UUID, lang:
                h.i18n_json AS hoby_i18n_json,
                COALESCE(
                    (
-                       SELECT COUNT(DISTINCT a."userId")::int
-                       FROM sessions s
-                       JOIN attendance a ON a."sessionId" = s.id
-                       WHERE s."circleId" = c.id
-                         AND s."dateTime" >= NOW()
+                       SELECT COUNT(*)::int
+                       FROM circle_members m
+                       WHERE m.circle_id = c.id
+                         AND m.status = 'active'
                    ),
                    0
                ) AS "memberCount",
                EXISTS (
                    SELECT 1
-                   FROM sessions s2
-                   JOIN attendance a2 ON a2."sessionId" = s2.id
-                   WHERE s2."circleId" = c.id
-                     AND s2."dateTime" >= NOW()
-                     AND a2."userId" = $1
+                   FROM circle_members m2
+                   WHERE m2.circle_id = c.id
+                     AND m2.user_id = $1
+                     AND m2.status = 'active'
                ) AS "isYours",
                (c.created_by = $1) AS "isCreator",
-               (
-                   SELECT MIN(s4."dateTime")
-                   FROM sessions s4
-                   WHERE s4."circleId" = c.id
-                     AND s4."dateTime" >= NOW()
-               ) AS "nextSessionAt",
                COALESCE(
                    (
                        SELECT COUNT(*)::int
@@ -889,17 +664,11 @@ async def list_circles_catalog(conn: asyncpg.Connection, *, user_id: UUID, lang:
                ) AS "messagesToday"
         FROM circles c
         LEFT JOIN hobies h ON lower(trim(h.slug)) = lower(trim(c."ritualType"))
-        WHERE EXISTS (
-            SELECT 1
-            FROM sessions s3
-            JOIN attendance a3 ON a3."sessionId" = s3.id
-            WHERE s3."circleId" = c.id
-              AND s3."dateTime" >= NOW()
-        )
         ORDER BY c."ritualType" ASC, c.id ASC
         """,
         user_id,
     )
+    next_activities = await public_next_activities(conn, [r["id"] for r in rows])
     out: list[dict[str, object]] = []
     for r in rows:
         hoby_row = {"display_name": r.get("hoby_display_name_raw"), "i18n_json": r.get("hoby_i18n_json")}
@@ -927,7 +696,7 @@ async def list_circles_catalog(conn: asyncpg.Connection, *, user_id: UUID, lang:
                 "groupSize": _group_size_from_json(r.get("group_size_json")),
                 "costPayment": _cost_payment_from_json(r.get("cost_payment_json")),
                 "inviteOnly": bool(r["inviteOnly"]),
-                "nextSessionAt": r.get("nextSessionAt"),
+                "nextActivity": next_activities.get(r["id"]),
                 "messagesLastWeek": int(r.get("messagesLastWeek") or 0),
                 "messagesToday": int(r.get("messagesToday") or 0),
             }

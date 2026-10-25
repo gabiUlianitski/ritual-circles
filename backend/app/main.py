@@ -12,8 +12,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
 
 from app.db import close_pool, create_pool
+from app.security_config import SecurityConfigurationError, validate_security_config
 
-from app.routers.attendance import router as attendance_router
+from app.routers.activities import router as activities_router
 from app.routers.auth import router as auth_router
 from app.routers.circle_chat import router as circle_chat_router
 from app.routers.community import router as community_router
@@ -22,9 +23,9 @@ from app.routers.discovery import router as discovery_router
 from app.routers.hobies import router as hobies_router
 from app.routers.hobby_insights import router as hobby_insights_router
 from app.routers.geo import router as geo_router
+from app.routers.health import router as health_router
 from app.routers.home import router as home_router
 from app.routers.me import router as me_router
-from app.routers.sessions import router as sessions_router
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +121,11 @@ def create_app() -> FastAPI:
     async def _startup() -> None:
         # Load backend/.env before DB pool + JWT usage (JWT_SECRET, DATABASE_URL).
         load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+        try:
+            validate_security_config()
+        except SecurityConfigurationError:
+            logger.error("Refusing startup due to unsafe authentication configuration")
+            raise
         logger.info("Ritual Circles API starting…")
         app.state.db_pool = await create_pool()
         logger.info("Ritual Circles API ready")
@@ -130,6 +136,7 @@ def create_app() -> FastAPI:
         if pool is not None:
             await close_pool(pool)
 
+    app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(geo_router)
     app.include_router(home_router)
@@ -140,8 +147,7 @@ def create_app() -> FastAPI:
     app.include_router(circles_router)
     app.include_router(discovery_router)
     app.include_router(circle_chat_router)
-    app.include_router(sessions_router)
-    app.include_router(attendance_router)
+    app.include_router(activities_router)
 
     return app
 

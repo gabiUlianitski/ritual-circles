@@ -1,35 +1,28 @@
-import React, { useState } from "react";
+import React from "react";
 import { useTranslation } from "react-i18next";
-import type { AttendanceStatus, HomeCalendarSession } from "../api/types";
-import { api } from "../api/client";
+import type { HomeActivityItem } from "../api/types";
+import { activityPriceLabel } from "./activityDisplay";
 import { BidiText } from "./BidiText";
-import {
-  formatJoinedLine,
-  formatSessionDateTimeHero,
-  getUpcomingSessions,
-  isSessionPending,
-  sessionTitle,
-} from "./homeDashboardUtils";
-import { FormError } from "./FormError";
+import { HomeActivityReconfirm } from "./HomeActivityReconfirm";
+import { homeActivityPlace, needsReconfirmation } from "./homeActivities";
+import { formatSessionDateTimeHero } from "./homeDashboardUtils";
 
+/** The earliest joined Activity date that has not ended. */
 export function HomeNextActivityCard(props: {
-  sessions: HomeCalendarSession[];
-  onOpenCircle: (circleId: string) => void;
-  onRefresh?: () => Promise<void> | void;
+  items: HomeActivityItem[];
+  onOpen: (item: HomeActivityItem) => void;
+  onRefresh: () => Promise<void> | void;
   onFindCircles?: () => void;
   onCreateCircle?: () => void;
 }) {
   const { t } = useTranslation();
-  const [working, setWorking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const next = getUpcomingSessions(props.sessions)[0];
+  const next = props.items[0];
 
   if (!next) {
     return (
-      <section className="home-hero home-hero--empty card stack onboarding-empty-guidance" aria-label="Next activity">
-        <p className="onboarding-empty-title">{t("emptyStates.calendarTitle")}</p>
-        <p className="home-hero-empty-text muted">{t("emptyStates.calendarSubtitle")}</p>
+      <section className="home-hero home-hero--empty card stack onboarding-empty-guidance" aria-label={t("homeFeed.yourNextActivity")}>
+        <p className="onboarding-empty-title">{t("emptyStates.activitiesTitle")}</p>
+        <p className="home-hero-empty-text muted">{t("emptyStates.activitiesSubtitle")}</p>
         <div className="onboarding-empty-actions row">
           {props.onFindCircles ? (
             <button type="button" className="primary" style={{ width: "auto" }} onClick={props.onFindCircles}>
@@ -46,68 +39,36 @@ export function HomeNextActivityCard(props: {
     );
   }
 
-  const title = sessionTitle(next);
-  const pending = isSessionPending(next);
-  const imComing = next.myAttendance?.status === "attending";
-  const memberCount = next.memberCount ?? 0;
-  const maxSize = next.maxSize ?? memberCount ?? 6;
-
-  async function setAttendance(status: AttendanceStatus) {
-    setWorking(true);
-    setError(null);
-    try {
-      await api.putAttendance(next!.session.id, status);
-      await props.onRefresh?.();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setWorking(false);
-    }
-  }
+  const changed = needsReconfirmation(next);
+  const place = homeActivityPlace(next);
+  const price = activityPriceLabel(next);
+  const meta = [
+    t("activityParticipation.goingCount", { count: next.participation.goingCount, size: next.participation.groupSize }),
+    place ? `📍 ${place}` : null,
+    price,
+  ].filter(Boolean);
 
   return (
-    <section className="home-hero card" aria-label="Next activity">
+    <section className="home-hero card" aria-label={t("homeFeed.yourNextActivity")}>
       <div className="home-hero-row">
-        <button
-          type="button"
-          className="home-hero-body"
-          onClick={() => props.onOpenCircle(next.circleId)}
-        >
+        <button type="button" className="home-hero-body" onClick={() => props.onOpen(next)}>
           <span className="home-hobby-badge" aria-hidden>
             {next.hobyIcon ?? ""}
           </span>
           <span className="home-hero-copy">
             <BidiText as="span" className="home-hero-title">
-              {title}
+              {next.title}
             </BidiText>
-            <span className="home-hero-time">{formatSessionDateTimeHero(next.session.dateTime)}</span>
-            <span className="home-hero-meta">{formatJoinedLine(memberCount, maxSize, t)}</span>
+            <span className="home-hero-time">{formatSessionDateTimeHero(next.startAt)}</span>
+            <span className="home-hero-meta">{meta.join(" · ")}</span>
+            {next.isRecurring ? <span className="home-hero-meta">{t("activityDetails.recurringLabel")}</span> : null}
           </span>
-          <span className={`home-status-badge ${pending ? "home-status-badge--pending" : "home-status-badge--confirmed"}`}>
-            {pending ? t("home.pending") : t("home.confirmed")}
+          <span className={`home-status-badge ${changed ? "home-status-badge--pending" : "home-status-badge--confirmed"}`}>
+            {changed ? t("activitySuggestions.activityChanged") : t("activityParticipation.youreGoing")}
           </span>
         </button>
-
-        <div className="home-hero-actions">
-          <button
-            type="button"
-            className="primary home-hero-primary"
-            disabled={working || imComing}
-            onClick={() => void setAttendance("attending")}
-          >
-            {working && !imComing ? t("common.saving") : t("home.imIn")}
-          </button>
-          <button
-            type="button"
-            className="home-hero-secondary"
-            disabled={working || (!imComing && pending)}
-            onClick={() => void setAttendance("not_attending")}
-          >
-            {working && imComing ? t("common.saving") : t("home.notNow")}
-          </button>
-        </div>
       </div>
-      {error ? <FormError>{error}</FormError> : null}
+      {changed ? <HomeActivityReconfirm key={next.occurrenceId ?? next.activityId} item={next} onDone={props.onRefresh} /> : null}
     </section>
   );
 }

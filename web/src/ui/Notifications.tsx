@@ -10,8 +10,9 @@ import {
   syncNotificationInbox,
   type StoredNotification,
 } from "../notificationInbox";
+import { BidiText } from "./BidiText";
 import { FormError } from "./FormError";
-import { suggestionAcceptPayloadFromBody } from "./suggestionAccept";
+import { occurrenceWhen } from "./activityDisplay";
 
 function formatWhen(iso: string) {
   try {
@@ -26,8 +27,54 @@ function formatWhen(iso: string) {
   }
 }
 
-function itemTitle(item: StoredNotification): string {
-  if (item.kind === "time_suggest") return `Time suggestion in ${item.circleName}`;
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+function activityTitleLine(item: StoredNotification, t: Translate): string {
+  switch (item.activityType) {
+    case "activity_confirmed":
+      return t("activityNotifications.confirmedTitle");
+    case "activity_cancelled":
+      return t("activityNotifications.cancelledTitle");
+    case "activity_changed":
+      return t("activityNotifications.changedTitle");
+    case "reconfirmation_required":
+      return t("activityNotifications.reconfirmTitle");
+    case "upcoming_activity":
+      return t("activityNotifications.upcomingTitle");
+    case "suggestion_accepted":
+      return t("activityNotifications.suggestionAcceptedTitle");
+    case "suggestion_declined":
+      return t("activityNotifications.suggestionDeclinedTitle");
+    default:
+      return t("activityNotifications.title");
+  }
+}
+
+function activityMessage(item: StoredNotification, t: Translate): string {
+  switch (item.activityType) {
+    case "activity_confirmed":
+      return t("activityNotifications.confirmedBody");
+    case "activity_cancelled":
+      return item.recurring ? t("activityNotifications.dateCancelledBody") : t("activityNotifications.cancelledBody");
+    case "activity_changed":
+      if (item.suggestionType === "time") return t("activityNotifications.timeChangedBody");
+      if (item.suggestionType === "location") return t("activityNotifications.placeChangedBody");
+      return t("activityNotifications.changedBody");
+    case "reconfirmation_required":
+      return t("activityNotifications.reconfirmBody");
+    case "upcoming_activity":
+      return t("activityNotifications.upcomingBody");
+    case "suggestion_accepted":
+      return t("activityNotifications.suggestionAcceptedBody");
+    case "suggestion_declined":
+      return t("activityNotifications.suggestionDeclinedBody");
+    default:
+      return "";
+  }
+}
+
+function itemTitle(item: StoredNotification, t: Translate): string {
+  if (item.kind === "activity") return activityTitleLine(item, t);
   if (item.kind === "place_suggest") return `Place suggestion in ${item.circleName}`;
   if (item.kind === "chat") return `New message in ${item.circleName}`;
   if (item.kind === "circle_dropped") return `${item.circleName} was dropped`;
@@ -39,12 +86,10 @@ function itemBody(
   item: StoredNotification,
   t: (key: string, options?: Record<string, unknown>) => string,
 ): string {
-  if (item.kind === "time_suggest") {
-    return `${item.authorName ?? "Someone"} suggested: ${item.suggestLabel ?? "a new meeting time"}`;
-  }
   if (item.kind === "place_suggest") {
     return `${item.authorName ?? "Someone"} suggested: ${item.suggestLabel ?? "a new meeting place"}`;
   }
+  if (item.kind === "activity") return activityMessage(item, t);
   if (item.kind === "chat") return item.body ?? "";
   if (item.kind === "circle_dropped") {
     return item.body ?? "The organizer ended this circle. You are no longer in it.";
@@ -66,7 +111,7 @@ function decisionLabel(
     if (item.decision === "declined") return t("invitePreview.declinedStatus");
     return null;
   }
-  if (item.kind !== "time_suggest" && item.kind !== "place_suggest") return null;
+  if (item.kind !== "place_suggest") return null;
   if (item.decision === "accepted") return "You accepted this suggestion";
   if (item.decision === "declined") return "You declined this suggestion";
   return null;
@@ -161,6 +206,7 @@ export function Notifications(props: {
   onOpenCircleChat: (circleId: string) => void;
   onOpenCircleDetails: (circleId: string) => void;
   onViewInvitation: (invitationId: string) => void;
+  onOpenActivity: (circleId: string, activityId: string, occurrenceId: string | null) => void;
   declineNotice?: boolean;
   onInboxChanged?: () => void;
   onHomeRefresh?: () => Promise<void> | void;
@@ -220,6 +266,11 @@ export function Notifications(props: {
 
     if (item.kind === "circle_dropped") {
       props.onBack();
+      return;
+    }
+
+    if (item.kind === "activity") {
+      if (item.activityId) props.onOpenActivity(item.circleId, item.activityId, item.occurrenceId ?? null);
       return;
     }
 
@@ -285,19 +336,7 @@ export function Notifications(props: {
     setBusyId(item.id);
     setError(null);
     try {
-      const schedule =
-        action === "accept" && item.messageBody
-          ? suggestionAcceptPayloadFromBody(item.messageBody)
-          : null;
-      if (action === "accept" && item.kind === "time_suggest" && item.messageBody && !schedule) {
-        throw new Error("Could not read the suggested time.");
-      }
-      await api.respondToCircleSuggestion(item.circleId, item.messageId, {
-        action,
-        ...(schedule
-          ? { firstSessionAt: schedule.firstSessionAt, recurringTime: schedule.recurringTime }
-          : {}),
-      });
+      await api.respondToCircleSuggestion(item.circleId, item.messageId, { action });
       markSuggestionDecision(props.myUserId, item.id, action === "accept" ? "accepted" : "declined");
       notifyChanged();
       if (action === "accept") {
@@ -310,11 +349,36 @@ export function Notifications(props: {
     }
   }
 
+  async function answerReconfirm(item: StoredNotification, action: "stay" | "leave") {
+    if (!props.myUserId || !item.activityId) return;
+    setBusyId(item.id);
+    setError(null);
+    try {
+      const occurrenceId = item.occurrenceId ?? null;
+      if (action === "stay") {
+        if (occurrenceId) await api.reconfirmOccurrence(item.activityId, occurrenceId);
+        else await api.reconfirmActivity(item.activityId);
+      } else if (occurrenceId) {
+        await api.leaveOccurrence(item.activityId, occurrenceId);
+      } else {
+        await api.leaveActivity(item.activityId);
+      }
+      await syncNotificationInbox(props.myUserId, props.homeCircleId);
+      markNotificationRead(props.myUserId, item.id);
+      notifyChanged();
+      await props.onHomeRefresh?.();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const unreadCount = items.filter((n) => !n.read).length;
   const visibleItems = filter === "unread" ? items.filter((n) => !n.read) : items;
 
   function renderItem(item: StoredNotification) {
-    const isSuggestion = item.kind === "time_suggest" || item.kind === "place_suggest" || item.kind === "circle_invite";
+    const isSuggestion = item.kind === "place_suggest" || item.kind === "circle_invite";
     const statusLabel = decisionLabel(item, t);
     const menu = (
       <NotificationItemMenu
@@ -324,6 +388,81 @@ export function Notifications(props: {
         onDelete={() => removeItem(item)}
       />
     );
+
+    if (item.kind === "activity") {
+      const when = item.startAt ? occurrenceWhen(item.startAt) : null;
+      const askAgain = item.activityType === "reconfirmation_required" && !item.resolved;
+      return (
+        <li key={item.id}>
+          <div
+            className={`notif-item notif-item--activity${item.read ? " is-read" : " is-unread"}`}
+            onClick={() => openItem(item)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openItem(item);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="notif-item-row">
+              <span className="notif-item-title">{itemTitle(item, t)}</span>
+              {menu}
+            </div>
+            <span className="notif-item-body">
+              <BidiText>{item.activityTitle ?? ""}</BidiText>
+              {" · "}
+              <BidiText>{item.circleName}</BidiText>
+            </span>
+            {when ? (
+              <span className="notif-item-body muted">
+                {when.date}
+                {when.time ? ` · ${when.time}` : ""}
+              </span>
+            ) : null}
+            <span className="notif-item-body muted">{itemBody(item, t)}</span>
+            {item.cancellationNote ? (
+              <span className="notif-item-body muted">
+                <BidiText>{item.cancellationNote}</BidiText>
+              </span>
+            ) : null}
+            <span className="notif-item-when muted">{formatWhen(item.createdAt)}</span>
+            <div className="notif-item-actions row" onClick={(e) => e.stopPropagation()}>
+              {askAgain ? (
+                <>
+                  <button
+                    type="button"
+                    className="primary"
+                    style={{ width: "auto" }}
+                    disabled={busyId === item.id}
+                    onClick={() => void answerReconfirm(item, "stay")}
+                  >
+                    {busyId === item.id ? "…" : t("activityNotifications.stillGoing")}
+                  </button>
+                  <button
+                    type="button"
+                    style={{ width: "auto" }}
+                    disabled={busyId === item.id}
+                    onClick={() => void answerReconfirm(item, "leave")}
+                  >
+                    {t("activityNotifications.leaveActivity")}
+                  </button>
+                </>
+              ) : null}
+              <button
+                type="button"
+                style={{ width: "auto" }}
+                disabled={busyId === item.id}
+                onClick={() => openItem(item)}
+              >
+                {t("activityNotifications.openActivity")}
+              </button>
+            </div>
+          </div>
+        </li>
+      );
+    }
 
     if (isSuggestion) {
       return (
@@ -341,7 +480,7 @@ export function Notifications(props: {
             tabIndex={0}
           >
             <div className="notif-item-row">
-              <span className="notif-item-title">{itemTitle(item)}</span>
+              <span className="notif-item-title">{itemTitle(item, t)}</span>
               {menu}
             </div>
             <span className="notif-item-body muted">{itemBody(item, t)}</span>
@@ -405,7 +544,7 @@ export function Notifications(props: {
           tabIndex={0}
         >
           <div className="notif-item-row">
-            <span className="notif-item-title">{itemTitle(item)}</span>
+            <span className="notif-item-title">{itemTitle(item, t)}</span>
             {menu}
           </div>
           <span className="notif-item-body muted">{itemBody(item, t)}</span>
@@ -419,7 +558,7 @@ export function Notifications(props: {
     <div className="card stack">
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <div className="h1" style={{ marginBottom: 0 }}>
-          Notifications
+          {t("activityNotifications.title")}
         </div>
         <button type="button" style={{ width: "auto" }} onClick={props.onBack}>
           Back

@@ -8,26 +8,10 @@ from fastapi import HTTPException
 from app.user_fields import user_display_label
 
 
-async def _has_future_attendance(conn: asyncpg.Connection, user_id: UUID, circle_id: UUID) -> bool:
-    row = await conn.fetchval(
-        """
-        SELECT EXISTS (
-          SELECT 1
-          FROM attendance a
-          JOIN sessions s ON s.id = a."sessionId"
-          WHERE s."circleId" = $1
-            AND a."userId" = $2
-            AND s."dateTime" >= NOW()
-        )
-        """,
-        circle_id,
-        user_id,
-    )
-    return bool(row)
-
-
 async def ensure_circle_member(conn: asyncpg.Connection, user_id: UUID, circle_id: UUID) -> None:
-    if not await _has_future_attendance(conn, user_id, circle_id):
+    from app.services.circle_members import is_active_member
+
+    if not await is_active_member(conn, user_id=user_id, circle_id=circle_id):
         raise HTTPException(status_code=403, detail="Not a member of this circle")
 
 
@@ -94,9 +78,14 @@ async def create_message(
     user_id: UUID,
     body: str,
 ) -> dict:
-    from app.services.circle_suggestions import is_suggestion_message_body
+    from app.services.circle_suggestions import is_suggestion_message_body, is_time_suggestion_body
 
     await ensure_circle_member(conn, user_id, circle_id)
+    if is_time_suggestion_body(body):
+        raise HTTPException(
+            status_code=400,
+            detail="Time suggestions are no longer supported. Suggest an activity instead.",
+        )
     circle = await conn.fetchrow('SELECT created_by FROM circles WHERE id = $1', circle_id)
     if (
         circle
@@ -105,7 +94,7 @@ async def create_message(
     ):
         raise HTTPException(
             status_code=403,
-            detail="Circle organizer updates schedule and place on Next Sessions; members can suggest in chat",
+            detail="Circle organizer updates the place in circle settings; members can suggest in chat",
         )
     msg_id = uuid4()
     try:

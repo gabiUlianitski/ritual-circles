@@ -3,10 +3,14 @@ import { getAppLanguageCode } from "../i18n";
 import { localizeHobies } from "../hobyI18n/localizeHoby";
 import { getOrCreateDevUserId } from "./devUserId";
 import type {
-  AttendanceResponse,
-  AttendanceStatus,
   AuthConfigResponse,
   GoogleAuthResponse,
+  ActivityCreatePayload,
+  Activity,
+  ActivityDefaults,
+  ActivityNotification,
+  ActivityParticipation,
+  ActivityUpdatePayload,
   CircleCreateRequest,
   CircleInvitation,
   CircleInvitationPreview,
@@ -46,6 +50,8 @@ import type {
 } from "./types";
 
 const TOKEN_KEY = "auth_token";
+const ALLOW_DEV_USER_HEADER =
+  String(import.meta.env.VITE_ALLOW_DEV_USER_HEADER ?? "").trim().toLowerCase() === "true";
 
 export function getAuthToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -62,8 +68,8 @@ async function request<T>(
   body?: unknown,
   fetchOptions?: { signal?: AbortSignal },
 ): Promise<T> {
-  const userId = getOrCreateDevUserId();
   const token = getAuthToken();
+  const userId = ALLOW_DEV_USER_HEADER ? getOrCreateDevUserId() : null;
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method,
     signal: fetchOptions?.signal,
@@ -73,7 +79,11 @@ async function request<T>(
       ...(body !== undefined && body !== null
         ? { "Content-Type": "application/json" }
         : { "Content-Type": "text/plain" }),
-      ...(token ? { Authorization: `Bearer ${token}` } : { "X-User-Id": userId }),
+      ...(token
+        ? { Authorization: `Bearer ${token}` }
+        : userId
+          ? { "X-User-Id": userId }
+          : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -177,6 +187,7 @@ export const api = {
   openSharedCircleLink: (circleId: string) =>
     request<SharedCircleLink>("POST", `/circles/${encodeURIComponent(circleId)}/shared-link`),
   listMyInvitations: () => request<CircleInvitation[]>("GET", "/me/invitations"),
+  listActivityNotifications: () => request<ActivityNotification[]>("GET", "/me/activity-notifications"),
   getInvitationPreview: (invitationId: string) =>
     request<CircleInvitationPreview>("GET", `/me/invitations/${encodeURIComponent(invitationId)}`),
   acceptInvitation: (invitationId: string) =>
@@ -193,6 +204,104 @@ export const api = {
       "GET",
       circleId ? `/circles/me?circleId=${encodeURIComponent(circleId)}` : "/circles/me",
     ),
+  getActivityDefaults: (circleId: string) =>
+    request<ActivityDefaults>("GET", `/circles/${encodeURIComponent(circleId)}/activity-defaults`),
+  listActivities: (circleId: string) =>
+    request<Activity[]>("GET", `/circles/${encodeURIComponent(circleId)}/activities`),
+  createActivity: (circleId: string, payload: ActivityCreatePayload) =>
+    request<Activity>("POST", `/circles/${encodeURIComponent(circleId)}/activities`, payload),
+  getActivity: (activityId: string) =>
+    request<Activity>("GET", `/activities/${encodeURIComponent(activityId)}`),
+  updateActivity: (activityId: string, payload: ActivityUpdatePayload) =>
+    request<Activity>("PATCH", `/activities/${encodeURIComponent(activityId)}`, payload),
+  cancelActivity: (activityId: string, payload?: { occurrenceId?: string | null; cancellationReason?: string | null }) =>
+    request<Activity>("POST", `/activities/${encodeURIComponent(activityId)}/cancel`, payload ?? {}),
+  publishActivity: (activityId: string) =>
+    request<Activity>("POST", `/activities/${encodeURIComponent(activityId)}/publish`),
+  confirmActivity: (activityId: string, occurrenceId?: string | null) =>
+    request<Activity>("POST", `/activities/${encodeURIComponent(activityId)}/confirm`, {
+      occurrenceId: occurrenceId ?? null,
+    }),
+  completeActivity: (activityId: string, occurrenceId?: string | null) =>
+    request<Activity>("POST", `/activities/${encodeURIComponent(activityId)}/complete`, {
+      occurrenceId: occurrenceId ?? null,
+    }),
+  joinActivity: (activityId: string) =>
+    request<ActivityParticipation>("POST", `/activities/${encodeURIComponent(activityId)}/join`),
+  leaveActivity: (activityId: string) =>
+    request<ActivityParticipation>("POST", `/activities/${encodeURIComponent(activityId)}/leave`),
+  joinOccurrence: (activityId: string, occurrenceId: string) =>
+    request<Activity>(
+      "POST",
+      `/activities/${encodeURIComponent(activityId)}/occurrences/${encodeURIComponent(occurrenceId)}/join`,
+    ),
+  leaveOccurrence: (activityId: string, occurrenceId: string) =>
+    request<Activity>(
+      "POST",
+      `/activities/${encodeURIComponent(activityId)}/occurrences/${encodeURIComponent(occurrenceId)}/leave`,
+    ),
+  suggestActivity: (
+    activityId: string,
+    payload: {
+      type: "time" | "location";
+      proposedStartAt?: string | null;
+      proposedEndAt?: string | null;
+      proposedLocationName?: string | null;
+      proposedLocationAddress?: string | null;
+      note?: string | null;
+    },
+  ) => request<Activity>("POST", `/activities/${encodeURIComponent(activityId)}/suggestions`, payload),
+  suggestOccurrence: (
+    activityId: string,
+    occurrenceId: string,
+    payload: {
+      type: "time" | "location";
+      proposedStartAt?: string | null;
+      proposedEndAt?: string | null;
+      proposedLocationName?: string | null;
+      proposedLocationAddress?: string | null;
+      note?: string | null;
+    },
+  ) =>
+    request<Activity>(
+      "POST",
+      `/activities/${encodeURIComponent(activityId)}/occurrences/${encodeURIComponent(occurrenceId)}/suggestions`,
+      payload,
+    ),
+  supportSuggestion: (suggestionId: string) =>
+    request<Activity>("POST", `/activity-suggestions/${encodeURIComponent(suggestionId)}/support`),
+  removeSuggestionSupport: (suggestionId: string) =>
+    request<Activity>("POST", `/activity-suggestions/${encodeURIComponent(suggestionId)}/support/remove`),
+  withdrawSuggestion: (suggestionId: string) =>
+    request<Activity>("POST", `/activity-suggestions/${encodeURIComponent(suggestionId)}/withdraw`),
+  acceptSuggestion: (suggestionId: string) =>
+    request<Activity>("POST", `/activity-suggestions/${encodeURIComponent(suggestionId)}/accept`),
+  declineSuggestion: (suggestionId: string) =>
+    request<Activity>("POST", `/activity-suggestions/${encodeURIComponent(suggestionId)}/decline`),
+  reconfirmActivity: (activityId: string) =>
+    request<Activity>("POST", `/activities/${encodeURIComponent(activityId)}/reconfirm`),
+  reconfirmOccurrence: (activityId: string, occurrenceId: string) =>
+    request<Activity>(
+      "POST",
+      `/activities/${encodeURIComponent(activityId)}/occurrences/${encodeURIComponent(occurrenceId)}/reconfirm`,
+    ),
+  recordAttendance: (activityId: string, participantId: string, attendanceStatus: "attended" | "no_show") =>
+    request<Activity>(
+      "POST",
+      `/activities/${encodeURIComponent(activityId)}/participants/${encodeURIComponent(participantId)}/attendance`,
+      { attendanceStatus },
+    ),
+  recordDateAttendance: (
+    activityId: string,
+    occurrenceId: string,
+    participantId: string,
+    attendanceStatus: "attended" | "no_show",
+  ) =>
+    request<Activity>(
+      "POST",
+      `/activities/${encodeURIComponent(activityId)}/occurrences/${encodeURIComponent(occurrenceId)}/participants/${encodeURIComponent(participantId)}/attendance`,
+      { attendanceStatus },
+    ),
 
   getCircleMessages: (circleId: string, opts?: { limit?: number }) => {
     const lim = opts?.limit ?? 200;
@@ -206,21 +315,13 @@ export const api = {
   respondToCircleSuggestion: (
     circleId: string,
     messageId: string,
-    payload: {
-      action: "accept" | "decline";
-      firstSessionAt?: string;
-      recurringTime?: string;
-      isRecurring?: boolean;
-    },
+    payload: { action: "accept" | "decline" },
   ) =>
     request<CircleResponse>(
       "POST",
       `/circles/${encodeURIComponent(circleId)}/messages/${encodeURIComponent(messageId)}/suggestion`,
       payload,
     ),
-
-  putAttendance: (sessionId: string, status: AttendanceStatus) =>
-    request<AttendanceResponse>("PUT", `/sessions/${sessionId}/attendance`, { status }),
 
   getHobies: async () =>
     localizeHobies(await request<Hoby[]>("GET", "/hobies"), getAppLanguageCode()),

@@ -4,7 +4,6 @@ import { api } from "../api/client";
 import type { CircleListItem, Hoby, UserMeResponse } from "../api/types";
 import { CircleDetails } from "./CircleDetails";
 import { CircleDetailsPrimaryAction, CircleDetailsSummary, CircleDetailsWhyJoin } from "./CircleDetailsSummary";
-import { CircleMomentumNote, CircleProgressCard, circleMomentum, momentumRank } from "./CircleProgressCard";
 import { DiscoverHobbyChips, DiscoverMomentumCard } from "./DiscoverMomentumCard";
 import { CreateJoinCircle } from "./CreateJoinCircle";
 import { hobbiesFromMe } from "./circleJoinHobby";
@@ -17,12 +16,18 @@ import {
   type DiscoverSizeFilter,
   type DiscoverTimeFilter,
 } from "./circleDiscover";
-import { isCircleJoinable } from "./circleParticipation";
 import { DiscoverEmptyState, DiscoverFilterChips, DiscoverSection } from "./DiscoverCircleCard";
 import { FormError } from "./FormError";
 import { CircleJoinSuccess, hasSeenJoinSuccess, markJoinSuccessSeen } from "./CircleJoinSuccess";
 
-type CirclesDeepLink = { circleId: string; initialTab: "details" | "chat" | "scheduled"; justJoined?: boolean };
+type CirclesDeepLink = {
+  circleId: string;
+  initialTab: "details" | "chat" | "scheduled";
+  justJoined?: boolean;
+  activityId?: string;
+  occurrenceId?: string | null;
+};
+type ActivityFocus = { activityId: string; occurrenceId: string | null };
 type DiscoverPageTab = "discover" | "mine" | "joined";
 
 const CLOSEST_LIMIT = 3;
@@ -56,6 +61,7 @@ export function Circles(props: {
   const [detailsCircleId, setDetailsCircleId] = useState<string | null>(null);
   const [detailsInitialTab, setDetailsInitialTab] = useState<"details" | "chat" | "scheduled">("details");
   const [detailsInitialDraft, setDetailsInitialDraft] = useState<string | undefined>(undefined);
+  const [detailsActivity, setDetailsActivity] = useState<ActivityFocus | null>(null);
   const [joinSuccessCircleId, setJoinSuccessCircleId] = useState<string | null>(null);
   const [catalogDetail, setCatalogDetail] = useState<CircleListItem | null>(null);
   const [joinBusyId, setJoinBusyId] = useState<string | null>(null);
@@ -154,6 +160,7 @@ export function Circles(props: {
     setCatalogDetail(null);
     setDetailsCircleId(link.circleId);
     setDetailsInitialTab(link.initialTab);
+    setDetailsActivity(link.activityId ? { activityId: link.activityId, occurrenceId: link.occurrenceId ?? null } : null);
     setShowDetails(true);
     props.onDeepLinkConsumed?.();
   }, [props.deepLink, me?.id, loading, catalog]);
@@ -169,16 +176,13 @@ export function Circles(props: {
     return [...catalog].sort((a, b) => Number(b.isYours) - Number(a.isYours));
   }, [catalog]);
 
-  const sortByMomentum = useCallback(
+  const sortDiscover = useCallback(
     (list: CircleListItem[]) =>
-      list
-        .map((c) => ({
-          c,
-          rank: momentumRank(circleMomentum(c.memberCount, c.maxSize, Boolean(c.nextSessionAt))),
-          score: scoreCircleForUser(c, userHobies, userCity),
-        }))
-        .sort((a, b) => a.rank - b.rank || b.c.memberCount - a.c.memberCount || b.score - a.score)
-        .map((x) => x.c),
+      [...list].sort(
+        (a, b) =>
+          b.memberCount - a.memberCount ||
+          scoreCircleForUser(b, userHobies, userCity) - scoreCircleForUser(a, userHobies, userCity),
+      ),
     [userHobies, userCity],
   );
 
@@ -209,7 +213,7 @@ export function Circles(props: {
 
   const discoverResults = useMemo(
     () =>
-      sortByMomentum(
+      sortDiscover(
         applyDiscoverFilters(joinableCircles, {
           query: searchQuery,
           hobbySlug: filterHobby,
@@ -218,18 +222,11 @@ export function Circles(props: {
           size: filterSize,
         }),
       ),
-    [joinableCircles, searchQuery, filterHobby, filterLevel, filterTime, filterSize, sortByMomentum],
+    [joinableCircles, searchQuery, filterHobby, filterLevel, filterTime, filterSize, sortDiscover],
   );
 
   const discoverSections = useMemo(() => {
-    const fillPct = (c: CircleListItem) => c.memberCount / Math.max(1, c.maxSize);
-    const closest = discoverResults
-      .filter((c) => isCircleJoinable(c.memberCount, c.maxSize))
-      .map((c) => ({ c, status: circleMomentum(c.memberCount, c.maxSize, Boolean(c.nextSessionAt)) }))
-      .filter(({ status }) => status === "readyToSchedule" || status === "almostReady" || status === "growing")
-      .sort((a, b) => momentumRank(a.status) - momentumRank(b.status) || fillPct(b.c) - fillPct(a.c))
-      .slice(0, CLOSEST_LIMIT)
-      .map(({ c }) => c);
+    const closest = discoverResults.slice(0, CLOSEST_LIMIT);
     const taken = new Set(closest.map((c) => c.id));
     const recommended = discoverResults
       .filter((c) => !taken.has(c.id) && scoreCircleForUser(c, userHobies, userCity) > 0)
@@ -241,8 +238,8 @@ export function Circles(props: {
 
   const datePrefilterResults = useMemo(() => {
     if (!props.prefilterDateIso) return [];
-    return sortByMomentum(filterCirclesByMeetDate(joinableCircles, props.prefilterDateIso));
-  }, [joinableCircles, props.prefilterDateIso, sortByMomentum]);
+    return sortDiscover(filterCirclesByMeetDate(joinableCircles, props.prefilterDateIso));
+  }, [joinableCircles, props.prefilterDateIso, sortDiscover]);
 
   const hobbyChips = useMemo(
     () => hobies.filter((h) => h.slug && h.displayName),
@@ -345,16 +342,6 @@ export function Circles(props: {
 
     const busy = joinBusyId !== null;
     const joining = joinBusyId === c.id;
-
-    if (!isCircleJoinable(c.memberCount, c.maxSize)) {
-      return {
-        label: t("circleDetails.full"),
-        busy: false,
-        disabled: true,
-        secondary: true,
-        onJoin: () => {},
-      };
-    }
 
     if (c.inviteOnly) return null;
 
@@ -480,11 +467,14 @@ export function Circles(props: {
         circleId={detailsCircleId}
         initialTab={detailsInitialTab}
         initialDraft={detailsInitialDraft}
+        initialActivityId={detailsActivity?.activityId}
+        initialOccurrenceId={detailsActivity?.occurrenceId ?? null}
         onBack={() => {
           setShowDetails(false);
           setDetailsCircleId(null);
           setDetailsInitialTab("details");
           setDetailsInitialDraft(undefined);
+          setDetailsActivity(null);
         }}
         onLeftCircle={async () => {
           await props.onHomeRefresh();
@@ -492,6 +482,7 @@ export function Circles(props: {
           setDetailsCircleId(null);
           setDetailsInitialTab("details");
           setDetailsInitialDraft(undefined);
+          setDetailsActivity(null);
           await load();
         }}
       />
@@ -511,24 +502,7 @@ export function Circles(props: {
           circle={c}
           hobiesCatalog={hobies}
           memberCount={c.memberCount}
-          maxSize={c.maxSize}
-          hasNextSession={Boolean(c.nextSessionAt)}
         />
-        <CircleProgressCard
-          joined={c.memberCount}
-          capacity={c.maxSize}
-          hasNextSession={Boolean(c.nextSessionAt)}
-        />
-        <CircleMomentumNote
-          joined={c.memberCount}
-          capacity={c.maxSize}
-          hasNextSession={Boolean(c.nextSessionAt)}
-          viewerIsMember={c.isYours}
-        />
-        {!c.isYours && c.memberCount <= 1 ? (
-          <p className="circle-momentum-message">{t("circleChat.visitorHelp")}</p>
-        ) : null}
-
         {!c.isYours && joinAction ? (
           <CircleDetailsPrimaryAction
             isMember={false}

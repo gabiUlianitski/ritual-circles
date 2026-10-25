@@ -1,11 +1,10 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AttendanceStatus, HomeCalendarSession, HomeCircleItem } from "../api/types";
+import type { HomeCircleItem } from "../api/types";
 import { api } from "../api/client";
 import { markCircleLeftBySelf } from "../notificationInbox";
 import { BidiText } from "./BidiText";
 import { circleDisplayTitle, circleHobbySubtitle } from "./circleDisplay";
-import { formatSessionDateTimeHero } from "./homeDashboardUtils";
 import { FormError } from "./FormError";
 
 export function HomeCirclesList(props: {
@@ -24,8 +23,6 @@ export function HomeCirclesList(props: {
   /** Show leave/drop on expanded row (created = drop, joined = leave). */
   showLeaveAction?: boolean;
   leaveActionLabel?: string;
-  /** Calendar rows, used only to show member counts already loaded for Home. */
-  sessions?: HomeCalendarSession[];
 }) {
   const { t } = useTranslation();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -53,20 +50,6 @@ export function HomeCirclesList(props: {
         </div>
       </div>
     );
-  }
-
-  async function setAttendance(item: HomeCircleItem, status: AttendanceStatus) {
-    if (!item.nextSession) return;
-    setWorkingId(item.circle.id);
-    setError(null);
-    try {
-      await api.putAttendance(item.nextSession.id, status);
-      await props.onRefresh();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setWorkingId(null);
-    }
   }
 
   async function leaveOrDropCircle(item: HomeCircleItem) {
@@ -100,17 +83,8 @@ export function HomeCirclesList(props: {
           const title = circleDisplayTitle(item.circle);
           const hobbyLine = circleHobbySubtitle(item.circle);
           const busy = workingId === item.circle.id;
-          const related = (props.sessions ?? []).filter((s) => s.circleId === item.circle.id);
-          const matched =
-            (item.nextSession && related.find((s) => s.session.id === item.nextSession?.id)) || related[0];
-          const memberCount = matched?.memberCount;
           const memberLine =
-            memberCount == null
-              ? null
-              : memberCount === 1
-                ? t("home.oneMember")
-                : t("home.membersCount", { count: memberCount });
-          const when = item.nextSession ? formatSessionDateTimeHero(item.nextSession.dateTime) : null;
+            item.memberCount === 1 ? t("home.oneMember") : t("home.membersCount", { count: item.memberCount });
           return (
             <div key={item.circle.id} className={`home-circle-compact${open ? " home-circle-compact--open" : ""}`}>
               <button
@@ -126,15 +100,10 @@ export function HomeCirclesList(props: {
                   <span className="home-circle-compact-title circle-title-wrap">
                     <BidiText>{title}</BidiText>
                   </span>
-                  {hobbyLine || memberLine || when ? (
-                    <span className="home-circle-compact-meta">
-                      {[hobbyLine, memberLine, when].filter(Boolean).join(" • ")}
-                    </span>
-                  ) : null}
+                  <span className="home-circle-compact-meta">
+                    {[hobbyLine, memberLine].filter(Boolean).join(" • ")}
+                  </span>
                 </span>
-                {item.pendingConfirmation ? (
-                  <span className="home-pending-dot" title="Confirm attendance" aria-label="Needs confirmation" />
-                ) : null}
                 <span className="home-circle-chevron muted" aria-hidden>
                   {open ? "▴" : "▾"}
                 </span>
@@ -142,31 +111,6 @@ export function HomeCirclesList(props: {
 
               {open ? (
                 <div className="home-circle-compact-body stack">
-                  {item.nextSession ? (
-                    <>
-                      <div className="muted" style={{ fontSize: 13 }}>
-                        Next: {new Date(item.nextSession.dateTime).toLocaleString()} •{" "}
-                        {item.nextSession.locationOrLink}
-                      </div>
-                      <div className="muted" style={{ fontSize: 13 }}>
-                        {item.myAttendance?.status === "attending"
-                          ? "You’re coming."
-                          : "Confirm if you’re coming."}
-                      </div>
-                      <button
-                        className="primary"
-                        disabled={busy}
-                        onClick={() => void setAttendance(item, "attending")}
-                      >
-                        I’m coming
-                      </button>
-                      <button disabled={busy} onClick={() => void setAttendance(item, "not_attending")}>
-                        Not coming
-                      </button>
-                    </>
-                  ) : (
-                    <div className="muted">No upcoming session.</div>
-                  )}
                   <button disabled={busy} onClick={() => props.onOpenCircle(item.circle.id, "details")}>
                     Circle details
                   </button>

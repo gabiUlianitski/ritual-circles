@@ -301,11 +301,10 @@ Return only valid JSON with top-level keys "types", "levels", "short_description
         data = await client.chat_json(system=_SYSTEM, user=prompt)
     except Exception as e:
         logger.warning(
-            "ai_hoby_enrichment_failed slug=%s %s: %s",
+            "ai_hoby_enrichment_failed slug=%s error_type=%s",
             slug,
             type(e).__name__,
-            str(e),
-            extra={"slug": slug, "error_type": type(e).__name__, "error": str(e)},
+            extra={"slug": slug, "error_type": type(e).__name__},
         )
         return None
 
@@ -357,7 +356,11 @@ async def generate_discovery_description(display_name: str) -> tuple[str, str | 
             user=f'Hobby: {display_name}\nEcho nothing except the JSON object.',
         )
     except Exception as exc:
-        logger.warning("discovery_description_ai_failed hobby=%s error=%s", display_name, exc)
+        logger.warning(
+            "discovery_description_ai_failed hobby=%s error_type=%s",
+            display_name,
+            type(exc).__name__,
+        )
         return None
     if not isinstance(data, dict):
         return None

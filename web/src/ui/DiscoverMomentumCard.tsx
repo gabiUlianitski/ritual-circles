@@ -8,33 +8,19 @@ import {
   formatCircleCostChip,
   formatCircleDetailsVibe,
   formatCircleLocationChip,
-  formatCircleScheduleChip,
 } from "./circleDetailsFormat";
 import { formatSessionDateTimeHero } from "./homeDashboardUtils";
-import {
-  activityStatusMark,
-  circleMomentum,
-  circleMomentumMessage,
-  circleStatusKey,
-} from "./CircleProgressCard";
 
-const SCARCE_SPOTS = 2;
-
-/** Visitor-facing sentence built from the real headcount. */
-function discoverMomentumText(
-  joined: number,
-  capacity: number,
-  hasNextSession: boolean,
-  viewerIsMember: boolean,
-): { key: string; count?: number } {
-  if (viewerIsMember) return circleMomentumMessage(joined, capacity, hasNextSession, true);
-  const spots = Math.max(0, capacity - joined);
-  const status = circleMomentum(joined, capacity, hasNextSession);
-  if (status === "meetingConfirmed" || status === "readyToSchedule") return { key: "discoverPage.momentumReady" };
-  if (joined <= 1) return { key: "discoverPage.momentumBeFirst" };
-  if (spots === 1) return { key: "discoverPage.momentumOneMore" };
-  if (spots <= SCARCE_SPOTS) return { key: "discoverPage.momentumOnlyMore", count: spots };
-  return { key: "discoverPage.momentumAlreadyJoined", count: joined };
+function discoverMomentumText(joined: number, viewerIsMember: boolean): { key: string; count?: number } {
+  if (joined <= 1) {
+    return {
+      key: viewerIsMember ? "circleDetails.momentumInviteOthers" : "discoverPage.momentumBeFirst",
+    };
+  }
+  return {
+    key: viewerIsMember ? "circleDetails.momentumAlreadyJoined" : "discoverPage.momentumAlreadyJoined",
+    count: joined,
+  };
 }
 
 export function DiscoverMomentumCard(props: {
@@ -52,24 +38,12 @@ export function DiscoverMomentumCard(props: {
   const { circle } = props;
   const joined = Math.max(0, circle.memberCount);
   const capacity = Math.max(1, circle.maxSize);
-  const spots = Math.max(0, capacity - joined);
-  const hasNextSession = Boolean(circle.nextSessionAt);
-  const status = circleMomentum(joined, capacity, hasNextSession);
   const isNew = joined <= 1 && !circle.isYours;
-  const momentum = discoverMomentumText(joined, capacity, hasNextSession, circle.isYours);
-  const pct = Math.min(100, Math.round((joined / capacity) * 100));
-  const when = circle.nextSessionAt
-    ? formatSessionDateTimeHero(circle.nextSessionAt)
-    : formatCircleScheduleChip(circle, t);
-  const scarce = spots > 0 && spots <= SCARCE_SPOTS;
-  const spotsLine =
-    spots <= 0
-      ? t("discoverPage.cardFull")
-      : spots === 1
-        ? t("discoverPage.onlyOneSpotLeft")
-        : scarce
-          ? t("discoverPage.onlySpotsLeft", { count: spots })
-          : t("discoverPage.spotsLeft", { count: spots });
+  const momentum = discoverMomentumText(joined, circle.isYours);
+  const next = circle.nextActivity ?? null;
+  const when = next ? formatSessionDateTimeHero(next.startAt) : t("discoverPage.noActivityPlanned");
+  const nextLine = next ? t("discoverPage.nextActivityAt", { when }) : t("discoverPage.noActivityPlanned");
+  const sizeLine = t("circleDetails.typicalSizeValue", { count: capacity });
   const proofLine = isNew
     ? t("discoverPage.proofHelpStart")
     : joined >= 2
@@ -88,7 +62,6 @@ export function DiscoverMomentumCard(props: {
   );
 
   if (!props.compact) {
-    const seats = Array.from({ length: capacity }, (_, i) => i < joined);
     const activeThisWeek = (circle.messagesLastWeek ?? 0) > 0;
 
     return (
@@ -116,12 +89,7 @@ export function DiscoverMomentumCard(props: {
               <span aria-hidden>✨</span>
               {t("discoverPage.newCircle")}
             </span>
-          ) : (
-            <span className={`circle-activity-status-badge circle-progress-status--${status}`}>
-              <span aria-hidden>{activityStatusMark(status)}</span>
-              {t(circleStatusKey(status))}
-            </span>
-          )}
+          ) : null}
         </header>
 
         <div className="discover-community-identity">
@@ -139,23 +107,22 @@ export function DiscoverMomentumCard(props: {
 
         <DiscoverCircleSignals
           memberCount={joined}
-          nextSessionAt={circle.nextSessionAt}
           isRecurring={circle.isRecurring}
           recurringTime={circle.recurringTime}
         />
 
         <div className="discover-community-people">
-          <span className="discover-community-seats" aria-hidden>
-            {seats.map((filled, i) => (
-              <span key={i} className={filled ? "is-filled" : undefined} />
-            ))}
-          </span>
-          <span className={`discover-momentum-spots${scarce ? " discover-momentum-spots--scarce" : ""}`}>
-            {spotsLine}
-          </span>
+          <span>{t("circleDetails.memberCount", { count: joined })}</span>
+          <span className="discover-momentum-spots">{sizeLine}</span>
         </div>
 
         <ul className="discover-community-signals" aria-label={t("circleDetails.chipsAria")}>
+          <li>
+            <span aria-hidden>📅</span>
+            <span>
+              <bdi>{nextLine}</bdi>
+            </span>
+          </li>
           <li>
             <span aria-hidden>📍</span>
             <span>
@@ -216,12 +183,7 @@ export function DiscoverMomentumCard(props: {
             <span aria-hidden>✨</span>
             {t("discoverPage.newCircle")}
           </span>
-        ) : (
-          <span className={`circle-activity-status-badge circle-progress-status--${status}`}>
-            <span aria-hidden>{activityStatusMark(status)}</span>
-            {t(circleStatusKey(status))}
-          </span>
-        )}
+        ) : null}
       </header>
 
       {props.compact ? (
@@ -254,21 +216,11 @@ export function DiscoverMomentumCard(props: {
         <div className="discover-momentum-progress-row">
           <span className="discover-momentum-count">
             {props.compact ? <span aria-hidden>👥 </span> : null}
-            {t("discoverPage.joinedOfShort", { joined, capacity })}
+            {t("circleDetails.memberCount", { count: joined })}
           </span>
-          <span className={`discover-momentum-spots${scarce ? " discover-momentum-spots--scarce" : ""}`}>
-            {spotsLine}
+          <span className="discover-momentum-spots">
+            {sizeLine}
           </span>
-        </div>
-        <div
-          className="circle-progress-track"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={capacity}
-          aria-valuenow={Math.min(joined, capacity)}
-          aria-valuetext={t(circleStatusKey(status))}
-        >
-          <span className="circle-progress-fill" style={{ width: `${pct}%` }} />
         </div>
       </div>
 

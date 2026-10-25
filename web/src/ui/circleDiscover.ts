@@ -5,7 +5,7 @@ import { weekdayFromIsoDate } from "./createCircleSchedule";
 import { parseIsoDate } from "./calendarMonth";
 import { levelKeyToString } from "./hobyLevelKey";
 
-import { circleParticipationState, isCircleJoinable as circleIsJoinable } from "./circleParticipation";
+import { isCircleJoinable as circleIsJoinable } from "./circleParticipation";
 
 export type DiscoverLevelFilter = "" | "beginner" | "intermediate" | "advanced";
 export type DiscoverTimeFilter = "" | "morning" | "evening" | "weekend";
@@ -77,6 +77,17 @@ function circleMatchesUserHobbySlug(
   return userHobbies.some((h) => norm(h.slug) === slug);
 }
 
+/** Start of the circle's next Activity (or next recurring date), from the catalog. Null when none is planned. */
+export function nextActivityAt(circle: { nextActivity?: CircleListItem["nextActivity"] }): string | null {
+  return circle.nextActivity?.startAt ?? null;
+}
+
+function nextActivityTime(circle: CircleListItem): number {
+  const at = nextActivityAt(circle);
+  const time = at ? new Date(at).getTime() : NaN;
+  return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
+}
+
 export function circleNearUser(circle: CircleListItem, userCity: string | null | undefined): boolean {
   return locationClose(circle, userCity);
 }
@@ -127,9 +138,7 @@ export function getActiveCircles(circles: CircleListItem[], limit = 5): CircleLi
     .sort((a, b) => {
       const msg = (b.messagesLastWeek ?? 0) - (a.messagesLastWeek ?? 0);
       if (msg !== 0) return msg;
-      const ta = a.nextSessionAt ? new Date(a.nextSessionAt).getTime() : Number.MAX_SAFE_INTEGER;
-      const tb = b.nextSessionAt ? new Date(b.nextSessionAt).getTime() : Number.MAX_SAFE_INTEGER;
-      return ta - tb;
+      return nextActivityTime(a) - nextActivityTime(b);
     })
     .slice(0, limit);
 }
@@ -195,8 +204,9 @@ export function formatCompactSchedule(
   circle: CircleListItem,
   t?: (key: string) => string,
 ): string {
-  if (circle.nextSessionAt) {
-    const d = new Date(circle.nextSessionAt);
+  const at = nextActivityAt(circle);
+  if (at) {
+    const d = new Date(at);
     if (!Number.isNaN(d.getTime())) {
       if (isTomorrowDate(d)) return t ? t("discoverPage.tomorrow") : "Tomorrow";
       const day = d.toLocaleDateString(dateLocale(), { weekday: "short" });
@@ -221,30 +231,9 @@ export function formatParticipantsLabel(
   circle: CircleListItem,
   t?: (key: string, opts?: Record<string, unknown>) => string,
 ): string {
-  const state = circleParticipationState(circle.memberCount, circle.maxSize);
-  if (state.isFull) {
-    return t
-      ? t("discoverPage.circleFull", { count: state.joined, max: state.capacity })
-      : `Full (${state.joined}/${state.capacity})`;
-  }
-  const joined = state.joined;
-  const capacity = state.capacity;
-  const spotsLeft = capacity - joined;
-  if (t) {
-    const peopleInLine = joined <= 1 ? null : t("home.peopleIn", { count: joined });
-    const spotsLeftLine =
-      spotsLeft <= 0
-        ? null
-        : spotsLeft === 1
-          ? t("home.oneSpotLeft")
-          : t("home.spotsLeft", { count: spotsLeft });
-    if (peopleInLine && spotsLeftLine) return `${peopleInLine} · ${spotsLeftLine}`;
-    return peopleInLine ?? spotsLeftLine ?? "";
-  }
-  if (state.peopleInLine && state.spotsLeftLine) {
-    return `${state.peopleInLine} · ${state.spotsLeftLine}`;
-  }
-  return state.peopleInLine ?? state.spotsLeftLine ?? "";
+  const joined = Math.max(0, Number(circle.memberCount) || 0);
+  if (t) return t("circleDetails.memberCount", { count: joined });
+  return joined === 1 ? "1 member" : `${joined} members`;
 }
 
 export function formatOptionalDescription(
@@ -258,11 +247,7 @@ export function formatOptionalDescription(
 }
 
 export function formatCompactInfo(circle: CircleListItem): string {
-  const state = circleParticipationState(circle.memberCount, circle.maxSize);
-  const people = state.isFull
-    ? "Full"
-    : state.peopleInLine ?? state.spotsLeftLine ?? formatParticipantsLabel(circle);
-  return `${people} · ${formatCompactSchedule(circle)}`;
+  return `${formatParticipantsLabel(circle)} · ${formatCompactSchedule(circle)}`;
 }
 
 export type DiscoverFilters = {
@@ -430,8 +415,8 @@ export function getAllDiscoverCircles(
   return [...circles]
     .filter((c) => !c.isYours && circleMatchesInterestCategory(c, interestCategory, hobies))
     .sort((a, b) => {
-      const ta = a.nextSessionAt ? new Date(a.nextSessionAt).getTime() : Number.MAX_SAFE_INTEGER;
-      const tb = b.nextSessionAt ? new Date(b.nextSessionAt).getTime() : Number.MAX_SAFE_INTEGER;
+      const ta = nextActivityTime(a);
+      const tb = nextActivityTime(b);
       if (ta !== tb) return ta - tb;
       return (a.hobyDisplayName ?? a.ritualType).localeCompare(b.hobyDisplayName ?? b.ritualType);
     });
@@ -461,8 +446,9 @@ export function circleMatchesMeetDate(circle: CircleListItem, dateIso: string): 
   const p = parseIsoDate(dateIso);
   if (!p) return false;
 
-  if (circle.nextSessionAt) {
-    const d = new Date(circle.nextSessionAt);
+  const at = nextActivityAt(circle);
+  if (at) {
+    const d = new Date(at);
     if (
       !Number.isNaN(d.getTime()) &&
       d.getFullYear() === p.year &&

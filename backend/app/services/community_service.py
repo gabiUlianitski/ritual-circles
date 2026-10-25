@@ -4,40 +4,27 @@ import asyncpg
 
 from app.circle_identity import circle_identity
 from app.hoby_i18n import localized_display_name
+from app.services.circle_next_activity import (
+    SOONEST_GATHERING_CTE,
+    public_next_activities,
+    upcoming_activity_counts,
+)
 from app.services.circles_service import _meeting_display
 
 
 async def get_community_preview(conn: asyncpg.Connection, *, lang: str = "en") -> dict[str, object]:
-    stats = await conn.fetchrow(
+    members = await conn.fetchval(
         """
-        SELECT
-            (
-                SELECT COUNT(DISTINCT a."userId")::int
-                FROM attendance a
-                JOIN sessions s ON s.id = a."sessionId"
-                WHERE s."dateTime" >= NOW()
-            ) AS members,
-            (
-                SELECT COUNT(DISTINCT c.id)::int
-                FROM circles c
-                WHERE EXISTS (
-                    SELECT 1
-                    FROM sessions s
-                    WHERE s."circleId" = c.id
-                      AND s."dateTime" >= NOW()
-                )
-            ) AS active_circles,
-            (
-                SELECT COUNT(*)::int
-                FROM sessions s
-                WHERE s."dateTime" >= NOW()
-                  AND s."dateTime" < NOW() + INTERVAL '7 days'
-            ) AS meetups_this_week
+        SELECT COUNT(*)::int
+        FROM circle_members
+        WHERE status = 'active'
         """
     )
+    active_circles, meetups_this_week = await upcoming_activity_counts(conn)
 
     rows = await conn.fetch(
-        """
+        f"""
+        WITH {SOONEST_GATHERING_CTE}
         SELECT c.id,
                c."ritualType" AS "ritualType",
                c."recurringTime" AS "recurringTime",
@@ -51,33 +38,27 @@ async def get_community_preview(conn: asyncpg.Connection, *, lang: str = "en") -
                h.i18n_json AS hoby_i18n_json,
                COALESCE(
                    (
-                       SELECT COUNT(DISTINCT a."userId")::int
-                       FROM sessions s
-                       JOIN attendance a ON a."sessionId" = s.id
-                       WHERE s."circleId" = c.id
-                         AND s."dateTime" >= NOW()
+                       SELECT COUNT(*)::int
+                       FROM circle_members m
+                       WHERE m.circle_id = c.id
+                         AND m.status = 'active'
                    ),
                    0
-               ) AS "memberCount",
-               (
-                   SELECT MIN(s4."dateTime")
-                   FROM sessions s4
-                   WHERE s4."circleId" = c.id
-                     AND s4."dateTime" >= NOW()
-               ) AS "nextSessionAt"
+               ) AS "memberCount"
         FROM circles c
         LEFT JOIN hobies h ON lower(trim(h.slug)) = lower(trim(c."ritualType"))
+        LEFT JOIN soonest_gathering sg ON sg.circle_id = c.id
         WHERE EXISTS (
             SELECT 1
-            FROM sessions s3
-            JOIN attendance a3 ON a3."sessionId" = s3.id
-            WHERE s3."circleId" = c.id
-              AND s3."dateTime" >= NOW()
+            FROM circle_members m3
+            WHERE m3.circle_id = c.id
+              AND m3.status = 'active'
         )
-        ORDER BY "memberCount" DESC, "nextSessionAt" ASC NULLS LAST, c.id ASC
+        ORDER BY "memberCount" DESC, sg.start_at ASC NULLS LAST, c.id ASC
         LIMIT 3
         """
     )
+    next_activities = await public_next_activities(conn, [r["id"] for r in rows])
 
     featured: list[dict[str, object]] = []
     for r in rows:
@@ -99,15 +80,15 @@ async def get_community_preview(conn: asyncpg.Connection, *, lang: str = "en") -
                 "name": stored,
                 "displayTitle": title,
                 "hasCustomName": has_custom,
-                "nextSessionAt": r.get("nextSessionAt"),
+                "nextActivity": next_activities.get(r["id"]),
             }
         )
 
     return {
         "stats": {
-            "members": int(stats["members"] or 0) if stats else 0,
-            "activeCircles": int(stats["active_circles"] or 0) if stats else 0,
-            "meetupsThisWeek": int(stats["meetups_this_week"] or 0) if stats else 0,
+            "members": int(members or 0),
+            "activeCircles": active_circles,
+            "meetupsThisWeek": meetups_this_week,
         },
         "featuredCircles": featured,
     }

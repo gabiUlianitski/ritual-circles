@@ -6,10 +6,9 @@ import { BidiText } from "./BidiText";
 import { CircleInviteModal } from "./CircleInviteModal";
 import { circleDisplayTitle, circleHobbySubtitle } from "./circleDisplay";
 import { formatHourOnlyDisplay } from "./HourOnlyPicker";
-import { formatSessionDateTimeHero } from "./homeDashboardUtils";
 
 /**
- * Create always enrolls the creator on the new circle's sessions.
+ * Create always makes the creator a member.
  * The response has no member list, so this is that known result, not a fetched count.
  */
 const CREATOR_IS_FIRST_MEMBER = 1;
@@ -25,8 +24,6 @@ function meetingClock(recurringTime: string): { day: string; time: string } {
 
 export function CircleCreationSuccess(props: {
   circle: CircleResponse;
-  /** First meeting instant already chosen in the wizard. The create response does not include it. */
-  meetingAt?: string | null;
   onViewCircle: () => void;
   onEditCircle: () => void;
 }) {
@@ -35,16 +32,10 @@ export function CircleCreationSuccess(props: {
   const title = circleDisplayTitle(circle);
   const hobby = circleHobbySubtitle(circle);
   const when = meetingClock(circle.recurringTime);
-  const meetingLabel = props.meetingAt ? formatSessionDateTimeHero(props.meetingAt) : "";
-  const schedule =
-    meetingLabel && meetingLabel !== props.meetingAt
-      ? meetingLabel
-      : [when.day, when.time].filter(Boolean).join(" · ");
+  const schedule = [when.day, when.time].filter(Boolean).join(" · ");
   const place = meetingPlaceReviewParts(circle.meetingPlace ?? "");
   const location = [circle.cityName?.trim(), place.placeName].filter(Boolean).join(" · ");
   const open = circle.inviteOnly === false;
-  const capacity = Math.max(CREATOR_IS_FIRST_MEMBER, circle.maxSize || 6);
-  const openSpots = Math.max(0, capacity - CREATOR_IS_FIRST_MEMBER);
 
   return (
     <div className="card stack circle-join-success-page circle-created-page">
@@ -112,11 +103,6 @@ export function CircleCreationSuccess(props: {
         <p className="circle-created-description" dir="auto">
           {t("createSuccess.growBody")}
         </p>
-        {openSpots > 0 ? (
-          <p className="circle-created-meta">
-            {openSpots === 1 ? t("createSuccess.oneSpotOpen") : t("createSuccess.spotsOpen", { count: openSpots })}
-          </p>
-        ) : null}
       </section>
 
       <CircleInviteModal
@@ -124,8 +110,6 @@ export function CircleCreationSuccess(props: {
         isOpen
         circle={circle}
         joined={CREATOR_IS_FIRST_MEMBER}
-        capacity={capacity}
-        meetingAt={props.meetingAt}
         location={location || null}
         canInviteMembers
         onClose={() => {}}

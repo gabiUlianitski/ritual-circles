@@ -1,10 +1,29 @@
 # Data-model map
 
-Source of truth: `db/schema.sql` plus `db/migrations/` through `029`. Access is asyncpg SQL in `backend/app/services/` and routers. There is no ORM.
+Source of truth: `db/schema.sql` plus `db/migrations/` through `044`. Access is asyncpg SQL in `backend/app/services/` and routers. There is no ORM.
 
-Membership is **not** a table. Future `attendance` rows are the membership list. Do not add a members table unless product scope explicitly changes.
+## Current architecture
 
-No migration is proposed here. Gaps are missing concepts, not unused columns.
+```
+Hobby
+  └── Circle
+       ├── CircleMember
+       └── Activity
+            ├── ActivityParticipant
+            ├── ActivityOccurrence
+            │    └── ActivityOccurrenceParticipant
+            └── ActivitySuggestion
+                 └── ActivitySuggestionSupport
+```
+
+- **Circle** = the persistent community around a hobby.
+- **Activity** = a real-world gathering a Circle organizes (one date, or recurring weekly).
+- **ActivityOccurrence** = one date of a recurring Activity. Users see "this date", never "occurrence".
+- **Circle membership ≠ Activity participation.** Joining a Circle joins no Activity. Going to an Activity is `activity_participants` (one-time) or `activity_occurrence_participants` (one date of a recurring Activity).
+
+"Activity" is the technical name and the user-facing name. "Plan" appears in copy only as a verb ("Plan an Activity").
+
+Legacy `sessions` and `attendance` are read-only history (see below). No code path reads or writes them.
 
 ## Tables
 
@@ -71,8 +90,8 @@ Fields:
 - `recurringTime` (text schedule)
 - `is_recurring` (019)
 - `city`, `country_code`, `city_name`, `meeting_place` (007)
-- `"maxSize"` integer 1–6, join cap
-- `group_size_json` fixed / max / min / range policy (022). `"maxSize"` is still what join enforces.
+- `"maxSize"` integer 1–6, kept in step with `group_size_json`; a fallback for the default Activity size. Not a membership cap.
+- `group_size_json` fixed / max / min / range policy (022): the Circle's typical group size. Descriptive only; it pre-fills a new Activity's `group_size`.
 - `cost_payment_json` (023)
 - `"inviteCode"` unique
 - `invite_only` default true (006). False allows `POST /circles/join-open`.
@@ -86,33 +105,42 @@ Pages: create wizard, discover, home my-circles, circle details, chat.
 
 API: `POST /circles`, `GET /circles`, `PATCH /circles/{id}`, `GET /circles/me`, join, leave, drop.
 
-### Circle membership
+### `circle_members` (migration 038)
 
-Derived. Join inserts `attendance` rows for future sessions in one transaction and rejects when distinct future members `>= maxSize` (`circles_service`). Leave deletes future attendance rows. Home member list is distinct `userId` on future attendance (`home_query.py`).
+One row per user and circle, `status` `active` | `left`. Join inserts or reactivates the row in one transaction (`circles_service`, `circle_members.py`). Membership is unlimited: join never consults `maxSize`, `group_size_json`, or the member count. Only an Activity's `group_size` limits going participants. Leave sets `left`. Home `myCircles` and `memberCount` come from active rows (`home_query.py`).
 
 `isCreator` is `created_by == current user`, returned on home circle items and circle list items.
+
+### Activities (migrations 039–044)
+
+| Table | Role |
+| --- | --- |
+| `activities` | The gathering: title, start/end, place, group size, payment, `recurrence_type` (`one_time` / `recurring`) + `recurrence_rule`, lifecycle `status` (`draft`, `open`, `confirmed`, `completed`, `cancelled`) |
+| `activity_participants` | Who is going to a one-time Activity. `attendance_status` (`pending` \| `attended` \| `no_show`) records afterwards whether a going person came; it is separate from the RSVP `status`, set only by the creator or Circle owner, and shown only to them |
+| `activity_occurrences` | Dates of a recurring Activity. Topped up to a rolling window by `ensure_future_activity_occurrences` (`activities_service.py`, rules in `activity_recurrence.py`) |
+| `activity_occurrence_participants` | Who is going to one date, with that date's own `attendance_status` |
+| `activity_suggestions` / `activity_suggestion_support` | Member time/place suggestions and their support. Accepting one changes the Activity and may ask participants to reconfirm |
+| `activity_notifications` | In-app Activity notifications: one row per recipient and event, written in the same transaction as the change, unique per `(user_id, dedup_key)`. Identifiers only; read/dismiss state stays in the client inbox. Push is not implemented |
+
+API: `POST/GET /circles/{circleId}/activities`, `GET /circles/{circleId}/activity-defaults`, `GET/PATCH /activities/{activityId}`, `/activities/{activityId}/publish|confirm|complete|cancel|join|leave|reconfirm|suggestions`, `/activities/{activityId}/occurrences/{occurrenceId}/join|leave|reconfirm|suggestions`, `/activity-suggestions/{suggestionId}/support|support/remove|withdraw|accept|decline`.
+
+Pages: Circle Details activities list, Create / Edit Activity (shared form), Activity Details, Home upcoming activities, Discover "Next activity".
 
 ### `sessions` (meetups)
 
 Primary key: `id`. `circleId` → circles `ON DELETE CASCADE`. `dateTime`. `locationOrLink` (URL when online, plain text when offline).
 
-Created in a batch when a circle is created (about six weeks) and replenished when home is fetched (`session_replenish.py`). Recurrence is `circles.recurringTime` + `is_recurring`, not a separate schedule table.
-
-Pages: Home calendar and next card, circle details, attendance.
-
-API: `GET /sessions/next`, `GET /sessions`, and the sessions embedded in `GET /home`.
+Retired. Read-only history: no runtime code creates, replenishes, or reads Sessions, and no API exposes them. Meetups are Activities (`activities`, `activity_occurrences`).
 
 ### `attendance`
 
 Primary key: (`userId`, `sessionId`). `status` `attending` | `not_attending`, default `not_attending`, never null in the schema contract.
 
-API: `PUT /sessions/{sessionId}/attendance`.
-
-Pages: Home next card, day events, expanded my-circle row.
+Retired. Read-only history: no runtime code writes or reads Attendance, and no API exposes it. Participation is `activity_participants` / `activity_occurrence_participants`.
 
 ### Invitations
 
-Only `circles."inviteCode"`. No invitee list, no email invite record, no pending-request row.
+`circles."inviteCode"` for share links, plus `circle_invitations` (migration 034) for direct invitations with `pending` / `accepted` / `declined` / `canceled` status. Accepting joins the Circle through the same join transaction.
 
 ### Notifications
 
@@ -128,7 +156,7 @@ Page: `CircleChat` inside circle details. Notifications deep-link here.
 
 ### Locations
 
-Circle columns above, plus session `locationOrLink`. City autocomplete uses external geocoders through `/geo/*`, not a cities table.
+Circle columns above, plus each Activity's own place (and per-date overrides on `activity_occurrences`). City autocomplete uses external geocoders through `/geo/*`, not a cities table.
 
 ### Availability
 
@@ -142,8 +170,8 @@ User columns above. Not matched to circles by a server query today. Create-circl
 | `/home` | Signed-in home aggregate |
 | `/me` | Profile, password, delete, device token |
 | `/hobies` | Catalogue |
-| `/circles` | List, create, patch, join, leave, drop, me, messages, suggestions, venue suggestions |
-| `/sessions` | Next, list, attendance |
+| `/circles` | List, create, patch, join, leave, drop, me, messages, suggestions, venue suggestions, invitations, a circle's activities |
+| `/activities`, `/activity-suggestions` | Activity details, lifecycle, participation, dates, suggestions, reconfirmation |
 | `/community/preview` | Guest/landing counts and preview cards |
 | `/geo/*` | Countries, city and language suggest, reverse locate, maps link |
 
@@ -151,4 +179,4 @@ User columns above. Not matched to circles by a server query today. Create-circl
 
 ## Pages that depend on `GET /home`
 
-`App.refresh` loads it for every signed-in session. `Dashboard` reads `calendarSessions` and `myCircles`. Attendance and leave call `onRefresh`, which calls `GET /home` again. Notifications unread check uses the primary circle id from that payload. Moving calendar UI off Home without still calling `GET /home` on login would drop member counts, next session, and the unread check.
+`App.refresh` loads it for every signed-in session. `Dashboard` reads `upcomingActivities` and `myCircles` (member counts come from active `circle_members`). Leave calls `onRefresh`, which calls `GET /home` again. Notifications unread check uses the primary circle id from that payload.

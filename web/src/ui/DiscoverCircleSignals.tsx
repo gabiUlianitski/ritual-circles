@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { BidiText } from "./BidiText";
 import { DiscoverMemberPreview, type DiscoverMemberPerson } from "./DiscoverMemberPreview";
 
-/** True only when the card already has a meetup time that is still ahead. */
+/** True only when the circle's next Activity starts ahead. */
 function hasScheduledActivity(value?: string | null): boolean {
   const raw = value?.trim();
   if (!raw) return false;
@@ -44,7 +44,7 @@ export function discoverScheduleSignalKey(input: {
 export function DiscoverCircleSignals(props: {
   memberCount: number;
   people?: DiscoverMemberPerson[] | null;
-  nextSessionAt?: string | null;
+  nextActivityAt?: string | null;
   isRecurring?: boolean;
   recurringTime?: string | null;
 }) {
@@ -56,7 +56,7 @@ export function DiscoverCircleSignals(props: {
   });
   const items: { key: string; icon: string; label: string; good?: boolean }[] = [];
 
-  if (hasScheduledActivity(props.nextSessionAt)) {
+  if (hasScheduledActivity(props.nextActivityAt)) {
     items.push({
       key: "activity",
       icon: "✅",

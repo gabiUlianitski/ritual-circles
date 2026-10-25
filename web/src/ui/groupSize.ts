@@ -115,31 +115,6 @@ export function formatGroupSizeSummary(
   }
 }
 
-/** Upper bound on how many people can join, given the group-size preference. */
-export function effectiveGroupSizeCap(state: GroupSizeState): number {
-  const cap = 6;
-  switch (state.type) {
-    case "fixed":
-      return Math.min(cap, state.fixedCount);
-    case "max":
-      return Math.min(cap, state.maxCount);
-    case "min":
-      return cap;
-    case "range":
-      return Math.min(cap, state.rangeMax);
-  }
-}
-
-export function validateGroupSizeForMembers(state: GroupSizeState, memberCount: number): string | null {
-  const base = validateGroupSize(state);
-  if (base) return base;
-  const cap = effectiveGroupSizeCap(state);
-  if (memberCount > cap) {
-    return `You already have ${memberCount} members — set the limit to at least ${memberCount}.`;
-  }
-  return null;
-}
-
 export function groupSizeStateFromPayload(payload: GroupSizePayload | null | undefined): GroupSizeState {
   if (!payload) return { ...DEFAULT_GROUP_SIZE };
   const base: GroupSizeState = { ...DEFAULT_GROUP_SIZE, type: payload.type };

@@ -1,5 +1,5 @@
 import type { CircleListItem, Hoby } from "../api/types";
-import { circleNearUser } from "./circleDiscover";
+import { circleNearUser, nextActivityAt } from "./circleDiscover";
 import { isCircleJoinable } from "./circleParticipation";
 
 export type NewInterestMatch = {
@@ -97,9 +97,9 @@ export function discoverNewInterests(input: {
           circle.memberCount > 0 ||
           (circle.messagesToday ?? 0) > 0 ||
           (circle.messagesLastWeek ?? 0) > 0 ||
-          isFuture(circle.nextSessionAt, now),
+          isFuture(nextActivityAt(circle), now),
       );
-      const upcoming = opportunities.filter((circle) => isFuture(circle.nextSessionAt, now));
+      const upcoming = opportunities.filter((circle) => isFuture(nextActivityAt(circle), now));
       const category = key(hobby.interestCategory);
       const neighbor = relatedTo(slug, selectedHobbies);
       const sameCategory = category

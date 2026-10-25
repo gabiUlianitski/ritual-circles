@@ -8,34 +8,12 @@ import MenuItem from "@mui/material/MenuItem";
 import FormControl from "@mui/material/FormControl";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Switch from "@mui/material/Switch";
-import List from "@mui/material/List";
-import ListItem from "@mui/material/ListItem";
-import ListItemAvatar from "@mui/material/ListItemAvatar";
-import ListItemText from "@mui/material/ListItemText";
-import Avatar from "@mui/material/Avatar";
 import CircularProgress from "@mui/material/CircularProgress";
 import { api } from "../api/client";
-import type {
-  CircleMemberAttendanceItem,
-  CircleNextSessionRoster,
-  CircleResponse,
-  CitySuggestItem,
-  CountryItem,
-  VenueSuggestionItem,
-} from "../api/types";
-import { userDisplayLabel } from "../userDisplay";
+import type { CircleResponse, CitySuggestItem, CountryItem, VenueSuggestionItem } from "../api/types";
 import { meetingPlaceValue, splitMeetingPlace } from "../venueCardDisplay";
-import {
-  buildFirstSessionIso,
-  defaultMeetDateIso,
-  isMeetDateOnOrAfterToday,
-  recurringFromDateAndHour,
-  todayIsoLocal,
-} from "./createCircleSchedule";
-import { toDateInputValue } from "./circleChatTimeSuggest";
 import { CreateCircleCostPaymentStep } from "./CreateCircleCostPaymentStep";
 import { CreateCircleVenuePicker } from "./CreateCircleVenuePicker";
-import { MeetDateTimePicker } from "./MeetDateTimePicker";
 import { circleAdjustTheme } from "./circleAdjustTheme";
 import { FormError } from "./FormError";
 import { CircleNameField, circleNameIsValid, circleNamePayload } from "./CircleNameField";
@@ -52,7 +30,7 @@ import {
 import {
   DEFAULT_GROUP_SIZE,
   toGroupSizePayload,
-  validateGroupSizeForMembers,
+  validateGroupSize,
   type GroupSizeState,
 } from "./groupSize";
 
@@ -65,31 +43,6 @@ function groupSizeFromCircle(circle: CircleResponse | null): number {
 
 function fixedGroupSizeState(n: number): GroupSizeState {
   return { ...DEFAULT_GROUP_SIZE, type: "fixed", fixedCount: n };
-}
-
-function datetimeToMeetFields(iso: string): { meetDate: string; meetHour: string } {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) {
-    return { meetDate: defaultMeetDateIso(), meetHour: "17" };
-  }
-  return { meetDate: toDateInputValue(d), meetHour: String(d.getHours()) };
-}
-
-function rosterDisplayName(
-  member: CircleMemberAttendanceItem,
-  all: readonly CircleMemberAttendanceItem[],
-): string {
-  const label = userDisplayLabel(member);
-  const key = label.toLowerCase();
-  const sameLabel = all.filter((m) => userDisplayLabel(m).toLowerCase() === key);
-  if (sameLabel.length <= 1) return label;
-  return `${label} (@${member.user_name})`;
-}
-
-function memberInitial(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return (parts[0]?.[0] ?? "?").toUpperCase();
 }
 
 function FieldLabel(props: { children: React.ReactNode }) {
@@ -118,14 +71,10 @@ export function CircleScheduledTab(props: {
 }) {
   const { t } = useTranslation();
   const [circle, setCircle] = useState<CircleResponse | null>(null);
-  const [roster, setRoster] = useState<CircleNextSessionRoster | null>(null);
-  const [myUserId, setMyUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [meetDate, setMeetDate] = useState(() => defaultMeetDateIso());
-  const [meetHour, setMeetHour] = useState("17");
   const [cityQuery, setCityQuery] = useState("");
   const [citySelected, setCitySelected] = useState("");
   const [countryCode, setCountryCode] = useState("");
@@ -137,21 +86,11 @@ export function CircleScheduledTab(props: {
   const [costPayment, setCostPayment] = useState<CostPaymentState>(DEFAULT_COST_PAYMENT);
   const [groupSizeN, setGroupSizeN] = useState(6);
   const [openToEveryone, setOpenToEveryone] = useState(false);
-  const [repeatsWeekly, setRepeatsWeekly] = useState(true);
   const [circleName, setCircleName] = useState("");
 
   const hydratedRef = useRef(false);
-  const meetDateRef = useRef(meetDate);
-  const meetHourRef = useRef(meetHour);
-  const repeatsWeeklyRef = useRef(repeatsWeekly);
-  const scheduleSaveTimer = useRef<number | null>(null);
   const costSaveTimer = useRef<number | null>(null);
 
-  meetDateRef.current = meetDate;
-  meetHourRef.current = meetHour;
-  repeatsWeeklyRef.current = repeatsWeekly;
-
-  const minMeetDate = useMemo(() => todayIsoLocal(), []);
   const groupSizeState = useMemo(() => fixedGroupSizeState(groupSizeN), [groupSizeN]);
 
   const notifyCircleUpdated = useCallback(async () => {
@@ -176,21 +115,9 @@ export function CircleScheduledTab(props: {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [circleMe, me] = await Promise.all([
-        api.getMyCircle(props.circleId),
-        api.getMe().catch(() => null),
-      ]);
+      const circleMe = await api.getMyCircle(props.circleId);
       const c = circleMe.circle ?? null;
       setCircle(c);
-      setRoster(circleMe.nextSessionRoster ?? null);
-      if (me) setMyUserId(me.id);
-
-      const iso = circleMe.nextSessionRoster?.dateTime;
-      if (iso) {
-        const fields = datetimeToMeetFields(iso);
-        setMeetDate(fields.meetDate);
-        setMeetHour(fields.meetHour);
-      }
 
       if (!hydratedRef.current && c) {
         const city = c.cityName?.trim() || c.city?.trim() || "";
@@ -201,13 +128,11 @@ export function CircleScheduledTab(props: {
         setCostPayment(costPaymentStateFromPayload(c.costPayment));
         setGroupSizeN(groupSizeFromCircle(c));
         setOpenToEveryone(c.inviteOnly === false);
-        setRepeatsWeekly(c.isRecurring !== false);
         setCircleName(c.name?.trim() || "");
         if (city && c.ritualType) setVenueSearchNonce(1);
         hydratedRef.current = true;
       } else if (c) {
         setOpenToEveryone(c.inviteOnly === false);
-        setRepeatsWeekly(c.isRecurring !== false);
         setGroupSizeN(groupSizeFromCircle(c));
       }
     } catch (e) {
@@ -243,43 +168,6 @@ export function CircleScheduledTab(props: {
     } finally {
       setSaving(false);
     }
-  }
-
-  async function saveSchedule(meetDateValue: string, meetHourValue: string, recurring: boolean) {
-    if (!meetDateValue || meetHourValue === "") return;
-    if (!isMeetDateOnOrAfterToday(meetDateValue)) {
-      setError("Pick today or a future date.");
-      return;
-    }
-    const when = new Date(buildFirstSessionIso(meetDateValue, meetHourValue));
-    if (Number.isNaN(when.getTime()) || when.getTime() < Date.now() - 60_000) {
-      setError("Pick a future date and time.");
-      return;
-    }
-    await patchAndRefresh({
-      firstSessionAt: buildFirstSessionIso(meetDateValue, meetHourValue),
-      recurringTime: recurringFromDateAndHour(meetDateValue, meetHourValue),
-      isRecurring: recurring,
-    });
-  }
-
-  function queueSaveSchedule() {
-    if (scheduleSaveTimer.current) window.clearTimeout(scheduleSaveTimer.current);
-    scheduleSaveTimer.current = window.setTimeout(() => {
-      void saveSchedule(meetDateRef.current, meetHourRef.current, repeatsWeeklyRef.current);
-    }, 0);
-  }
-
-  function onMeetDateChange(value: string) {
-    setMeetDate(value);
-    meetDateRef.current = value;
-    queueSaveSchedule();
-  }
-
-  function onMeetHourChange(value: string) {
-    setMeetHour(value);
-    meetHourRef.current = value;
-    queueSaveSchedule();
   }
 
   function clearMeetingPlace() {
@@ -377,8 +265,7 @@ export function CircleScheduledTab(props: {
 
   async function saveGroupSize(n: number) {
     const state = fixedGroupSizeState(n);
-    const memberCount = roster?.members?.length ?? 0;
-    const err = validateGroupSizeForMembers(state, memberCount);
+    const err = validateGroupSize(state);
     if (err) {
       setError(err);
       return;
@@ -392,14 +279,6 @@ export function CircleScheduledTab(props: {
     await patchAndRefresh({ inviteOnly: !open });
   }
 
-  async function onRepeatsWeeklyChange(checked: boolean) {
-    setRepeatsWeekly(checked);
-    repeatsWeeklyRef.current = checked;
-    await saveSchedule(meetDateRef.current, meetHourRef.current, checked);
-  }
-
-  const members = roster?.members ?? [];
-
   if (loading && !circle) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
@@ -412,10 +291,10 @@ export function CircleScheduledTab(props: {
     <ThemeProvider theme={circleAdjustTheme}>
       <Box className="circle-adjust-tab" sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
         <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 400 }}>
-          Adjust your meetup
+          Adjust your circle
         </Typography>
 
-        <SectionCard title="Meetup details">
+        <SectionCard title="Circle details">
           <CircleNameField
             id="circle-adjust-name"
             value={circleName}
@@ -438,31 +317,6 @@ export function CircleScheduledTab(props: {
             {saving ? t("common.saving") : t("common.save")}
           </button>
           <Box className="circle-adjust-wizards stack">
-            <div className="stack" style={{ gap: 12 }}>
-              <h2 className="create-circle-step-title" style={{ margin: 0 }}>
-                When do you meet?
-              </h2>
-              <MeetDateTimePicker
-                dateId="circle-adjust-meet-datetime"
-                dateValue={meetDate}
-                hourValue={meetHour}
-                minDate={minMeetDate}
-                onDateChange={onMeetDateChange}
-                onHourChange={onMeetHourChange}
-                disabled={saving}
-              />
-              <label className="create-circle-repeat-row row">
-                <input
-                  type="checkbox"
-                  className="create-circle-repeat-checkbox"
-                  checked={repeatsWeekly}
-                  onChange={(e) => void onRepeatsWeeklyChange(e.target.checked)}
-                  disabled={saving}
-                />
-                <span className="create-circle-helper muted">{t("createCircle.repeatsWeekly")}</span>
-              </label>
-            </div>
-
             {circle ? (
               <CreateCircleVenuePicker
                 cityQuery={cityQuery}
@@ -541,53 +395,6 @@ export function CircleScheduledTab(props: {
               Anyone can join your circle
             </Typography>
           </Box>
-        </SectionCard>
-
-        <SectionCard title="Who's coming">
-          {!roster ? (
-            <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 400 }}>
-              No upcoming session yet.
-            </Typography>
-          ) : members.length === 0 ? (
-            <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 400 }}>
-              No one in this session yet.
-            </Typography>
-          ) : (
-            <List disablePadding dense>
-              {members.map((m) => {
-                const name = rosterDisplayName(m, members);
-                const confirmed = m.status === "attending";
-                return (
-                  <ListItem key={m.userId} disableGutters sx={{ py: 0.75 }}>
-                    <ListItemAvatar sx={{ minWidth: 44 }}>
-                      <Avatar sx={{ width: 34, height: 34, fontSize: 13, bgcolor: "#334155" }}>
-                        {memberInitial(name)}
-                      </Avatar>
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={
-                        <Typography variant="body1" color="text.primary" sx={{ fontWeight: 500 }}>
-                          {name}
-                          {m.userId === myUserId ? " (You)" : ""}
-                        </Typography>
-                      }
-                      secondary={
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontWeight: 500,
-                            color: confirmed ? "#22C55E" : "text.secondary",
-                          }}
-                        >
-                          {confirmed ? "Confirmed" : "Pending"}
-                        </Typography>
-                      }
-                    />
-                  </ListItem>
-                );
-              })}
-            </List>
-          )}
         </SectionCard>
 
         {saving ? (

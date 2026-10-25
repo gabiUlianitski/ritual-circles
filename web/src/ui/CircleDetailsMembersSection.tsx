@@ -32,10 +32,9 @@ export function CircleDetailsMembersSection(props: {
   hobiesCatalog: Hoby[];
   myUserId: string | null;
   creatorUserId: string | null;
-  maxSize: number;
   selectedMemberId: string | null;
   onSelectMember: (id: string | null) => void;
-  /** Creator-only. Empty seats stay decorative when this is omitted. */
+  /** Creator-only. Shows one invite action. */
   onInviteSeat?: () => void;
 }) {
   const { t } = useTranslation();
@@ -98,8 +97,6 @@ export function CircleDetailsMembersSection(props: {
     );
   }
 
-  const capacity = Math.max(members.length, props.maxSize || 6);
-  const openSeats = Math.max(0, capacity - members.length);
   const ordered = [...members].sort((a, b) => memberRank(b, props) - memberRank(a, props));
 
   return (
@@ -110,7 +107,7 @@ export function CircleDetailsMembersSection(props: {
           <h2 className="circle-details-members-title">{t("circleDetails.peopleTitle")}</h2>
         </div>
         <span className="circle-details-members-meta">
-          {t("circleDetails.seatsFilled", { joined: members.length, capacity })}
+          {t("circleDetails.memberCount", { count: members.length })}
         </span>
       </div>
       {members.length <= 1 ? (
@@ -154,29 +151,20 @@ export function CircleDetailsMembersSection(props: {
             </li>
           );
         })}
-        {Array.from({ length: openSeats }, (_, i) =>
-          props.onInviteSeat ? (
-            <li key={`open-${i}`}>
-              <button
-                type="button"
-                className="circle-details-person circle-details-person--open circle-details-person--invite"
-                onClick={props.onInviteSeat}
-              >
-                <span className="circle-details-person-avatar">
-                  <span className="circle-details-open-seat">+</span>
-                </span>
-                <span className="circle-details-person-name">{t("circleDetails.inviteSomeone")}</span>
-              </button>
-            </li>
-          ) : (
-            <li key={`open-${i}`} className="circle-details-person circle-details-person--open" aria-hidden>
+        {props.onInviteSeat ? (
+          <li>
+            <button
+              type="button"
+              className="circle-details-person circle-details-person--open circle-details-person--invite"
+              onClick={props.onInviteSeat}
+            >
               <span className="circle-details-person-avatar">
                 <span className="circle-details-open-seat">+</span>
               </span>
-              <span className="circle-details-person-name">{t("circleDetails.openSpot")}</span>
-            </li>
-          ),
-        )}
+              <span className="circle-details-person-name">{t("circleDetails.inviteSomeone")}</span>
+            </button>
+          </li>
+        ) : null}
       </ul>
     </section>
   );

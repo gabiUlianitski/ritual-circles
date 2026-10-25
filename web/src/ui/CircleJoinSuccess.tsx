@@ -4,11 +4,6 @@ import { api } from "../api/client";
 import type { CircleMeResponse, CircleMessage } from "../api/types";
 import { BidiText } from "./BidiText";
 import { circleDisplayTitle, circleHobbySubtitle } from "./circleDisplay";
-import {
-  activityStatusMark,
-  circleMomentum,
-  circleStatusKey,
-} from "./CircleProgressCard";
 import { FormError } from "./FormError";
 
 export function hasSeenJoinSuccess(userId: string | null, circleId: string): boolean {
@@ -79,46 +74,7 @@ export function CircleJoinSuccess(props: {
   const members = data?.members ?? [];
   const creatorUserId = data?.creatorUserId ?? null;
   const joined = Math.max(0, members.length);
-  const capacity = Math.max(1, circle?.maxSize ?? 6);
-  const spots = Math.max(0, capacity - joined);
-  const hasNextSession = Boolean(data?.nextSessionRoster?.dateTime);
-  const status = circleMomentum(joined, capacity, hasNextSession);
-  const pct = Math.min(100, Math.round((joined / capacity) * 100));
-
-  const needed =
-    spots <= 0
-      ? t("circleDetails.circleFullProgress")
-      : spots === 1
-        ? t("circleJoinSuccess.oneSpotNeeded")
-        : t("circleJoinSuccess.spotsNeeded", { count: spots });
-
-  const momentumText = useMemo(() => {
-    if (joined === 2) {
-      return t("circleJoinSuccess.momentumSecondMember");
-    }
-    if (status === "readyToSchedule" || status === "meetingConfirmed") {
-      return t("circleJoinSuccess.momentumReady");
-    }
-    if (spots <= 2) {
-      return spots === 1
-        ? t("circleJoinSuccess.momentumOneMore")
-        : t("circleJoinSuccess.momentumOnlyMore", { count: spots });
-    }
-    return t("circleJoinSuccess.momentumAlreadyJoined", { count: joined });
-  }, [joined, status, spots, t]);
-
-  const nextStepText = useMemo(() => {
-    if (status === "meetingConfirmed") {
-      return t("circleJoinSuccess.nextMeetingConfirmed");
-    }
-    if (hasNextSession) {
-      return t("circleJoinSuccess.nextMeetingScheduled");
-    }
-    if (status === "readyToSchedule") {
-      return t("circleJoinSuccess.nextReadyToSchedule");
-    }
-    return t("circleJoinSuccess.nextStillForming");
-  }, [status, hasNextSession, t]);
+  const nextStepText = t("circleJoinSuccess.communityNext");
 
   const starterChips = useMemo(
     () => [
@@ -168,28 +124,14 @@ export function CircleJoinSuccess(props: {
                   ) : null}
                 </div>
               </div>
-              <span className={`circle-activity-status-badge circle-progress-status--${status}`}>
-                <span aria-hidden>{activityStatusMark(status)}</span>
-                {t(circleStatusKey(status))}
+              <span className="circle-activity-status-badge circle-details-status--forming">
+                {t("circleDetails.youAreMember")}
               </span>
             </div>
 
-            <div className="circle-progress-card circle-join-success-progress" aria-label={t("circleDetails.groupProgress")}>
-              <p className="circle-progress-count">
-                {t("circleJoinSuccess.joinedOfParticipants", { joined, capacity })}
-              </p>
-              <p className="circle-progress-needed">{needed}</p>
-              <div
-                className="circle-progress-track"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={capacity}
-                aria-valuenow={Math.min(joined, capacity)}
-                aria-valuetext={t(circleStatusKey(status))}
-              >
-                <span className="circle-progress-fill" style={{ width: `${pct}%` }} />
-              </div>
-              <p className="circle-momentum-message">{momentumText}</p>
+            <div className="circle-progress-card circle-join-success-progress">
+              <p className="circle-progress-count">{t("circleDetails.memberCount", { count: joined })}</p>
+              <p className="circle-momentum-message">{nextStepText}</p>
             </div>
           </section>
 

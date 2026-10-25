@@ -1,6 +1,6 @@
 # Render blueprint — FastAPI API connected to Supabase PostgreSQL
 # Deploy: Render Dashboard → New → Blueprint → connect repo
-# Set DATABASE_URL and ALLOWED_ORIGINS in the Render dashboard after sync.
+# Set DATABASE_URL, ALLOWED_ORIGINS, and HOBBY_ADMIN_USER_IDS in Render after sync.
 
 services:
   - type: web
@@ -10,16 +10,22 @@ services:
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /docs
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: "3.12"
       - key: DATABASE_SSL
         value: require
+      - key: ENVIRONMENT
+        value: production
+      - key: ALLOW_DEV_USER_HEADER
+        value: "false"
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
         generateValue: true
+      - key: HOBBY_ADMIN_USER_IDS
+        sync: false
       - key: ALLOWED_ORIGINS
         sync: false
       - key: GOOGLE_OAUTH_CLIENT_ID

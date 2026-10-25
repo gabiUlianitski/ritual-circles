@@ -15,6 +15,7 @@ from app.schemas import (
     UserUpdateRequest,
 )
 from app.deps import CurrentUser, conn_dep, get_current_user, get_request_lang
+from app.security_config import is_hobby_admin
 from app.services.auth_service import change_password
 from app.user_hobbies import parse_hoby_level_key, user_hobies_from_row
 from app.user_availability_windows import availability_windows_from_row
@@ -46,6 +47,7 @@ def _user_me_from_row(row) -> UserMeResponse:
     first = hobbies[0] if hobbies else None
     return UserMeResponse(
         id=str(row["id"]),
+        hobbyAdmin=is_hobby_admin(row["id"]),
         user_name=row["user_name"],
         first_name=row["first_name"],
         last_name=row["last_name"],

@@ -8,7 +8,7 @@ from uuid import UUID
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.deps import conn_dep, get_current_user, get_request_lang, CurrentUser
+from app.deps import conn_dep, get_request_lang, CurrentUser, require_hobby_admin
 from app.schemas import (
     DailyLibraryInsight,
     GenerateInsightLibraryRequest,
@@ -18,8 +18,6 @@ from app.schemas import (
 )
 from app.services.hobby_insight_library import (
     InsightValidationError,
-    admin_allowlist,
-    catalogue_admin_allowed,
     create_insight_library,
     select_daily_insight,
 )
@@ -29,19 +27,12 @@ router = APIRouter(prefix="/hobby-insights", tags=["hobby-insights"])
 _DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
-async def _require_catalogue_admin(conn: asyncpg.Connection, user: CurrentUser) -> None:
-    email = await conn.fetchval("SELECT email FROM users WHERE id = $1", user.id)
-    if not catalogue_admin_allowed(authenticated=True, email=email, allowlist=admin_allowlist()):
-        raise HTTPException(status_code=403, detail="Catalogue admin required")
-
-
 @router.post("/generate", response_model=GenerateInsightLibraryResponse)
 async def generate_insight_library(
     payload: GenerateInsightLibraryRequest,
     conn: asyncpg.Connection = Depends(conn_dep),
-    user: CurrentUser = Depends(get_current_user),
+    _admin: CurrentUser = Depends(require_hobby_admin),
 ) -> GenerateInsightLibraryResponse:
-    await _require_catalogue_admin(conn, user)
     try:
         result = await create_insight_library(conn, hobby_id=payload.hobbyId)
     except LookupError as exc:
@@ -67,9 +58,8 @@ async def generate_insight_library(
 @router.get("/summary", response_model=InsightLibrarySummary)
 async def insight_summary(
     conn: asyncpg.Connection = Depends(conn_dep),
-    user: CurrentUser = Depends(get_current_user),
+    _admin: CurrentUser = Depends(require_hobby_admin),
 ) -> InsightLibrarySummary:
-    await _require_catalogue_admin(conn, user)
     try:
         rows = await conn.fetch(
             """

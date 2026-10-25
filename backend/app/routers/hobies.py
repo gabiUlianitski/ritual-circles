@@ -4,7 +4,7 @@ from uuid import uuid4
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.deps import conn_dep, get_request_lang
+from app.deps import CurrentUser, conn_dep, get_request_lang, require_hobby_admin
 from app.hoby_i18n import (
     localized_display_name,
     localized_levels_types,
@@ -44,6 +44,7 @@ router = APIRouter(prefix="/hobies", tags=["hobies"])
 async def hoby_spell_suggest(
     payload: HobySpellSuggestRequest,
     conn: asyncpg.Connection = Depends(conn_dep),
+    _admin: CurrentUser = Depends(require_hobby_admin),
 ) -> HobySpellSuggestResponse:
     data = await hoby_spell_suggestions(conn, slug=payload.slug, display_name=payload.displayName)
     return HobySpellSuggestResponse(
@@ -158,6 +159,7 @@ async def list_hobies(
 async def precheck_hoby(
     payload: HobyPrecheckRequest,
     conn: asyncpg.Connection = Depends(conn_dep),
+    _admin: CurrentUser = Depends(require_hobby_admin),
 ) -> HobyPrecheckResponse:
     data = await precheck_new_hoby(conn, display_name=payload.displayName)
     return HobyPrecheckResponse(**data)
@@ -168,6 +170,7 @@ async def create_hoby(
     payload: HobyCreateRequest,
     conn: asyncpg.Connection = Depends(conn_dep),
     lang: str = Depends(get_request_lang),
+    _admin: CurrentUser = Depends(require_hobby_admin),
 ) -> HobyResponse:
     dn = payload.displayName.strip()
     if not dn:
@@ -281,6 +284,7 @@ async def _archive_slug(conn: asyncpg.Connection, slug: str) -> bool:
 async def bulk_hobies(
     payload: HobyBulkRequest,
     conn: asyncpg.Connection = Depends(conn_dep),
+    _admin: CurrentUser = Depends(require_hobby_admin),
 ) -> HobyBulkResponse:
     slugs = [slug.strip() for slug in payload.slugs if slug and slug.strip()]
     result = HobyBulkResponse()
@@ -320,7 +324,11 @@ async def hoby_usage(slug: str, conn: asyncpg.Connection = Depends(conn_dep)) ->
 
 
 @router.delete("/{slug}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_hoby(slug: str, conn: asyncpg.Connection = Depends(conn_dep)) -> None:
+async def delete_hoby(
+    slug: str,
+    conn: asyncpg.Connection = Depends(conn_dep),
+    _admin: CurrentUser = Depends(require_hobby_admin),
+) -> None:
     slug_s = slug.strip()
     row = await conn.fetchrow("SELECT 1 FROM hobies WHERE slug = $1", slug_s)
     if not row:
@@ -335,6 +343,7 @@ async def archive_hoby(
     slug: str,
     conn: asyncpg.Connection = Depends(conn_dep),
     lang: str = Depends(get_request_lang),
+    _admin: CurrentUser = Depends(require_hobby_admin),
 ) -> HobyResponse:
     slug_s = slug.strip()
     if not await _archive_slug(conn, slug_s):
@@ -349,6 +358,7 @@ async def restore_hoby(
     slug: str,
     conn: asyncpg.Connection = Depends(conn_dep),
     lang: str = Depends(get_request_lang),
+    _admin: CurrentUser = Depends(require_hobby_admin),
 ) -> HobyResponse:
     slug_s = slug.strip()
     result = await conn.execute("UPDATE hobies SET archived_at = NULL WHERE slug = $1", slug_s)
@@ -405,6 +415,7 @@ async def update_hoby(
     payload: HobyUpdateRequest,
     conn: asyncpg.Connection = Depends(conn_dep),
     lang: str = Depends(get_request_lang),
+    _admin: CurrentUser = Depends(require_hobby_admin),
 ) -> HobyResponse:
     slug_s = slug.strip()
     if not slug_s:
@@ -547,6 +558,7 @@ async def regenerate_hoby(
     slug: str,
     payload: HobyRegenerateRequest,
     conn: asyncpg.Connection = Depends(conn_dep),
+    _admin: CurrentUser = Depends(require_hobby_admin),
 ) -> HobyRegeneratePreview:
     """Return AI suggestions for the chosen fields. Does not write the hobby."""
     slug_s = slug.strip()

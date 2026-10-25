@@ -28,3 +28,10 @@ Thumbs.db
 # Local API keys (see backend/.gitignore)
 backend/config/ai_keys.json
 backend/config/google_maps_keys.json
+
+# Local backups, archives, and audit output (never part of a release)
+/backups/
+/web.zip
+/_audit*.txt
+/h origin main
+/db/reset_account_for_onboarding.sql

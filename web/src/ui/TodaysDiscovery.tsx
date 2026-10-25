@@ -140,9 +140,9 @@ export function TodaysDiscovery(props: {
       })
     : libraryInsight || compactInsight(t(insightFallbackKey(visualPick.slug, today), { name: visualPick.displayName }));
   const imageUrl = discoveryImageUrl(scenePrompt(visualPick.displayName), `${today}:${visualPick.slug}`);
-  const nextActivity = shown?.nextSessionAt
-    ? formatSessionDateTimeHero(shown.nextSessionAt)
-    : t("homeFeed.readyToChooseDate");
+  const nextActivity = shown?.nextActivity
+    ? formatSessionDateTimeHero(shown.nextActivity.startAt)
+    : t("homeFeed.nothingScheduledYet");
 
   const open = () => {
     if (shown) props.onOpenCircle(shown);

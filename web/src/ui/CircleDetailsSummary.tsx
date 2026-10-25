@@ -32,15 +32,12 @@ export function CircleDetailsSummary(props: {
     modality?: string;
     costPayment?: CostPaymentPayload | null;
     groupSize?: GroupSizePayload | null;
-    maxSize?: number;
     description?: string | null;
   };
   hobiesCatalog?: Hoby[];
   members?: CircleMemberResponse[];
   myUserId?: string | null;
   memberCount?: number;
-  maxSize?: number;
-  hasNextSession?: boolean;
   /** Invitation preview shows schedule and place in their own sections. */
   hideFacts?: boolean;
   hideDescription?: boolean;
@@ -71,17 +68,9 @@ export function CircleDetailsSummary(props: {
   const scheduleChip = formatCircleScheduleChip(circle, t);
   const locationChip = formatCircleLocationChip(circle, t);
   const costChip = formatCircleCostChip(circle.costPayment, circle.groupSize, t);
-  const joined = Math.max(0, props.memberCount ?? 0);
-  const capacity = Math.max(1, props.maxSize ?? circle.maxSize ?? 6);
-  const status =
-    joined >= capacity ? "full" : !props.hasNextSession ? "noActivity" : joined >= 3 ? "ready" : "forming";
-  const statusKey = {
-    full: "circleDetails.statusFull",
-    noActivity: "circleDetails.statusNoActivity",
-    ready: "circleDetails.statusReady",
-    forming: "circleDetails.statusForming",
-  }[status];
   const allMembers = props.members ?? [];
+  const joined = Math.max(0, props.memberCount ?? allMembers.length);
+  const viewerIsMember = Boolean(props.myUserId && allMembers.some((member) => member.id === props.myUserId));
   const previewMembers = allMembers.slice(0, 5);
   const showHobbyLine = identity.hasCustomName && identity.hobbyDisplayName !== identity.displayTitle;
   const identityLine = [
@@ -90,7 +79,6 @@ export function CircleDetailsSummary(props: {
     level,
   ].filter((part): part is string => Boolean(part));
   const peopleLine = membersNamesLine(allMembers, props.myUserId ?? null, t);
-  const seats = Array.from({ length: capacity }, (_, i) => i < joined);
 
   return (
     <div className="circle-details-summary">
@@ -100,9 +88,9 @@ export function CircleDetailsSummary(props: {
           <span className="home-hobby-badge circle-details-hobby-badge" aria-hidden>
             {icon}
           </span>
-          {props.hideStatus ? null : (
-            <span className={`circle-activity-status-badge circle-details-status--${status}`}>
-              {t(statusKey)}
+          {props.hideStatus || !viewerIsMember ? null : (
+            <span className="circle-activity-status-badge circle-details-status--forming">
+              {t("circleDetails.youAreMember")}
             </span>
           )}
         </div>
@@ -145,14 +133,7 @@ export function CircleDetailsSummary(props: {
           ) : null}
           <div className="circle-details-hero-people-copy">
             {peopleLine ? <BidiText className="circle-details-hero-names">{peopleLine}</BidiText> : null}
-            <span className="circle-details-seats" aria-label={t("circleDetails.seatsFilled", { joined, capacity })}>
-              <span className="circle-details-seat-dots" aria-hidden>
-                {seats.map((filled, i) => (
-                  <span key={i} className={filled ? "is-filled" : undefined} />
-                ))}
-              </span>
-              {t("circleDetails.seatsFilled", { joined, capacity })}
-            </span>
+            <span className="circle-details-seats">{t("circleDetails.memberCount", { count: joined })}</span>
           </div>
         </div>
         )}

@@ -1,5 +1,5 @@
 import { api } from "./api/client";
-import type { CircleListItem, CircleMessage } from "./api/types";
+import type { ActivityNotificationType, CircleListItem, CircleMessage } from "./api/types";
 import i18n from "./i18n";
 import { circleDisplayTitle } from "./ui/circleDisplay";
 import { parsePlaceSuggestMessage } from "./ui/circleChatPlaceSuggest";
@@ -11,10 +11,20 @@ export type NotificationKind =
   | "member_joined"
   | "circle_dropped"
   | "circle_invite"
-  | "time_suggest"
-  | "place_suggest";
+  | "place_suggest"
+  | "activity";
 
 export type SuggestionDecision = "pending" | "accepted" | "declined";
+
+const ACTIVITY_TYPES: ReadonlySet<string> = new Set<ActivityNotificationType>([
+  "activity_cancelled",
+  "activity_confirmed",
+  "activity_changed",
+  "reconfirmation_required",
+  "upcoming_activity",
+  "suggestion_accepted",
+  "suggestion_declined",
+]);
 
 export type StoredNotification = {
   id: string;
@@ -31,6 +41,15 @@ export type StoredNotification = {
   suggestLabel?: string;
   messageBody?: string;
   decision?: SuggestionDecision;
+  activityType?: ActivityNotificationType;
+  activityId?: string;
+  occurrenceId?: string | null;
+  activityTitle?: string;
+  startAt?: string;
+  recurring?: boolean;
+  suggestionType?: "time" | "location" | null;
+  cancellationNote?: string | null;
+  resolved?: boolean;
 };
 
 const INBOX_PREFIX = "ritual_notif_inbox_v1:";
@@ -52,7 +71,8 @@ function loadInbox(userId: string): StoredNotification[] {
         typeof x === "object" &&
         x != null &&
         typeof (x as StoredNotification).id === "string" &&
-        typeof (x as StoredNotification).kind === "string",
+        typeof (x as StoredNotification).kind === "string" &&
+        (x as { kind: string }).kind !== "time_suggest",
     );
   } catch {
     return [];
@@ -154,10 +174,6 @@ function memberCircleIds(catalog: CircleListItem[], homeCircleId: string | null 
 
 function chatNotificationId(messageId: string): string {
   return `chat:${messageId}`;
-}
-
-function timeSuggestNotificationId(messageId: string): string {
-  return `time-suggest:${messageId}`;
 }
 
 function placeSuggestNotificationId(messageId: string): string {
@@ -281,6 +297,47 @@ function isChatMessageUnread(userId: string, circleId: string, message: CircleMe
   return messageTimeMs(message.createdAt) > seenMs;
 }
 
+function activityNotificationId(serverId: string): string {
+  return `activity:${serverId}`;
+}
+
+/** Server-stored Activity notifications. Items the server no longer lists (Activity gone, Circle left) are dropped. */
+async function syncActivityNotifications(userId: string, deletedIds: Set<string>) {
+  let rows;
+  try {
+    rows = await api.listActivityNotifications();
+  } catch {
+    return;
+  }
+  const listed = new Set<string>();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!ACTIVITY_TYPES.has(row.type)) continue;
+    const id = activityNotificationId(row.id);
+    listed.add(id);
+    if (deletedIds.has(id)) continue;
+    upsertInbox(userId, {
+      id,
+      kind: "activity",
+      read: row.resolved,
+      createdAt: row.createdAt,
+      circleId: row.circleId,
+      circleName: row.circleName,
+      activityType: row.type,
+      activityId: row.activityId,
+      occurrenceId: row.occurrenceId ?? null,
+      activityTitle: row.activityTitle,
+      startAt: row.startAt,
+      recurring: row.recurring,
+      suggestionType: row.suggestionType ?? null,
+      cancellationNote: row.cancellationNote ?? null,
+      resolved: row.resolved,
+    });
+  }
+  const items = loadInbox(userId);
+  const kept = items.filter((n) => n.kind !== "activity" || listed.has(n.id));
+  if (kept.length !== items.length) saveInbox(userId, kept);
+}
+
 /** Pull new events from the server into the local inbox (does not remove read items). */
 export async function syncNotificationInbox(
   userId: string | null,
@@ -315,6 +372,8 @@ export async function syncNotificationInbox(
   } catch {
     /* invitations are optional until the migration is applied */
   }
+
+  await syncActivityNotifications(userId, deletedIds);
 
   const list = await api.listCircles();
   const catalog = Array.isArray(list) ? list : [];
@@ -354,21 +413,18 @@ export async function syncNotificationInbox(
         const arr = Array.isArray(messages) ? messages : [];
         for (const m of arr) {
           if (sameUserId(m.userId, userId)) continue;
-          const timeSuggest = parseTimeSuggestMessage(m.body);
-          const placeSuggest = !timeSuggest ? parsePlaceSuggestMessage(m.body) : null;
+          const placeSuggest = parsePlaceSuggestMessage(m.body);
 
-          if (timeSuggest || placeSuggest) {
+          if (placeSuggest) {
             const isCreator = Boolean(c?.isCreator);
             if (isCreator) {
-              const id = timeSuggest
-                ? timeSuggestNotificationId(m.id)
-                : placeSuggestNotificationId(m.id);
+              const id = placeSuggestNotificationId(m.id);
               if (existingIds.has(id) || deletedIds.has(id)) continue;
               const prev = loadInbox(userId).find((n) => n.id === id);
               const unread = isChatMessageUnread(userId, circleId, m);
               upsertInbox(userId, {
                 id,
-                kind: timeSuggest ? "time_suggest" : "place_suggest",
+                kind: "place_suggest",
                 read: prev?.decision && prev.decision !== "pending" ? true : !unread,
                 createdAt: m.createdAt,
                 circleId,
@@ -376,7 +432,7 @@ export async function syncNotificationInbox(
                 authorName: m.authorName,
                 messageId: m.id,
                 messageBody: m.body,
-                suggestLabel: timeSuggest?.label ?? placeSuggest?.headline,
+                suggestLabel: placeSuggest.headline,
                 decision: prev?.decision ?? "pending",
               });
               existingIds.add(id);
@@ -465,9 +521,7 @@ export function markCircleChatNotificationsRead(userId: string | null, circleId:
   let changed = false;
   for (let i = 0; i < items.length; i++) {
     if (
-      (items[i].kind === "chat" ||
-        items[i].kind === "time_suggest" ||
-        items[i].kind === "place_suggest") &&
+      (items[i].kind === "chat" || items[i].kind === "place_suggest") &&
       items[i].circleId === circleId &&
       !items[i].read
     ) {

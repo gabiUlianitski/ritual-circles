@@ -1,14 +1,11 @@
-import React, { useState } from "react";
+import React from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { CircleListItem, CommunityStats } from "../api/types";
-import { api } from "../api/client";
 import { BidiText } from "./BidiText";
 import { circleDisplayTitle, circleHobbySubtitle } from "./circleDisplay";
-import { activityStatusMark, circleStatusKey } from "./CircleProgressCard";
-import { FormError } from "./FormError";
-import { formatSessionDateTimeHero, sessionHobbySubtitle, sessionTitle } from "./homeDashboardUtils";
-import { circleStatus, type HomeInterest, type HomeUpcoming } from "./homeSections";
+import { formatSessionDateTimeHero } from "./homeDashboardUtils";
+import { type HomeInterest } from "./homeSections";
 
 /** Dark-blue gradients; the hobby slug always maps to the same one. */
 const VISUAL_GRADIENTS = [
@@ -53,15 +50,13 @@ export function isBeginnerCircle(level: string | number | null | undefined): boo
 
 /** Real signals only: headcount, level, chat this week, and the next meetup. */
 export function circleSocialProof(c: CircleListItem, t: TFunction): string[] {
-  const spots = Math.max(0, c.maxSize - c.memberCount);
   return [
     t("homeFeed.memberCount", { count: c.memberCount }),
     isBeginnerCircle(c.ritualLevel) ? t("homeFeed.beginnerFriendly") : null,
     (c.messagesLastWeek ?? 0) > 0 ? t("homeFeed.proofActiveWeek") : null,
-    c.nextSessionAt
-      ? t("homeFeed.proofNextMeetup", { when: formatSessionDateTimeHero(c.nextSessionAt) })
+    c.nextActivity
+      ? t("homeFeed.proofNextMeetup", { when: formatSessionDateTimeHero(c.nextActivity.startAt) })
       : null,
-    spots > 0 && spots <= 2 ? t("homeFeed.proofSpotsLeft", { count: spots }) : null,
   ].filter((x): x is string => Boolean(x));
 }
 
@@ -69,37 +64,16 @@ function ProgressBlock(props: { circle: CircleListItem }) {
   const { t } = useTranslation();
   const joined = Math.max(0, props.circle.memberCount);
   const capacity = Math.max(1, props.circle.maxSize);
-  const spots = Math.max(0, capacity - joined);
-  const pct = Math.min(100, Math.round((joined / capacity) * 100));
-  const status = circleStatus(props.circle);
   return (
     <div className="discover-momentum-progress">
       <div className="discover-momentum-progress-row">
         <span className="discover-momentum-count">
           <span aria-hidden>👥 </span>
-          {t("discoverPage.joinedOfShort", { joined, capacity })}
+          {t("circleDetails.memberCount", { count: joined })}
         </span>
-        <span
-          className={`discover-momentum-spots${spots > 0 && spots <= 2 ? " discover-momentum-spots--scarce" : ""}`}
-        >
-          {spots <= 0
-            ? t("discoverPage.cardFull")
-            : spots === 1
-              ? t("discoverPage.onlyOneSpotLeft")
-              : spots === 2
-                ? t("discoverPage.onlySpotsLeft", { count: spots })
-                : t("discoverPage.spotsLeft", { count: spots })}
+        <span className="discover-momentum-spots">
+          {t("circleDetails.typicalSizeValue", { count: capacity })}
         </span>
-      </div>
-      <div
-        className="circle-progress-track"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={capacity}
-        aria-valuenow={Math.min(joined, capacity)}
-        aria-valuetext={t(circleStatusKey(status))}
-      >
-        <span className="circle-progress-fill" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
@@ -107,105 +81,16 @@ function ProgressBlock(props: { circle: CircleListItem }) {
 
 function StatusBadge(props: { circle: CircleListItem }) {
   const { t } = useTranslation();
-  const status = circleStatus(props.circle);
-  if (props.circle.memberCount <= 1 && !props.circle.isYours) {
-    return (
-      <span className="circle-activity-status-badge discover-momentum-new-badge">
-        <span aria-hidden>✨</span>
-        {t("discoverPage.newCircle")}
-      </span>
-    );
-  }
+  if (props.circle.memberCount > 1 || props.circle.isYours) return null;
   return (
-    <span className={`circle-activity-status-badge circle-progress-status--${status}`}>
-      <span aria-hidden>{activityStatusMark(status)}</span>
-      {t(circleStatusKey(status))}
+    <span className="circle-activity-status-badge discover-momentum-new-badge">
+      <span aria-hidden>✨</span>
+      {t("discoverPage.newCircle")}
     </span>
   );
 }
 
 /* ---------- 1. Hero ---------- */
-
-export function HomeHeroActivity(props: {
-  upcoming: HomeUpcoming;
-  onOpen: (circleId: string, tab?: "details" | "chat") => void;
-  onRefresh: () => Promise<void> | void;
-}) {
-  const { t } = useTranslation();
-  const [working, setWorking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const u = props.upcoming;
-  const circleId = u.kind === "session" ? u.item.circleId : u.circle.id;
-  const slug = u.kind === "session" ? u.item.ritualType : u.circle.ritualType;
-  const icon = u.kind === "session" ? u.item.hobyIcon : u.circle.hobyIcon;
-  const title = u.kind === "session" ? sessionTitle(u.item) : circleDisplayTitle(u.circle);
-  const hobbyLine = u.kind === "session" ? sessionHobbySubtitle(u.item) : circleHobbySubtitle(u.circle);
-  const members = u.kind === "session" ? (u.item.memberCount ?? 0) : u.circle.memberCount;
-  const coming = u.kind === "session" ? u.item.attendingCount : undefined;
-
-  async function imComing() {
-    if (u.kind !== "session") return;
-    setWorking(true);
-    setError(null);
-    try {
-      await api.putAttendance(u.item.session.id, "attending");
-      await props.onRefresh();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  return (
-    <section className="home-hero-visual" aria-label={t("homeFeed.yourNextActivity")}>
-      <HobbyVisual slug={slug} icon={icon} size="lg">
-        <span className="home-visual-kicker">
-          {u.kind === "readyToSchedule"
-            ? t("homeFeed.readyToChooseDate")
-            : u.needsAnswer
-              ? t("homeFeed.waitingForYourAnswer")
-              : t("homeFeed.yourNextActivity")}
-        </span>
-      </HobbyVisual>
-      <div className="home-hero-visual-body">
-        <BidiText as="h2" className="home-hero-visual-title circle-title-wrap">
-          {title}
-        </BidiText>
-        {hobbyLine ? <p className="home-hero-visual-meta circle-identity-hobby">{hobbyLine}</p> : null}
-        <p className="home-hero-visual-meta">
-          {u.kind === "session" ? (
-            <>
-              <span>📅 {formatSessionDateTimeHero(u.item.session.dateTime)}</span>
-              <span>
-                👥 {coming != null && coming > 0
-                  ? t("homeFeed.peopleComing", { count: coming })
-                  : t("discoverPage.proofPeopleJoined", { count: members })}
-              </span>
-            </>
-          ) : (
-            <span>👥 {t("discoverPage.proofPeopleJoined", { count: members })}</span>
-          )}
-        </p>
-        <div className="home-hero-visual-actions">
-          <button
-            type="button"
-            className="circle-details-primary"
-            onClick={() => props.onOpen(circleId, u.kind === "readyToSchedule" ? "chat" : "details")}
-          >
-            {u.kind === "readyToSchedule" ? t("homeFeed.suggestDate") : t("homeFeed.openActivity")}
-          </button>
-          {u.kind === "session" && u.needsAnswer ? (
-            <button type="button" className="home-hero-secondary" disabled={working} onClick={() => void imComing()}>
-              {working ? t("common.saving") : t("home.imComing")}
-            </button>
-          ) : null}
-        </div>
-        {error ? <FormError>{error}</FormError> : null}
-      </div>
-    </section>
-  );
-}
 
 export function HomeHeroEmpty(props: { chips: HomeInterest[]; onPickHobby: (slug: string) => void; onExplore: () => void }) {
   const { t } = useTranslation();
@@ -268,8 +153,8 @@ export function HappeningCarousel(props: { circles: CircleListItem[]; onOpen: (c
               {circleHobbySubtitle(c) ? (
                 <p className="home-happening-when circle-identity-hobby">{circleHobbySubtitle(c)}</p>
               ) : null}
-              {c.nextSessionAt ? (
-                <p className="home-happening-when">📅 {formatSessionDateTimeHero(c.nextSessionAt)}</p>
+              {c.nextActivity ? (
+                <p className="home-happening-when">📅 {formatSessionDateTimeHero(c.nextActivity.startAt)}</p>
               ) : null}
               <ProgressBlock circle={c} />
             </div>
@@ -308,51 +193,6 @@ export function CommunityPulse(props: { stats: CommunityStats | null; groupsForm
             <span className="home-pulse-label">{it.label}</span>
           </li>
         ))}
-      </ul>
-    </section>
-  );
-}
-
-/* ---------- 6. Upcoming Activity ---------- */
-
-export function UpcomingList(props: { items: HomeUpcoming[]; onOpen: (circleId: string) => void }) {
-  const { t } = useTranslation();
-  if (props.items.length === 0) return null;
-  return (
-    <section className="home-feed-block" aria-label={t("homeFeed.upcomingActivity")}>
-      <h2 className="home-section-title">{t("homeFeed.upcomingActivity")}</h2>
-      <ul className="activity-history">
-        {props.items.map((u) => {
-          const id = u.kind === "session" ? u.item.circleId : u.circle.id;
-          const key = u.kind === "session" ? u.item.session.id : `ready-${u.circle.id}`;
-          return (
-            <li key={key}>
-              <button type="button" className="activity-history-item" onClick={() => props.onOpen(id)}>
-                <span className="home-hobby-badge home-hobby-badge--sm" aria-hidden>
-                  {(u.kind === "session" ? u.item.hobyIcon : u.circle.hobyIcon) ?? ""}
-                </span>
-                <span className="activity-history-copy">
-                  <BidiText as="span" className="activity-history-title">
-                    {u.kind === "session" ? sessionTitle(u.item) : circleDisplayTitle(u.circle)}
-                  </BidiText>
-                  <span className="activity-history-time muted">
-                    {[
-                      u.kind === "session" ? sessionHobbySubtitle(u.item) : circleHobbySubtitle(u.circle),
-                      u.kind === "session"
-                        ? formatSessionDateTimeHero(u.item.session.dateTime)
-                        : t("homeFeed.readyToChooseDate"),
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </span>
-                <span className="activity-history-status muted">
-                  {u.kind === "session" && u.needsAnswer ? t("homeFeed.waitingForYourAnswer") : t("homeFeed.openActivity")}
-                </span>
-              </button>
-            </li>
-          );
-        })}
       </ul>
     </section>
   );

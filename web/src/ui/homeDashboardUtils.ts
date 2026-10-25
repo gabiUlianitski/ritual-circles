@@ -1,64 +1,4 @@
-import type { HomeCalendarSession } from "../api/types";
 import { dateLocale } from "../dateLocale";
-import { circleHobyTitle } from "./circleDisplay";
-
-export function sessionTitle(item: HomeCalendarSession): string {
-  return (
-    item.displayTitle?.trim() ||
-    item.hobyDisplayName?.trim() ||
-    circleHobyTitle({ ritualType: item.ritualType, recurringTime: "" })
-  );
-}
-
-/** Hobby line under a session title when the parent circle has a custom name. */
-export function sessionHobbySubtitle(item: HomeCalendarSession): string | null {
-  if (!item.hasCustomName) return null;
-  const hobby = item.hobyDisplayName?.trim() || "";
-  if (!hobby || hobby === sessionTitle(item)) return null;
-  return hobby;
-}
-
-export function getUpcomingSessions(sessions: HomeCalendarSession[]): HomeCalendarSession[] {
-  const now = Date.now();
-  return [...sessions]
-    .filter((s) => new Date(s.session.dateTime).getTime() >= now - 60_000)
-    .sort((a, b) => new Date(a.session.dateTime).getTime() - new Date(b.session.dateTime).getTime());
-}
-
-export function countActivitiesThisWeek(sessions: HomeCalendarSession[]): number {
-  const now = new Date();
-  const weekEnd = new Date(now);
-  weekEnd.setDate(weekEnd.getDate() + 7);
-  return getUpcomingSessions(sessions).filter((s) => {
-    const d = new Date(s.session.dateTime);
-    return d <= weekEnd;
-  }).length;
-}
-
-export function daysUntilNextSession(sessions: HomeCalendarSession[]): number | null {
-  const next = getUpcomingSessions(sessions)[0];
-  if (!next) return null;
-  const d = new Date(next.session.dateTime);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
-}
-
-export function formatSessionDateTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const dayDiff = Math.round((target.getTime() - today.getTime()) / 86_400_000);
-  const locale = dateLocale();
-  const time = d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12: false });
-  if (dayDiff === 0) return `Today · ${time}`;
-  if (dayDiff === 1) return `Tomorrow · ${time}`;
-  const day = d.toLocaleDateString(locale, { weekday: "short", month: "short", day: "numeric" });
-  return `${day} · ${time}`;
-}
 
 /** Hero card time line — e.g. Fri Oct 9 • 20:00 */
 export function formatSessionDateTimeHero(iso: string): string {
@@ -102,15 +42,12 @@ export function formatSessionEventParts(iso: string): { date: string; time: stri
 /** Compact social line, e.g. "2 members joined • 4 spots available". */
 export function formatJoinedLine(
   memberCount: number,
-  maxSize: number,
+  _maxSize: number,
   t: (key: string, options?: Record<string, unknown>) => string,
 ): string {
   const joined = Math.max(0, memberCount);
-  const spots = Math.max(0, maxSize - joined);
   const members = joined === 1 ? t("home.oneMemberJoined") : t("home.membersJoined", { count: joined });
-  if (spots <= 0) return members;
-  const spotsText = spots === 1 ? t("home.oneSpotAvailable") : t("home.spotsAvailable", { count: spots });
-  return `${members} • ${spotsText}`;
+  return members;
 }
 
 export function activityTypeClass(ritualType: string): string {
@@ -118,10 +55,6 @@ export function activityTypeClass(ritualType: string): string {
   const known = ["tennis", "chess", "bicycle", "coffee", "dancing", "cooking"];
   if (known.includes(slug)) return `home-calendar-day-chip--type-${slug === "bicycle" ? "cycling" : slug}`;
   return "home-calendar-day-chip--type-default";
-}
-
-export function isSessionPending(item: HomeCalendarSession): boolean {
-  return item.myAttendance?.status !== "attending";
 }
 
 export function dateToIsoLocal(d: Date): string {

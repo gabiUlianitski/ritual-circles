@@ -21,13 +21,11 @@ export function CreateJoinCircle(props: {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdCircle, setCreatedCircle] = useState<CircleResponse | null>(null);
-  const [createdMeetingAt, setCreatedMeetingAt] = useState<string | null>(null);
 
   if (createdCircle?.id) {
     return (
       <CircleCreationSuccess
         circle={createdCircle}
-        meetingAt={createdMeetingAt}
         onViewCircle={() => props.onOpenCircle(createdCircle.id, "details")}
         onEditCircle={() => props.onOpenCircle(createdCircle.id, "scheduled")}
       />
@@ -44,12 +42,11 @@ export function CreateJoinCircle(props: {
       </div>
 
       <CreateCircleWizard
-          onDone={async (created, firstSessionAt) => {
+          onDone={async (created) => {
             if (!created?.id?.trim()) {
               await props.onCreated(null);
               return;
             }
-            setCreatedMeetingAt(firstSessionAt?.trim() || null);
             setCreatedCircle(created);
           }}
           working={working}

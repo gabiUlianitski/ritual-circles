@@ -12,39 +12,40 @@ export type GoogleAuthResponse = {
 };
 
 export type Modality = "online" | "offline";
-export type AttendanceStatus = "attending" | "not_attending";
 
 export type HomeCircleItem = {
   circle: CircleResponse;
-  nextSession: SessionResponse | null;
-  myAttendance: AttendanceResponse | null;
-  pendingConfirmation: boolean;
   isCreator?: boolean;
-};
-
-export type HomeCalendarSession = {
-  session: SessionResponse;
-  circleId: string;
-  ritualType: string;
-  hobyDisplayName?: string | null;
-  hobyIcon?: string | null;
-  displayTitle?: string | null;
-  hasCustomName?: boolean;
-  myAttendance: AttendanceResponse | null;
-  /** Members who tapped "I'm coming" for this session. */
-  attendingCount?: number;
-  /** People in the circle (attendance rows for this session). */
-  memberCount?: number;
-  /** Maximum people allowed in the circle (from group size). */
-  maxSize?: number;
+  /** Active circle members. */
+  memberCount: number;
 };
 
 export type HomeResponse = {
   circle: CircleResponse | null;
-  nextSession: SessionResponse | null;
-  myAttendance: AttendanceResponse | null;
   myCircles?: HomeCircleItem[];
-  calendarSessions?: HomeCalendarSession[];
+  /** Joined Activities that have not ended, earliest first. Recurring Activities give one item per joined date. */
+  upcomingActivities?: HomeActivityItem[];
+};
+
+export type HomeActivityItem = {
+  activityId: string;
+  occurrenceId?: string | null;
+  circleId: string;
+  circleName: string;
+  title: string;
+  ritualType: string;
+  hobyDisplayName?: string | null;
+  hobyIcon?: string | null;
+  isRecurring: boolean;
+  startAt: string;
+  endAt?: string | null;
+  locationName?: string | null;
+  locationAddress?: string | null;
+  paymentType: "free" | "paid";
+  priceAmount?: string | number | null;
+  currency?: string | null;
+  status: "open" | "confirmed";
+  participation: ActivityParticipation;
 };
 
 export type UserHobyPreference = {
@@ -68,6 +69,7 @@ export type UserLanguageItem = {
 
 export type UserMeResponse = {
   id: string;
+  hobbyAdmin: boolean;
   user_name: string;
   first_name: string;
   last_name: string;
@@ -141,6 +143,142 @@ export type CircleResponse = {
   hasCustomName?: boolean;
 };
 
+export type ActivityDefaults = {
+  locationName: string | null;
+  locationAddress: string | null;
+  preferredGroupSize: number;
+};
+
+export type ActivityCreatePayload = {
+  title: string;
+  description?: string | null;
+  startAt: string;
+  endAt?: string | null;
+  recurrenceType: "one_time" | "recurring";
+  recurrenceRule?: string | null;
+  locationName?: string | null;
+  locationAddress?: string | null;
+  groupSize: number;
+  paymentType: "free" | "paid";
+  priceAmount?: string | null;
+  currency?: string | null;
+};
+
+export type ActivityActions = {
+  canJoin: boolean;
+  canLeave: boolean;
+  canEdit: boolean;
+  canPublish: boolean;
+  canConfirm: boolean;
+  canComplete: boolean;
+  canCancel: boolean;
+  canSuggest?: boolean;
+  hasStarted: boolean;
+  hasEnded: boolean;
+};
+
+export type ActivitySuggestion = {
+  id: string;
+  activityId: string;
+  occurrenceId?: string | null;
+  type: "time" | "location";
+  proposedStartAt?: string | null;
+  proposedEndAt?: string | null;
+  proposedLocationName?: string | null;
+  proposedLocationAddress?: string | null;
+  note?: string | null;
+  status: "open" | "accepted" | "declined" | "withdrawn";
+  suggestedByName: string;
+  suggestedByAvatarUrl?: string | null;
+  supportCount: number;
+  supportedByMe: boolean;
+  canSupport: boolean;
+  canWithdraw: boolean;
+  canDecide: boolean;
+  actionable: boolean;
+  createdAt: string;
+};
+
+export type ActivityOccurrence = {
+  id: string;
+  startAt: string;
+  endAt?: string | null;
+  status: "draft" | "open" | "confirmed" | "cancelled" | "completed";
+  cancellationReason?: string | null;
+  locationName?: string | null;
+  locationAddress?: string | null;
+  hasStarted: boolean;
+  hasEnded: boolean;
+  actions: ActivityActions;
+  participation?: ActivityParticipation | null;
+  suggestions?: ActivitySuggestion[];
+  attendance?: ActivityAttendanceEntry[] | null;
+};
+
+/** What actually happened after an Activity or date ended. Separate from the going/cancelled RSVP. */
+export type ActivityAttendanceStatus = "pending" | "attended" | "no_show";
+
+/** Sent only to the Activity creator and Circle owner, only once the gathering has ended. */
+export type ActivityAttendanceEntry = {
+  participantId: string;
+  name: string;
+  avatarUrl?: string | null;
+  attendanceStatus: ActivityAttendanceStatus;
+};
+
+export type ActivityGoingPerson = {
+  name: string;
+  avatarUrl?: string | null;
+};
+
+export type ActivityParticipation = {
+  goingCount: number;
+  groupSize: number;
+  remainingPlaces: number;
+  isFull: boolean;
+  currentUserStatus?: "going" | "cancelled" | null;
+  confirmationRequired?: boolean;
+  going?: ActivityGoingPerson[];
+};
+
+export type Activity = {
+  id: string;
+  circleId: string;
+  title: string;
+  description?: string | null;
+  startAt: string;
+  endAt?: string | null;
+  recurrenceType: "one_time" | "recurring";
+  recurrenceRule?: string | null;
+  locationName?: string | null;
+  locationAddress?: string | null;
+  groupSize: number;
+  paymentType: "free" | "paid";
+  priceAmount?: string | number | null;
+  currency?: string | null;
+  status: "draft" | "open" | "confirmed" | "cancelled" | "completed";
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  cancellationReason?: string | null;
+  hasStarted?: boolean;
+  hasEnded?: boolean;
+  actions?: ActivityActions | null;
+  occurrences?: ActivityOccurrence[];
+  nextOccurrence?: ActivityOccurrence | null;
+  participation?: ActivityParticipation | null;
+  suggestions?: ActivitySuggestion[];
+  attendance?: ActivityAttendanceEntry[] | null;
+};
+
+export type ActivityCreated = Activity;
+
+export type ActivityUpdatePayload = Partial<Omit<ActivityCreatePayload, "paymentType" | "recurrenceType">> & {
+  recurrenceType?: ActivityCreatePayload["recurrenceType"];
+  paymentType?: ActivityCreatePayload["paymentType"];
+  status?: "open";
+};
+
 export type MeetingPlacePatch = {
   name: string;
   city: string;
@@ -151,9 +289,6 @@ export type CirclePatchRequest = {
   inviteOnly?: boolean;
   groupSize?: GroupSizePayload;
   costPayment?: CostPaymentPayload;
-  firstSessionAt?: string;
-  recurringTime?: string;
-  isRecurring?: boolean;
   meetingPlaceUpdate?: MeetingPlacePatch;
   description?: string | null;
   name?: string | null;
@@ -193,8 +328,6 @@ export type CircleCreateRequest = {
   description?: string | null;
   name?: string | null;
   inviteOnly?: boolean;
-  /** Exact first meeting time (local browser time sent as ISO UTC). */
-  firstSessionAt?: string | null;
   groupSize?: GroupSizePayload;
   costPayment?: CostPaymentPayload;
 };
@@ -251,6 +384,16 @@ export type CommunityStats = {
   meetupsThisWeek: number;
 };
 
+/**
+ * When a circle's next Activity (or recurring date) happens, as shown to guests, non-members and invitees.
+ * Title, place, address and headcount are not sent; members read them from the Activity APIs.
+ */
+export type CircleNextActivity = {
+  startAt: string;
+  endAt?: string | null;
+  isRecurring: boolean;
+};
+
 export type CommunityCirclePreview = {
   id: string;
   ritualType: string;
@@ -265,7 +408,7 @@ export type CommunityCirclePreview = {
   name?: string | null;
   displayTitle?: string | null;
   hasCustomName?: boolean;
-  nextSessionAt?: string | null;
+  nextActivity?: CircleNextActivity | null;
 };
 
 export type DiscoveryResponse = {
@@ -349,26 +492,9 @@ export type CircleListItem = {
   hasCustomName?: boolean;
   groupSize?: GroupSizePayload | null;
   costPayment?: CostPaymentPayload | null;
-  nextSessionAt?: string | null;
+  nextActivity?: CircleNextActivity | null;
   messagesLastWeek?: number;
   messagesToday?: number;
-};
-
-export type SessionResponse = {
-  id: string;
-  circleId: string;
-  dateTime: string; // ISO string
-  locationOrLink: string;
-};
-
-export type AttendanceResponse = {
-  userId: string;
-  sessionId: string;
-  status: AttendanceStatus;
-};
-
-export type AttendanceUpsertRequest = {
-  status: AttendanceStatus;
 };
 
 export type CircleMemberResponse = {
@@ -384,25 +510,9 @@ export type CircleMemberResponse = {
   hobby_level?: string | number | null;
   avatarUrl?: string | null;
 };
-export type CircleMemberAttendanceItem = {
-  userId: string;
-  user_name: string;
-  first_name: string;
-  last_name: string;
-  status: AttendanceStatus;
-};
-
-export type CircleNextSessionRoster = {
-  sessionId: string;
-  dateTime: string;
-  locationOrLink?: string | null;
-  members: CircleMemberAttendanceItem[];
-};
-
 export type CircleMeResponse = {
   circle: CircleResponse | null;
   members: CircleMemberResponse[];
-  nextSessionRoster?: CircleNextSessionRoster | null;
   isCreator?: boolean;
   creatorUserId?: string | null;
 };
@@ -447,6 +557,32 @@ export type CircleInvitation = {
   inviteeName: string;
 };
 
+export type ActivityNotificationType =
+  | "activity_cancelled"
+  | "activity_confirmed"
+  | "activity_changed"
+  | "reconfirmation_required"
+  | "upcoming_activity"
+  | "suggestion_accepted"
+  | "suggestion_declined";
+
+/** In-app only. Identifiers and display basics; wording is localized on the client. */
+export type ActivityNotification = {
+  id: string;
+  type: ActivityNotificationType;
+  activityId: string;
+  occurrenceId?: string | null;
+  circleId: string;
+  circleName: string;
+  activityTitle: string;
+  recurring: boolean;
+  startAt: string;
+  suggestionType?: "time" | "location" | null;
+  cancellationNote?: string | null;
+  resolved: boolean;
+  createdAt: string;
+};
+
 /** Pending-invitee read. Counts only — no invite code and no member identities. */
 export type CircleInvitationPreview = {
   id: string;
@@ -462,7 +598,7 @@ export type CircleInvitationPreview = {
   description?: string | null;
   recurringTime: string;
   isRecurring?: boolean;
-  nextSessionAt?: string | null;
+  nextActivity?: CircleNextActivity | null;
   modality: string;
   city?: string | null;
   cityName?: string | null;

@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
@@ -29,8 +30,6 @@ def _validate_circle_description(value: str | None) -> str | None:
 
 
 Modality = Literal["online", "offline"]
-AttendanceStatus = Literal["attending", "not_attending"]
-
 
 class AuthStartRequest(BaseModel):
     # Minimal V1 auth: email + password
@@ -99,6 +98,7 @@ class UserLanguageItem(BaseModel):
 
 class UserMeResponse(BaseModel):
     id: str
+    hobbyAdmin: bool = False
     user_name: str
     first_name: str
     last_name: str
@@ -269,27 +269,23 @@ class CircleMemberResponse(BaseModel):
     avatarUrl: str | None = None
 
 
-class CircleMemberAttendanceItem(BaseModel):
-    userId: str
-    user_name: str
-    first_name: str
-    last_name: str
-    status: AttendanceStatus
-
-
-class CircleNextSessionRoster(BaseModel):
-    sessionId: str
-    dateTime: datetime
-    locationOrLink: str | None = None
-    members: list[CircleMemberAttendanceItem] = Field(default_factory=list)
-
-
 class CircleMeResponse(BaseModel):
     circle: CircleResponse | None = None
     members: list[CircleMemberResponse] = Field(default_factory=list)
-    nextSessionRoster: CircleNextSessionRoster | None = None
     isCreator: bool = False
     creatorUserId: str | None = None
+
+
+class CircleNextActivity(BaseModel):
+    """When the circle's earliest upcoming gathering happens: a one-time Activity or a recurring date.
+
+    Sent to guests, non-members and invitees, so it has no title, place, address, ids or headcount.
+    Members get those from the Activity APIs.
+    """
+
+    startAt: datetime
+    endAt: datetime | None = None
+    isRecurring: bool = False
 
 
 class CircleListItemResponse(BaseModel):
@@ -318,7 +314,7 @@ class CircleListItemResponse(BaseModel):
     hasCustomName: bool = False
     groupSize: GroupSizeSpec | None = None
     costPayment: CirclePaymentSpec | None = None
-    nextSessionAt: datetime | None = None
+    nextActivity: CircleNextActivity | None = None
     messagesLastWeek: int = 0
     messagesToday: int = 0
 
@@ -343,7 +339,7 @@ class CommunityCirclePreview(BaseModel):
     name: str | None = None
     displayTitle: str = ""
     hasCustomName: bool = False
-    nextSessionAt: datetime | None = None
+    nextActivity: CircleNextActivity | None = None
 
 
 class CommunityPreviewResponse(BaseModel):
@@ -363,7 +359,6 @@ class CircleCreateRequest(BaseModel):
     cityName: str | None = None
     meetingPlace: str | None = None
     inviteOnly: bool = False
-    firstSessionAt: datetime | None = None
     groupSize: GroupSizeSpec | None = None
     costPayment: CirclePaymentSpec | None = None
     description: str | None = None
@@ -390,9 +385,6 @@ class CirclePatchRequest(BaseModel):
     inviteOnly: bool | None = None
     groupSize: GroupSizeSpec | None = None
     costPayment: CirclePaymentSpec | None = None
-    firstSessionAt: datetime | None = None
-    recurringTime: str | None = None
-    isRecurring: bool | None = None
     meetingPlaceUpdate: MeetingPlacePatch | None = None
     description: str | None = None
     name: str | None = None
@@ -409,18 +401,10 @@ class CirclePatchRequest(BaseModel):
 
     @model_validator(mode="after")
     def at_least_one_field(self) -> "CirclePatchRequest":
-        schedule_fields = (
-            self.firstSessionAt is not None,
-            self.recurringTime is not None,
-            self.isRecurring is not None,
-        )
-        if any(schedule_fields) and not all(schedule_fields):
-            raise ValueError("firstSessionAt, recurringTime, and isRecurring must be sent together")
         has_any = (
             self.inviteOnly is not None
             or self.groupSize is not None
             or self.costPayment is not None
-            or all(schedule_fields)
             or self.meetingPlaceUpdate is not None
             or "description" in self.model_fields_set
             or "name" in self.model_fields_set
@@ -432,9 +416,6 @@ class CirclePatchRequest(BaseModel):
 
 class CircleSuggestionActionRequest(BaseModel):
     action: Literal["accept", "decline"]
-    firstSessionAt: datetime | None = None
-    recurringTime: str | None = None
-    isRecurring: bool | None = None
 
 
 class CircleJoinByIdRequest(BaseModel):
@@ -521,55 +502,18 @@ class CircleLeaveRequest(BaseModel):
     circleId: str
 
 
-class SessionResponse(BaseModel):
-    id: str
-    circleId: str
-    dateTime: datetime
-    locationOrLink: str
-
-
-class AttendanceResponse(BaseModel):
-    userId: str
-    sessionId: str
-    status: AttendanceStatus
-
-
-class AttendanceUpsertRequest(BaseModel):
-    status: AttendanceStatus
-
-
 class HomeCircleItem(BaseModel):
-    """One circle the user belongs to (future attendance), with its next session."""
+    """One circle the user is an active member of."""
 
     circle: CircleResponse
-    nextSession: SessionResponse | None
-    myAttendance: AttendanceResponse | None
-    pendingConfirmation: bool = False
     isCreator: bool = False
-
-
-class HomeCalendarSession(BaseModel):
-    """A future session on the home calendar (all circles)."""
-
-    session: SessionResponse
-    circleId: str
-    ritualType: str
-    hobyDisplayName: str | None = None
-    hobyIcon: str | None = None
-    displayTitle: str = ""
-    hasCustomName: bool = False
-    myAttendance: AttendanceResponse | None
-    attendingCount: int = 0
     memberCount: int = 0
-    maxSize: int = 6
 
 
 class HomeResponse(BaseModel):
     circle: CircleResponse | None
-    nextSession: SessionResponse | None
-    myAttendance: AttendanceResponse | None
     myCircles: list[HomeCircleItem] = []
-    calendarSessions: list[HomeCalendarSession] = []
+    upcomingActivities: list["HomeActivityItem"] = []
 
 
 class HobyResponse(BaseModel):
@@ -743,7 +687,7 @@ class CircleInvitationPreviewResponse(BaseModel):
     description: str | None = None
     recurringTime: str
     isRecurring: bool = True
-    nextSessionAt: datetime | None = None
+    nextActivity: CircleNextActivity | None = None
     modality: str
     city: str | None = None
     cityName: str | None = None
@@ -814,4 +758,272 @@ class DailyLibraryInsight(BaseModel):
 class ForYouIntroResponse(BaseModel):
     text: str | None = None
     day: str
+
+
+ActivityStatusName = Literal["draft", "open", "confirmed", "cancelled", "completed"]
+ActivityParticipantStatusName = Literal["going", "cancelled"]
+ActivityRecurrenceName = Literal["one_time", "recurring"]
+ActivityPaymentName = Literal["free", "paid"]
+
+
+ActivityNotificationType = Literal[
+    "activity_cancelled",
+    "activity_confirmed",
+    "activity_changed",
+    "reconfirmation_required",
+    "upcoming_activity",
+    "suggestion_accepted",
+    "suggestion_declined",
+]
+
+
+class ActivityNotification(BaseModel):
+    """One in-app Activity notification. No place, people, or suggestion note is included."""
+
+    id: str
+    type: ActivityNotificationType
+    activityId: str
+    occurrenceId: str | None = None
+    circleId: str
+    circleName: str
+    activityTitle: str
+    recurring: bool = False
+    startAt: datetime
+    suggestionType: Literal["time", "location"] | None = None
+    cancellationNote: str | None = None
+    """Reconfirmation only: the person has already answered (still going or left)."""
+    resolved: bool = False
+    createdAt: datetime
+
+
+class ActivityDefaultsResponse(BaseModel):
+    """Starting values for planning an activity. The activity keeps its own copy after creation."""
+
+    locationName: str | None = None
+    locationAddress: str | None = None
+    preferredGroupSize: int
+
+
+class ActivityCreateRequest(BaseModel):
+    title: str
+    description: str | None = None
+    startAt: datetime
+    endAt: datetime | None = None
+    recurrenceType: ActivityRecurrenceName = "one_time"
+    recurrenceRule: str | None = None
+    locationName: str | None = None
+    locationAddress: str | None = None
+    groupSize: int | None = None
+    paymentType: ActivityPaymentName = "free"
+    priceAmount: Decimal | None = None
+    currency: str | None = None
+    status: ActivityStatusName = "draft"
+
+    @model_validator(mode="after")
+    def check_activity(self) -> "ActivityCreateRequest":
+        from app.services.activity_rules import prepare_activity_fields
+
+        try:
+            prepare_activity_fields(
+                title=self.title,
+                description=self.description,
+                start_at=self.startAt,
+                end_at=self.endAt,
+                recurrence_type=self.recurrenceType,
+                recurrence_rule=self.recurrenceRule,
+                location_name=self.locationName,
+                location_address=self.locationAddress,
+                group_size=self.groupSize,
+                payment_type=self.paymentType,
+                price_amount=self.priceAmount,
+                currency=self.currency,
+                status=self.status,
+                require_group_size=False,
+            )
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+        return self
+
+
+class ActivityUpdateRequest(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    startAt: datetime | None = None
+    endAt: datetime | None = None
+    recurrenceType: ActivityRecurrenceName | None = None
+    recurrenceRule: str | None = None
+    locationName: str | None = None
+    locationAddress: str | None = None
+    groupSize: int | None = None
+    paymentType: ActivityPaymentName | None = None
+    priceAmount: Decimal | None = None
+    currency: str | None = None
+    status: ActivityStatusName | None = None
+
+    @field_validator("groupSize")
+    @classmethod
+    def group_size_positive(cls, value: int | None) -> int | None:
+        if value is not None and value <= 0:
+            raise ValueError("Group size must be greater than zero")
+        return value
+
+
+class ActivityActions(BaseModel):
+    canJoin: bool = False
+    canLeave: bool = False
+    canEdit: bool = False
+    canPublish: bool = False
+    canConfirm: bool = False
+    canComplete: bool = False
+    canCancel: bool = False
+    canSuggest: bool = False
+    hasStarted: bool = False
+    hasEnded: bool = False
+
+
+ActivitySuggestionType = Literal["time", "location"]
+ActivitySuggestionStatus = Literal["open", "accepted", "declined", "withdrawn"]
+
+
+class ActivitySuggestionCreate(BaseModel):
+    type: ActivitySuggestionType
+    proposedStartAt: datetime | None = None
+    proposedEndAt: datetime | None = None
+    proposedLocationName: str | None = None
+    proposedLocationAddress: str | None = None
+    note: str | None = None
+
+
+class ActivitySuggestion(BaseModel):
+    id: str
+    activityId: str
+    occurrenceId: str | None = None
+    type: ActivitySuggestionType
+    proposedStartAt: datetime | None = None
+    proposedEndAt: datetime | None = None
+    proposedLocationName: str | None = None
+    proposedLocationAddress: str | None = None
+    note: str | None = None
+    status: ActivitySuggestionStatus
+    suggestedByName: str
+    suggestedByAvatarUrl: str | None = None
+    supportCount: int
+    supportedByMe: bool
+    canSupport: bool
+    canWithdraw: bool
+    canDecide: bool
+    actionable: bool
+    createdAt: datetime
+
+
+class ActivityGoingPerson(BaseModel):
+    name: str
+    avatarUrl: str | None = None
+
+
+ActivityAttendanceStatusName = Literal["pending", "attended", "no_show"]
+
+
+class ActivityAttendanceEntry(BaseModel):
+    """One going participant's outcome after an Activity or date ended. Sent only to its organizers."""
+
+    participantId: str
+    name: str
+    avatarUrl: str | None = None
+    attendanceStatus: ActivityAttendanceStatusName
+
+
+class ActivityAttendanceRequest(BaseModel):
+    attendanceStatus: Literal["attended", "no_show"]
+
+
+class ActivityParticipation(BaseModel):
+    goingCount: int
+    groupSize: int
+    remainingPlaces: int
+    isFull: bool
+    currentUserStatus: ActivityParticipantStatusName | None = None
+    confirmationRequired: bool = False
+    going: list[ActivityGoingPerson] = Field(default_factory=list)
+
+
+class ActivityOccurrence(BaseModel):
+    id: str
+    startAt: datetime
+    endAt: datetime | None = None
+    status: ActivityStatusName
+    cancellationReason: str | None = None
+    locationName: str | None = None
+    locationAddress: str | None = None
+    hasStarted: bool = False
+    hasEnded: bool = False
+    actions: ActivityActions
+    participation: ActivityParticipation | None = None
+    suggestions: list[ActivitySuggestion] = Field(default_factory=list)
+    attendance: list[ActivityAttendanceEntry] | None = None
+
+
+class ActivityCancelRequest(BaseModel):
+    occurrenceId: str | None = None
+    cancellationReason: str | None = None
+
+
+class ActivityOccurrenceRequest(BaseModel):
+    occurrenceId: str | None = None
+
+
+class ActivityResponse(BaseModel):
+    id: str
+    circleId: str
+    title: str
+    description: str | None = None
+    startAt: datetime
+    endAt: datetime | None = None
+    recurrenceType: ActivityRecurrenceName
+    recurrenceRule: str | None = None
+    locationName: str | None = None
+    locationAddress: str | None = None
+    groupSize: int
+    paymentType: ActivityPaymentName
+    priceAmount: Decimal | None = None
+    currency: str | None = None
+    status: ActivityStatusName
+    createdBy: str
+    createdAt: datetime
+    updatedAt: datetime
+    cancellationReason: str | None = None
+    hasStarted: bool = False
+    hasEnded: bool = False
+    actions: ActivityActions | None = None
+    occurrences: list[ActivityOccurrence] = Field(default_factory=list)
+    nextOccurrence: ActivityOccurrence | None = None
+    participation: ActivityParticipation | None = None
+    suggestions: list[ActivitySuggestion] = Field(default_factory=list)
+    attendance: list[ActivityAttendanceEntry] | None = None
+
+
+class HomeActivityItem(BaseModel):
+    """One upcoming Activity date the user joined. Recurring Activities give one item per joined date."""
+
+    activityId: str
+    occurrenceId: str | None = None
+    circleId: str
+    circleName: str
+    title: str
+    ritualType: str
+    hobyDisplayName: str | None = None
+    hobyIcon: str | None = None
+    isRecurring: bool = False
+    startAt: datetime
+    endAt: datetime | None = None
+    locationName: str | None = None
+    locationAddress: str | None = None
+    paymentType: ActivityPaymentName
+    priceAmount: Decimal | None = None
+    currency: str | None = None
+    status: ActivityStatusName
+    participation: ActivityParticipation
+
+
+HomeResponse.model_rebuild()
 

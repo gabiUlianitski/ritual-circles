@@ -62,4 +62,8 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
+    # LEGACY: deletes rows in the read-only sessions/attendance tables.
+    # Not part of the release. Never run against production.
+    if os.getenv("ALLOW_LEGACY_SCRIPT", "").strip().lower() not in {"1", "true", "yes"}:
+        raise SystemExit("Legacy script: it deletes sessions/attendance. Set ALLOW_LEGACY_SCRIPT=1 to run it locally.")
     asyncio.run(main())

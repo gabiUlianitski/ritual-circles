@@ -322,12 +322,11 @@ async def delete_account(conn: asyncpg.Connection, *, user_id: UUID) -> None:
         for circle in circles:
             other = await conn.fetchval(
                 """
-                SELECT a."userId"
-                FROM attendance a
-                JOIN sessions s ON s.id = a."sessionId"
-                WHERE s."circleId" = $1
-                  AND s."dateTime" >= NOW()
-                  AND a."userId" <> $2
+                SELECT m.user_id
+                FROM circle_members m
+                WHERE m.circle_id = $1
+                  AND m.status = 'active'
+                  AND m.user_id <> $2
                 LIMIT 1
                 """,
                 circle["id"],

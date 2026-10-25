@@ -1,5 +1,7 @@
 # Ritual Circles iOS (SwiftUI) — V1 Skeleton
 
+> **STALE — not compatible with the current API.** This skeleton is not built or shipped. It still calls the retired Session API (`GET /sessions/next`, `PUT /sessions/{id}/attendance`) and reads `nextSession` / `myAttendance` from `GET /home`. Those endpoints and fields no longer exist. The current model is Circle → Activity (see `docs/data-model-map.md`); the web client in `web/` is the reference. Port it to the Activity API before using it. Do not restore Session endpoints for it.
+
 This folder contains **Swift source files** for a minimal V1 iOS app matching the Ritual Circles rules:
 
 - Stack navigation only (no tabs)

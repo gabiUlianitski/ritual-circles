@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import json
+import os
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 from uuid import UUID, uuid4
 
+from app.security_config import is_hobby_admin
 from app.services.hobby_insight_library import (
     INSIGHT_TYPES,
     QUOTA,
     InsightValidationError,
-    catalogue_admin_allowed,
     select_daily_insight,
     stable_hash,
     store_library,
@@ -125,15 +127,19 @@ class SelectionTests(unittest.TestCase):
 
 
 class AccessTests(unittest.TestCase):
-    def test_anonymous_cannot_generate(self) -> None:
-        self.assertFalse(catalogue_admin_allowed(authenticated=False, email="a@b.c", allowlist=set()))
-
-    def test_allowlist_blocks_other_signed_in_users(self) -> None:
-        allow = {"owner@example.com"}
-        self.assertTrue(
-            catalogue_admin_allowed(authenticated=True, email="Owner@Example.com", allowlist=allow)
-        )
-        self.assertFalse(catalogue_admin_allowed(authenticated=True, email="member@example.com", allowlist=allow))
+    def test_admin_allowlist_defaults_to_deny_and_uses_user_ids(self) -> None:
+        admin_id = uuid4()
+        member_id = uuid4()
+        env = {
+            "ENVIRONMENT": "test",
+            "JWT_SECRET": "test-only-jwt-secret-with-32-characters",
+            "HOBBY_ADMIN_USER_IDS": str(admin_id),
+        }
+        with patch.dict(os.environ, env, clear=False):
+            self.assertTrue(is_hobby_admin(admin_id))
+            self.assertFalse(is_hobby_admin(member_id))
+        with patch.dict(os.environ, {**env, "HOBBY_ADMIN_USER_IDS": ""}, clear=False):
+            self.assertFalse(is_hobby_admin(admin_id))
 
 
 class ReplacementTests(unittest.IsolatedAsyncioTestCase):

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import os
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import jwt
 
+from app.security_config import security_config
+
 
 def _secret() -> str:
-    # In dev, set JWT_SECRET in backend/.env
-    return os.getenv("JWT_SECRET", "dev-secret-change-me")
+    return security_config().jwt_secret
 
 
 def create_token(user_id: UUID, *, ttl_hours: int = 24 * 30) -> str:

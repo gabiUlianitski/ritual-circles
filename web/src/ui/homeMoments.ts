@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { CircleListItem, CommunityStats } from "../api/types";
-import { circleNearUser } from "./circleDiscover";
+import { circleNearUser, nextActivityAt } from "./circleDiscover";
 import { isCircleJoinable } from "./circleParticipation";
 
 const DAY_MS = 86_400_000;
@@ -38,10 +38,6 @@ function meetsThisWeekend(iso: string | null | undefined): boolean {
   return day === 5 || day === 6 || day === 0;
 }
 
-function spotsLeft(c: CircleListItem): number {
-  return Math.max(0, c.maxSize - c.memberCount);
-}
-
 export function hobbyName(c: CircleListItem, t: TFunction): string {
   const fallback = c.hobyDisplayName?.trim() || c.ritualType;
   return t(`homeFeed.interest_${slugKey(c.ritualType)}`, { defaultValue: fallback });
@@ -49,13 +45,12 @@ export function hobbyName(c: CircleListItem, t: TFunction): string {
 
 /** One short human signal for a circle, from real data only. */
 export function circleSignal(c: CircleListItem, t: TFunction): string {
-  const away = daysAway(c.nextSessionAt);
-  const spots = spotsLeft(c);
+  const next = nextActivityAt(c);
+  const away = daysAway(next);
   if ((c.messagesToday ?? 0) > 0) return t("homeMoments.signalChattingToday");
   if (away === 0) return t("homeMoments.signalMeetsToday");
   if (away === 1) return t("homeMoments.signalMeetsTomorrow");
-  if (meetsThisWeekend(c.nextSessionAt)) return t("homeMoments.signalWeekend");
-  if (!c.isYours && spots > 0 && spots <= 2) return t("homeFeed.proofSpotsLeft", { count: spots });
+  if (meetsThisWeekend(next)) return t("homeMoments.signalWeekend");
   if (!c.isYours && c.memberCount <= 1) return t("homeMoments.signalNew");
   if ((c.messagesLastWeek ?? 0) > 0) return t("homeFeed.proofActiveWeek");
   return t("homeMoments.signalOpen");
@@ -84,21 +79,20 @@ export function dailyMoment(input: {
   ).length;
   const liked = new Set(input.likedSlugs.map(slugKey));
   const likedThisWeek = catalog.filter((c) => {
-    const away = daysAway(c.nextSessionAt);
+    const away = daysAway(nextActivityAt(c));
     return liked.has(slugKey(c.ritualType)) && away != null && away >= 0 && away <= 6;
   }).length;
-  const away = daysAway(featured.nextSessionAt);
-  const spots = spotsLeft(featured);
+  const featuredNext = nextActivityAt(featured);
+  const away = daysAway(featuredNext);
 
   const candidates = [
     sameHobbyNear >= 2 ? t("homeMoments.momentNearby", { count: sameHobbyNear, hobby }) : null,
     likedThisWeek >= 2 ? t("homeMoments.momentInterestsThisWeek", { count: likedThisWeek }) : null,
     away === 0 || away === 1
       ? t(away === 0 ? "homeMoments.momentMeetsToday" : "homeMoments.momentMeetsTomorrow", { hobby })
-      : meetsThisWeekend(featured.nextSessionAt)
+      : meetsThisWeekend(featuredNext)
         ? t("homeMoments.momentWeekend", { hobby })
         : null,
-    spots > 0 && spots <= 2 ? t("homeMoments.momentSpots", { count: spots }) : null,
     (featured.messagesToday ?? 0) > 0 ? t("homeMoments.momentChatting") : null,
     featured.memberCount <= 1 ? t("homeMoments.momentNew", { hobby }) : null,
     (input.stats?.meetupsThisWeek ?? 0) >= 2

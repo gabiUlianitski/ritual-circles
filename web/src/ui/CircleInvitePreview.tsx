@@ -20,13 +20,9 @@ function locationLine(preview: CircleInvitationPreview, onlineLabel: string, mis
 
 function seatLine(
   joined: number,
-  capacity: number,
   t: (key: string, options?: Record<string, unknown>) => string,
 ): string {
-  const spots = Math.max(0, capacity - Math.max(0, joined));
-  if (spots === 0) return t("invitePreview.circleFull");
-  if (spots === 1) return t("invitePreview.oneSpotLeft");
-  return t("invitePreview.spotsLeft", { count: spots });
+  return t("circleDetails.memberCount", { count: Math.max(0, joined) });
 }
 
 export function CircleInvitePreview(props: {
@@ -78,9 +74,8 @@ export function CircleInvitePreview(props: {
       const saved = await api.acceptInvitation(preview.id);
       markSuggestionDecision(props.myUserId, `invite:${preview.id}`, "accepted");
       await props.onAccepted(saved.circleId);
-    } catch (e) {
-      const raw = String(e).toLowerCase();
-      setActionError(raw.includes("full") ? t("invitePreview.circleFull") : t("invitePreview.actionFailed"));
+    } catch {
+      setActionError(t("invitePreview.actionFailed"));
       setBusy(null);
     }
   }
@@ -118,8 +113,8 @@ export function CircleInvitePreview(props: {
     : null;
   const description = preview?.description?.trim() ?? "";
   const when = circle
-    ? preview?.nextSessionAt
-      ? formatSessionDateTimeHero(preview.nextSessionAt)
+    ? preview?.nextActivity
+      ? t("discoverPage.nextActivityAt", { when: formatSessionDateTimeHero(preview.nextActivity.startAt) })
       : formatCircleScheduleChip(circle, t)
     : "";
   const where = preview
@@ -159,7 +154,7 @@ export function CircleInvitePreview(props: {
             <p>{when}</p>
             <BidiText as="p">{where}</BidiText>
             <p className="circle-invite-preview-seat">
-              {seatLine(preview.memberCount, preview.maxSize, t)}
+              {seatLine(preview.memberCount, t)}
             </p>
           </div>
 

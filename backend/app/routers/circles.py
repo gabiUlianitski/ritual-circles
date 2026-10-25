@@ -15,8 +15,6 @@ from app.schemas import (
     CircleLeaveRequest,
     CircleListItemResponse,
     CircleMeResponse,
-    CircleNextSessionRoster,
-    CircleMemberAttendanceItem,
     CirclePatchRequest,
     CircleSuggestionActionRequest,
     CircleResponse,
@@ -40,7 +38,6 @@ from app.services.circle_invitations import (
 )
 from app.services.circles_service import create_circle as create_circle_svc
 from app.services.circles_service import get_circle_me as get_circle_me_svc
-from app.services.circles_service import get_next_session_attendance_roster
 from app.services.circles_service import join_circle as join_circle_svc
 from app.services.circles_service import join_circle_open as join_circle_open_svc
 from app.services.circles_service import drop_circle as drop_circle_svc
@@ -165,9 +162,6 @@ async def respond_to_suggestion(
         circle_id=cid,
         message_id=mid,
         accept=payload.action == "accept",
-        first_session_at=payload.firstSessionAt,
-        recurring_time=payload.recurringTime,
-        is_recurring=payload.isRecurring,
     )
     if result is None:
         raise HTTPException(status_code=500, detail="Failed to apply suggestion")
@@ -193,9 +187,6 @@ async def patch_circle(
         invite_only=payload.inviteOnly,
         group_size=payload.groupSize,
         cost_payment=payload.costPayment,
-        first_session_at=payload.firstSessionAt,
-        recurring_time=payload.recurringTime,
-        is_recurring=payload.isRecurring,
         meeting_place_update=payload.meetingPlaceUpdate,
         description=payload.description,
         update_description="description" in payload.model_fields_set,
@@ -342,7 +333,7 @@ async def drop_circle(
 
 @router.get("/me", response_model=CircleMeResponse)
 async def get_my_circle(
-    circleId: str | None = Query(None, description="When set, return this circle if the user is a member (future sessions)."),
+    circleId: str | None = Query(None, description="When set, return this circle if the user is an active member."),
     conn: asyncpg.Connection = Depends(conn_dep),
     user: CurrentUser = Depends(get_current_user),
     lang: str = Depends(get_request_lang),
@@ -379,21 +370,11 @@ async def get_my_circle(
                 "avatarUrl": r.get("avatar_url"),
             }
         )
-    roster_raw = await get_next_session_attendance_roster(conn, circle_id=circle_row["id"])
-    next_session_roster: CircleNextSessionRoster | None = None
-    if roster_raw:
-        next_session_roster = CircleNextSessionRoster(
-            sessionId=str(roster_raw["sessionId"]),
-            dateTime=roster_raw["dateTime"],
-            locationOrLink=roster_raw.get("locationOrLink"),
-            members=[CircleMemberAttendanceItem(**m) for m in roster_raw["members"]],
-        )
     is_creator = circle_row.get("created_by") == user.id
     creator_id = circle_row.get("created_by")
     return CircleMeResponse(
         circle=circle,
         members=members,
-        nextSessionRoster=next_session_roster,
         isCreator=bool(is_creator),
         creatorUserId=str(creator_id) if creator_id is not None else None,
     )

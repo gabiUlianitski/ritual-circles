@@ -12,15 +12,15 @@ When a task touches users, visuals, or flows, explicitly consider **which agent�
 
 | Layer | Path / stack | Role |
 |-------|----------------|------|
-| Web (primary client) | `web/` — React 19 + Vite + MUI + i18n | Home hub, create/join, attendance |
+| Web (primary client) | `web/` — React 19 + Vite + MUI + i18n | Home hub, Circles, Activities |
 | API | `backend/` — FastAPI + asyncpg + JWT | Stateless REST; prefer `GET /home` |
-| DB | `db/` — PostgreSQL (Supabase) | `schema.sql` + `migrations/` (through `028`) |
+| DB | `db/` — PostgreSQL (Supabase) | `schema.sql` + `migrations/` (through `046`) |
 | Deploy | `DEPLOYMENT.md`, `vercel.json`, `render.yaml` | Vercel (web) + Render (API) + Supabase (PG) |
-| Mobile | `ios/`, `android/` | Source skeletons only (not full build projects) |
+| Mobile | `ios/`, `android/` | Stale source skeletons (not built; use the retired Session API — see their READMEs) |
 
-**V1 north star:** circles of **3–6** people meet weekly and reach **≥4 sessions**. Membership = future `attendance` rows (no `circle_members` table). Max size **6** enforced server-side on join.
+**V1 north star:** circles of **3–6** people meet weekly and reach **≥4 sessions** (meetups, now modeled as Activities). Model: Hobby → Circle (`circle_members`) → Activity (`activity_participants`; recurring dates in `activity_occurrences` / `activity_occurrence_participants`). Circle membership ≠ Activity participation. Circle membership is unlimited (typical group size is descriptive only); an Activity's `group_size` caps its going participants, enforced server-side. Legacy `sessions` / `attendance` are read-only history. See `docs/data-model-map.md`.
 
-**Known gaps vs strict V1 (do not expand casually):** chat + discovery exist in code; `POST /reports` missing; APNs/push sender missing; no automated test suite / CI; migrations applied manually; `DEPLOYMENT.md` may lag latest migration numbers.
+**Known gaps vs strict V1 (do not expand casually):** chat + discovery exist in code; `POST /reports` missing; APNs/push sender missing; backend unittest suite (`backend/.venv`) but no CI; migrations applied manually; `DEPLOYMENT.md` may lag latest migration numbers.
 
 ---
 
@@ -87,18 +87,18 @@ When a task touches users, visuals, or flows, explicitly consider **which agent�
 
 **Owns**
 
-- Backend: `backend/app/` (routers, services, auth, `GET /home`, circles/sessions/attendance)
-- Web: `web/src/` (API client, Home/Dashboard, create/join/attendance flows)
+- Backend: `backend/app/` (routers, services, auth, `GET /home`, circles, activities)
+- Web: `web/src/` (API client, Home/Dashboard, create/join Circle, Activity flows)
 - Schema fields on allowed tables; migrations only when required and approved for **new tables**
-- Keeping membership derived from future attendance; max-6 join transactions; session generate/replenish
+- Circle membership in `circle_members`; max-6 join transactions; Activity lifecycle, participation, and recurring date top-up
 
-**Core question:** Does this change make “next session + one-tap attendance” clearer and more reliable—without new abstractions?
+**Core question:** Does this change make “next Activity + one-tap going” clearer and more reliable—without new abstractions?
 
 **Working rules**
 
 1. Prefer clarity over cleverness; no unused layers; no real-time systems.
-2. Optimize for `GET /home` (circle / nextSession / myAttendance; null triad when no circle).
-3. Enforce max 6 in DB transactions on join; default attendance `not_attending`.
+2. Optimize for `GET /home` (`circle`, `myCircles`, `upcomingActivities`; `circle: null` and empty lists when no membership).
+3. Enforce Activity `group_size` in DB transactions on Activity join; never cap Circle membership. Never write legacy `sessions` / `attendance`.
 4. AI only for optional hobby metadata enrichment; fail open.
 5. Do not add chat/feeds/matching/gamification/admin unless product explicitly expands scope—and flag BusA if asked.
 6. Avoid dual-auth footguns: production = Bearer JWT; treat `X-User-Id` as dev-only.
@@ -106,7 +106,7 @@ When a task touches users, visuals, or flows, explicitly consider **which agent�
 
 **Hands off to**
 
-- **TestA** when behavior changes (home, join full, leave, attendance, auth)
+- **TestA** when behavior changes (home, join full, leave, Activity participation, auth)
 - **RelA** when migrations, env vars, or deploy docs change
 - **BusA** when a request expands beyond the 4-session retention goal
 - **UIExpert / Designer / EndUser** for UX copy and friction
@@ -124,21 +124,21 @@ When a task touches users, visuals, or flows, explicitly consider **which agent�
 
 **Owns**
 
-- Risk-based test plans for create → invite/join → home → attendance → leave
-- Contract checks for `GET /home` and join-when-full
+- Risk-based test plans for create → invite/join → home → join Activity → leave
+- Contract checks for `GET /home`, unlimited Circle join, and Activity join-when-full
 - Regression lists before RelA ships
-- Pointing out **missing automation** (today: no pytest/vitest/playwright/CI) and proposing the smallest useful first tests
+- Pointing out **missing automation** (today: backend unittest only; no vitest/playwright/CI) and proposing the smallest useful first tests
 
 **Core question:** What breaks the weekly meeting promise—and how do we prove it still works?
 
 **Priority scenarios (must cover before release)**
 
 1. Auth: register/login (and Google if enabled) → JWT used on subsequent calls
-2. Create circle → 6 future sessions → creator appears as member via attendance
-3. Join via invite → succeeds under 6; **rejects at 6**
-4. `GET /home` with circle; empty-home nulls when no membership
-5. One-tap attendance flip; leave removes future attendance
-6. Session replenish path (home fetch when future sessions &lt; 4)
+2. Create circle → creator is an active `circle_members` row; no Session or Activity is created
+3. Join via invite → succeeds at any member count (7th, 100th); an Activity at its `group_size` **rejects** the next going participant
+4. `GET /home` with circle; `circle: null` and empty lists when no membership
+5. One-tap join / leave Activity (and one date of a recurring Activity); leaving the Circle sets the member row to `left`
+6. Recurring Activity date top-up (`ensure_future_activity_occurrences`)
 7. Web build: `web` `npm run build`; API boots against migrated DB
 
 **Working rules**
@@ -215,7 +215,7 @@ When a task touches users, visuals, or flows, explicitly consider **which agent�
 3. Render: `backend` root, `uvicorn app.main:app`, env set, `ALLOWED_ORIGINS` includes Vercel URL
 4. Vercel: root directory `web` (or root config that builds `web/`), `VITE_*` env set, SPA rewrite OK
 5. Google OAuth origins/redirects match prod URLs if Google login is on
-6. Smoke: create or open circle → home shows next session → attendance updates
+6. Smoke: create or open circle → plan an Activity → home shows it → joining / leaving updates "going"
 7. Note Render free-tier cold start (~30s) so support/EndUser expectations are set
 8. No secrets committed; `.env.example` updated if new vars were added
 
@@ -260,7 +260,7 @@ When a task touches users, visuals, or flows, explicitly consider **which agent�
 | **EndUser** | Can someone with **no tech background** complete this in **one calm path**? |
 | **Designer** | Does this feel **warm, clear, and dignified** for people seeking **shared hobbies**? |
 | **UIExpert** | Is this **obvious, accessible, and mobile-ready** without extra complexity? |
-| **DevA** | Smallest correct change that strengthens next session + attendance? |
+| **DevA** | Smallest correct change that strengthens the next Activity + one-tap going? |
 | **TestA** | What breaks the weekly meeting promise—and how do we prove it still works? |
 | **BusA** | Does this raise the odds of **≥4 sessions** in a 3–6 person circle? |
 | **RelA** | Can we ship without breaking the live meeting loop? |

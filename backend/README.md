@@ -9,8 +9,10 @@ python -m venv .venv
 .\.venv\Scripts\activate
 pip install -r requirements.txt
 # Option A (recommended): create backend/.env (see backend/.env.example)
-# Option B: PowerShell env var:
+# JWT_SECRET is always required; use a unique 32+ character local value.
+# Option B: PowerShell env vars:
 #   $env:DATABASE_URL="postgresql://postgres:<PASSWORD>@localhost:5432/Circles"
+#   $env:JWT_SECRET="<LONG_RANDOM_LOCAL_VALUE>"
 uvicorn app.main:app --reload --port 8001 --reload-dir app
 ```
 

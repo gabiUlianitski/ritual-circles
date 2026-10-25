@@ -20,7 +20,6 @@ export function CircleInviteModal(props: {
   isOpen: boolean;
   circle: CircleResponse;
   joined: number;
-  capacity: number;
   meetingAt?: string | null;
   location?: string | null;
   canInviteMembers?: boolean;
@@ -43,7 +42,6 @@ export function CircleInviteModal(props: {
   const [peopleError, setPeopleError] = useState<string | null>(null);
   const [peopleBusy, setPeopleBusy] = useState<string | null>(null);
   const [shareHint, setShareHint] = useState<string | null>(null);
-  const circleFull = props.joined >= props.capacity;
   const circle = props.circle;
   const title = circleDisplayTitle(circle);
   const when = meetingLabel(props.meetingAt);
@@ -108,8 +106,7 @@ export function CircleInviteModal(props: {
       setInvitedIds((ids) => [...ids, person.id]);
     } catch (error) {
       const message = error instanceof Error ? error.message.toLowerCase() : "";
-      if (message.includes("full")) setPeopleError(t("circleDetails.inviteCircleFull"));
-      else if (message.includes("pending") || message.includes("already")) {
+      if (message.includes("pending") || message.includes("already")) {
         setAlreadyIds((ids) => [...ids, person.id]);
       } else setPeopleError(t("circleDetails.inviteSendFailed"));
     } finally {
@@ -132,7 +129,6 @@ export function CircleInviteModal(props: {
   }
 
   function inviteLabel(personId: string): string {
-    if (circleFull) return t("circleDetails.inviteCircleFull");
     if (peopleBusy === personId) return t("circleDetails.inviteSending");
     if (invitedIds.includes(personId)) return t("circleDetails.invited");
     if (alreadyIds.includes(personId)) return t("circleDetails.inviteAlready");
@@ -179,7 +175,7 @@ export function CircleInviteModal(props: {
         </span>
         <button
           type="button"
-          disabled={circleFull || peopleBusy === person.id || settled}
+          disabled={peopleBusy === person.id || settled}
           onClick={() => void sendInvite(person)}
         >
           {inviteLabel(person.id)}
@@ -291,7 +287,7 @@ export function CircleInviteModal(props: {
           </div>
           {when ? <p>{when}</p> : null}
           {location ? <p>{location}</p> : null}
-          <p>{t("circleDetails.seatsFilled", { joined: props.joined, capacity: props.capacity })}</p>
+          <p>{t("circleDetails.memberCount", { count: props.joined })}</p>
         </section>
 
         {people}

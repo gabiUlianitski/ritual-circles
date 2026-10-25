@@ -65,8 +65,9 @@ export function CreateCircleGroupSizeStep(props: {
   showTip?: boolean;
 }) {
   const { value, onChange, disabled, fieldError } = props;
-  const title = props.title ?? "Group size";
-  const helper = props.helper ?? "How many people should join this circle?";
+  const title = props.title ?? "Typical group size";
+  const helper =
+    props.helper ?? "A usual number of people for getting together. Anyone can still join the circle.";
   const showTip = props.showTip !== false;
 
   function patch(partial: Partial<GroupSizeState>) {
@@ -108,7 +109,7 @@ export function CreateCircleGroupSizeStep(props: {
 
           <GroupSizeOption
             type="max"
-            label="Maximum size"
+            label="Up to"
             selected={value.type === "max"}
             disabled={disabled}
             onSelect={selectType}
@@ -118,7 +119,7 @@ export function CreateCircleGroupSizeStep(props: {
               <NumberField
                 value={value.maxCount}
                 disabled={disabled}
-                ariaLabel="Maximum group size"
+                ariaLabel="Up to this many people"
                 onChange={(n) => patch({ maxCount: n })}
               />
               <span>people</span>

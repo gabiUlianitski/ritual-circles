@@ -1,35 +1,26 @@
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { HomeResponse } from "../api/types";
-import { BidiText } from "./BidiText";
+import type { HomeActivityItem, HomeResponse } from "../api/types";
 import { CircleDetails } from "./CircleDetails";
+import { HomeActivityEvents } from "./HomeActivityEvents";
 import { HomeCalendar } from "./HomeCalendar";
 import { HomeCirclesList } from "./HomeCirclesList";
 import { HomeEmptyDayPrompt } from "./HomeEmptyDayPrompt";
 import { HomeNextActivityCard } from "./HomeNextActivityCard";
-import { HomeSessionEvents } from "./HomeSessionEvents";
 import { HomeWeekStrip } from "./HomeWeekStrip";
-import {
-  dateToIsoLocal,
-  formatSessionDateTimeHero,
-  getUpcomingSessions,
-  sessionHobbySubtitle,
-  sessionTitle,
-} from "./homeDashboardUtils";
-
-const HISTORY_LIMIT = 6;
+import { upcomingHomeActivities } from "./homeActivities";
+import { dateToIsoLocal } from "./homeDashboardUtils";
 
 function ymdKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
-function defaultSelectedDay(sessions: HomeResponse["calendarSessions"]): Date {
-  const next = getUpcomingSessions(sessions ?? [])[0];
-  const d = next ? new Date(next.session.dateTime) : new Date();
+function defaultSelectedDay(items: HomeActivityItem[]): Date {
+  const d = items[0] ? new Date(items[0].startAt) : new Date();
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-/** Upcoming meetups, attendance and past sessions — moved off Home unchanged. */
+/** See-all for Home: joined Activities first, then the circles you belong to. */
 export function ActivityPage(props: {
   home: HomeResponse;
   onRefresh: () => Promise<void> | void;
@@ -37,33 +28,42 @@ export function ActivityPage(props: {
   onGoFindCircles: (prefillDateIso?: string) => void;
 }) {
   const { t } = useTranslation();
-  const calendarSessions = props.home.calendarSessions ?? [];
+  const activities = useMemo(
+    () => upcomingHomeActivities(props.home.upcomingActivities),
+    [props.home.upcomingActivities],
+  );
   const myCircles = props.home.myCircles ?? [];
-  const hasActivities = calendarSessions.length > 0;
+  const hasActivities = activities.length > 0;
   const [detailsCircleId, setDetailsCircleId] = useState<string | null>(null);
+  const [detailsActivityId, setDetailsActivityId] = useState<string | null>(null);
   const [detailsInitialTab, setDetailsInitialTab] = useState<"details" | "chat" | "scheduled">("details");
   const [showFullCalendar, setShowFullCalendar] = useState(false);
-  const [selectedDay, setSelectedDay] = useState<Date | null>(() => defaultSelectedDay(calendarSessions));
+  const [selectedDay, setSelectedDay] = useState<Date | null>(() => defaultSelectedDay(activities));
 
-  const selectedDaySessions = useMemo(() => {
+  const selectedDayActivities = useMemo(() => {
     if (!selectedDay) return [];
     const key = ymdKey(selectedDay);
-    return calendarSessions
-      .filter((s) => ymdKey(new Date(s.session.dateTime)) === key)
-      .sort((a, b) => new Date(a.session.dateTime).getTime() - new Date(b.session.dateTime).getTime());
-  }, [calendarSessions, selectedDay]);
-
-  const history = useMemo(() => {
-    const now = Date.now();
-    return calendarSessions
-      .filter((s) => new Date(s.session.dateTime).getTime() < now)
-      .sort((a, b) => new Date(b.session.dateTime).getTime() - new Date(a.session.dateTime).getTime())
-      .slice(0, HISTORY_LIMIT);
-  }, [calendarSessions]);
+    return activities.filter((item) => ymdKey(new Date(item.startAt)) === key);
+  }, [activities, selectedDay]);
 
   function openCircle(circleId: string, tab: "details" | "chat" | "scheduled" = "details") {
+    setDetailsActivityId(null);
     setDetailsCircleId(circleId);
     setDetailsInitialTab(tab);
+  }
+
+  function openActivity(item: HomeActivityItem) {
+    setDetailsActivityId(item.activityId);
+    setDetailsCircleId(item.circleId);
+    setDetailsInitialTab("details");
+  }
+
+  function closeDetails() {
+    const fromActivity = detailsActivityId != null;
+    setDetailsCircleId(null);
+    setDetailsActivityId(null);
+    setDetailsInitialTab("details");
+    if (fromActivity) void props.onRefresh();
   }
 
   if (detailsCircleId) {
@@ -71,20 +71,19 @@ export function ActivityPage(props: {
       <CircleDetails
         circleId={detailsCircleId}
         initialTab={detailsInitialTab}
-        onBack={() => {
-          setDetailsCircleId(null);
-          setDetailsInitialTab("details");
-        }}
+        initialActivityId={detailsActivityId ?? undefined}
+        onBack={closeDetails}
         onLeftCircle={async () => {
           await props.onRefresh();
           setDetailsCircleId(null);
+          setDetailsActivityId(null);
           setDetailsInitialTab("details");
         }}
       />
     );
   }
 
-  const showEmptyDayPrompt = selectedDay != null && selectedDaySessions.length === 0 && hasActivities;
+  const showEmptyDayPrompt = selectedDay != null && selectedDayActivities.length === 0 && hasActivities;
 
   return (
     <div className="stack dashboard-home activity-page">
@@ -96,8 +95,8 @@ export function ActivityPage(props: {
       <section className="home-primary-section stack" aria-label={t("activityPage.upcoming")}>
         <h2 className="home-section-title">{t("activityPage.upcoming")}</h2>
         <HomeNextActivityCard
-          sessions={calendarSessions}
-          onOpenCircle={(id) => openCircle(id, "details")}
+          items={activities}
+          onOpen={openActivity}
           onRefresh={props.onRefresh}
           onFindCircles={() => props.onGoFindCircles()}
           onCreateCircle={() => props.onGoCreateJoin()}
@@ -112,7 +111,7 @@ export function ActivityPage(props: {
             </h2>
             <p className="home-schedule-support">{t("home.yourScheduleSupport")}</p>
           </header>
-          <HomeWeekStrip sessions={calendarSessions} selectedDay={selectedDay} onSelectDay={setSelectedDay} />
+          <HomeWeekStrip items={activities} selectedDay={selectedDay} onSelectDay={setSelectedDay} />
           {showEmptyDayPrompt && selectedDay ? (
             <HomeEmptyDayPrompt
               selectedDay={selectedDay}
@@ -130,65 +129,18 @@ export function ActivityPage(props: {
           </button>
           <HomeCalendar
             expanded={showFullCalendar}
-            sessions={calendarSessions}
+            items={activities}
             selectedDay={selectedDay}
             onSelectDay={setSelectedDay}
           />
-          {selectedDay && selectedDaySessions.length > 0 ? (
-            <HomeSessionEvents
-              sessions={selectedDaySessions}
-              selectedDay={selectedDay}
-              onOpenCircle={(id) => openCircle(id, "details")}
-              onRefresh={props.onRefresh}
-            />
-          ) : null}
+          <HomeActivityEvents items={selectedDayActivities} selectedDay={selectedDay} onOpen={openActivity} />
         </section>
       ) : null}
 
       {myCircles.length > 0 ? (
-        <section className="home-secondary-section stack" aria-label={t("activityPage.attendance")}>
-          <h2 className="home-section-title">{t("activityPage.attendance")}</h2>
-          <HomeCirclesList
-            items={myCircles}
-            sessions={calendarSessions}
-            onRefresh={props.onRefresh}
-            onOpenCircle={openCircle}
-            hideHeading
-          />
-        </section>
-      ) : null}
-
-      {history.length > 0 ? (
-        <section className="home-secondary-section stack" aria-label={t("activityPage.history")}>
-          <h2 className="home-section-title">{t("activityPage.history")}</h2>
-          <ul className="activity-history">
-            {history.map((item) => (
-              <li key={item.session.id}>
-                <button
-                  type="button"
-                  className="activity-history-item"
-                  onClick={() => openCircle(item.circleId, "details")}
-                >
-                  <span className="home-hobby-badge home-hobby-badge--sm" aria-hidden>
-                    {item.hobyIcon ?? ""}
-                  </span>
-                  <span className="activity-history-copy">
-                    <BidiText as="span" className="activity-history-title circle-title-wrap">
-                      {sessionTitle(item)}
-                    </BidiText>
-                    <span className="activity-history-time muted">
-                      {[sessionHobbySubtitle(item), formatSessionDateTimeHero(item.session.dateTime)]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </span>
-                  </span>
-                  <span className="activity-history-status muted">
-                    {item.myAttendance?.status === "attending" ? t("activityPage.attended") : t("activityPage.missed")}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
+        <section className="home-secondary-section stack" aria-label={t("activityPage.yourCircles")}>
+          <h2 className="home-section-title">{t("activityPage.yourCircles")}</h2>
+          <HomeCirclesList items={myCircles} onRefresh={props.onRefresh} onOpenCircle={openCircle} hideHeading />
         </section>
       ) : null}
     </div>

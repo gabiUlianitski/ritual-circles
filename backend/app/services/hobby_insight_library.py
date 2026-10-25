@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import re
 from difflib import SequenceMatcher
 from uuid import UUID, uuid4
@@ -78,20 +77,6 @@ def select_daily_insight(insights: list[dict], hobby_id: str, day: str) -> dict 
     pool = [item for item in active if item.get("insight_type") == wanted] or active
     pool = sorted(pool, key=lambda item: str(item.get("id")))
     return pool[stable_hash(f"{hobby_id}:{day}:pick") % len(pool)]
-
-
-def catalogue_admin_allowed(*, authenticated: bool, email: str | None, allowlist: set[str]) -> bool:
-    """Signed-in catalogue users may generate. An email allowlist narrows that when configured."""
-    if not authenticated:
-        return False
-    if not allowlist:
-        return True
-    return (email or "").strip().lower() in allowlist
-
-
-def admin_allowlist() -> set[str]:
-    raw = os.getenv("CATALOGUE_ADMIN_EMAILS", "")
-    return {part.strip().lower() for part in raw.split(",") if part.strip()}
 
 
 def _words(text: str) -> list[str]:

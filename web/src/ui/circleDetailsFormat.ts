@@ -7,8 +7,6 @@ import { formatCostPaymentSummary, formatCurrencyAmount } from "./circlePayment"
 import { groupSizeStateFromPayload } from "./groupSize";
 import { circleHobyTypeLevelLabels } from "./memberHobbyLevel";
 
-import { circleParticipationState, formatPeopleInLine } from "./circleParticipation";
-
 type TFn = (key: string, opts?: Record<string, unknown>) => string;
 
 const TIME_RE = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{1,2}):(\d{2})$/;
@@ -166,62 +164,6 @@ export function formatCircleCostChip(
     return t ? t("circleDetails.splitCost", { amount }) : `Split ${amount}`;
   }
   return t ? t("circleDetails.paid") : "Paid";
-}
-
-export function formatCircleSizeChip(memberCount: number, maxSize: number, t?: TFn): string {
-  const state = circleParticipationState(memberCount, maxSize);
-  if (state.isFull) return t ? t("circleDetails.full") : "Full";
-  if (t) {
-    const joined = Math.max(0, memberCount);
-    const capacity = Math.max(1, maxSize);
-    const spotsLeft = capacity - joined;
-    if (spotsLeft <= 0) return t("circleDetails.full");
-    if (spotsLeft === 1) return t("home.oneSpotLeft").replace(/^\(+|\)+$/g, "");
-    return t("home.spotsLeft", { count: spotsLeft }).replace(/^\(+|\)+$/g, "");
-  }
-  if (state.spotsLeftLine) {
-    return state.spotsLeftLine.replace(/^\(+|\)+$/g, "");
-  }
-  return `${Math.max(1, maxSize)} spots total`;
-}
-
-export function formatCircleSpotsLeftHint(memberCount: number, maxSize: number): string | null {
-  return circleParticipationState(memberCount, maxSize).spotsLeftLine;
-}
-
-export function formatCircleMembersJoinedLine(memberCount: number): string | null {
-  return formatPeopleInLine(memberCount);
-}
-
-export function formatCircleSpotsHint(memberCount: number, maxSize: number, t?: TFn): string {
-  const state = circleParticipationState(memberCount, maxSize);
-  if (state.isFull) {
-    return t
-      ? t("discoverPage.circleFull", { count: state.joined, max: state.capacity })
-      : `Full (${state.joined}/${state.capacity})`;
-  }
-  if (t) {
-    const joined = Math.max(0, memberCount);
-    const capacity = Math.max(1, maxSize);
-    const spotsLeft = capacity - joined;
-    const peopleInLine = joined <= 1 ? null : t("home.peopleIn", { count: joined });
-    const spotsLeftLine =
-      spotsLeft <= 0
-        ? null
-        : spotsLeft === 1
-          ? t("home.oneSpotLeft")
-          : t("home.spotsLeft", { count: spotsLeft });
-    if (peopleInLine && spotsLeftLine) return `${peopleInLine} · ${spotsLeftLine}`;
-    return peopleInLine ?? spotsLeftLine ?? "";
-  }
-  if (state.peopleInLine && state.spotsLeftLine) {
-    return `${state.peopleInLine} · ${state.spotsLeftLine}`;
-  }
-  return state.peopleInLine ?? state.spotsLeftLine ?? "";
-}
-
-export function formatCircleSocialContext(memberCount: number, maxSize: number, t?: TFn): string {
-  return formatCircleSpotsHint(memberCount, maxSize, t);
 }
 
 export function formatSeeMeetupCta(iso: string | null | undefined): string {

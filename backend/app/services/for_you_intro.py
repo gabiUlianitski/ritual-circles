@@ -59,10 +59,9 @@ async def _hobby_names(conn: asyncpg.Connection, user_id: UUID, row: asyncpg.Rec
     joined = await conn.fetch(
         """
         SELECT DISTINCT c."ritualType" AS slug
-        FROM attendance a
-        JOIN sessions s ON s.id = a."sessionId"
-        JOIN circles c ON c.id = s."circleId"
-        WHERE a."userId" = $1 AND s."dateTime" >= NOW()
+        FROM circle_members m
+        JOIN circles c ON c.id = m.circle_id
+        WHERE m.user_id = $1 AND m.status = 'active'
         """,
         user_id,
     )

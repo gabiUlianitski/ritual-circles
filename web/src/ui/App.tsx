@@ -67,16 +67,15 @@ function navItemForStage(stage: AppStage): NavItem | null {
 /** Guests have no account, so Home is empty without calling the API. */
 const GUEST_HOME: HomeResponse = {
   circle: null,
-  nextSession: null,
-  myAttendance: null,
   myCircles: [],
-  calendarSessions: [],
 };
 
 export type CirclesDeepLink = {
   circleId: string;
   initialTab: "details" | "chat" | "scheduled";
   justJoined?: boolean;
+  activityId?: string;
+  occurrenceId?: string | null;
 };
 
 function IconBell() {
@@ -100,6 +99,7 @@ export function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [hasUnread, setHasUnread] = useState(false);
   const [myUserId, setMyUserId] = useState<string | null>(null);
+  const [hobbyAdmin, setHobbyAdmin] = useState(false);
   const [userFirstName, setUserFirstName] = useState<string | null>(null);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const [circlesDeepLink, setCirclesDeepLink] = useState<CirclesDeepLink | null>(null);
@@ -153,6 +153,7 @@ export function App() {
     if (guest) {
       setHome(GUEST_HOME);
       setMyUserId(null);
+      setHobbyAdmin(false);
       setUserFirstName(null);
       setOnboardingCompleted(false);
       setError(null);
@@ -173,6 +174,7 @@ export function App() {
       if (me) {
         userId = me.id;
         setMyUserId(me.id);
+        setHobbyAdmin(Boolean(me.hobbyAdmin));
         setUserFirstName(me.first_name ?? null);
         setOnboardingCompleted(Boolean(me.onboardingCompleted));
       }
@@ -231,12 +233,19 @@ export function App() {
   useEffect(() => {
     if (stage === "login" || guest) {
       setMyUserId(null);
+      setHobbyAdmin(false);
       return;
     }
     void api
       .getMe()
-      .then((me) => setMyUserId(me.id))
-      .catch(() => setMyUserId(null));
+      .then((me) => {
+        setMyUserId(me.id);
+        setHobbyAdmin(Boolean(me.hobbyAdmin));
+      })
+      .catch(() => {
+        setMyUserId(null);
+        setHobbyAdmin(false);
+      });
   }, [stage, guest]);
 
   useEffect(() => {
@@ -327,6 +336,7 @@ export function App() {
     setMenuOpen(false);
     setHasUnread(false);
     setMyUserId(null);
+    setHobbyAdmin(false);
     setCirclesDeepLink(null);
     setOnboardingCompleted(false);
     setInvitePreviewId(null);
@@ -383,9 +393,13 @@ export function App() {
     setStage("notifications");
   }
 
-  function openCircleFromNotification(circleId: string, initialTab: "details" | "chat") {
+  function openCircleFromNotification(
+    circleId: string,
+    initialTab: "details" | "chat",
+    activity?: { activityId: string; occurrenceId: string | null },
+  ) {
     setInvitePreviewId(null);
-    setCirclesDeepLink({ circleId, initialTab });
+    setCirclesDeepLink({ circleId, initialTab, ...activity });
     setCirclesVisitKey((k) => k + 1);
     setStage("circles");
     void checkNotifications(myUserId, home?.circle?.id);
@@ -472,7 +486,7 @@ export function App() {
               {menuOpen ? (
                 <div id="app-nav-menu" className="app-nav-dropdown stack" role="menu" aria-label={t("nav.moreOptions")}>
                   <AppLanguageSelect variant="menu" disabled={loading} />
-                  {!guest ? (
+                  {!guest && hobbyAdmin ? (
                     <button type="button" className="app-nav-item" role="menuitem" onClick={() => navigateFromMenu("hobies")}>
                       {t("nav.hobbies")}
                     </button>
@@ -585,6 +599,9 @@ export function App() {
           }}
           onOpenCircleChat={(circleId) => openCircleFromNotification(circleId, "chat")}
           onOpenCircleDetails={(circleId) => openCircleFromNotification(circleId, "details")}
+          onOpenActivity={(circleId, activityId, occurrenceId) =>
+            openCircleFromNotification(circleId, "details", { activityId, occurrenceId })
+          }
           onViewInvitation={(invitationId) => {
             setInviteDeclineNotice(false);
             setInvitePreviewId(invitationId);

@@ -1,8 +1,6 @@
 import type { CircleMessage } from "../api/types";
 import { parsePlaceSuggestMessage } from "./circleChatPlaceSuggest";
 import { parseTimeSuggestMessage } from "./circleChatTimeSuggest";
-import { circleParticipationState } from "./circleParticipation";
-
 export const CHAT_PLACEHOLDERS = [
   "Say something to the group...",
   "Say hi to your circle...",
@@ -71,57 +69,15 @@ export function suggestedFirstMessage(ritualType: string): string {
   return "Hey, looking forward to meeting everyone!";
 }
 
-export function coordinationChips(ritualType: string, isFull: boolean): string[] {
+export function coordinationChips(ritualType: string): string[] {
   const slug = ritualType.trim().toLowerCase().replace(/-/g, "_");
   const hobby = HOBBY_ICEBREAKERS[slug]?.[0];
-  if (isFull) {
-    return [
-      "Looking forward to tomorrow?",
-      "Should we confirm the exact spot?",
-      "Anyone want to arrive early?",
-      ...(hobby ? [hobby] : []),
-    ].slice(0, 4);
-  }
-  return [...PRE_MEETUP_CHIPS];
+  return [...PRE_MEETUP_CHIPS, ...(hobby ? [hobby] : [])].slice(0, 4);
 }
 
-export function daysUntilSession(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
-}
-
-export function systemPrompts(input: {
-  memberCount: number;
-  maxSize: number;
-  nextSessionAt: string | null;
-  isFull: boolean;
-  plainCount: number;
-}): string[] {
-  const out: string[] = [];
-  const days = daysUntilSession(input.nextSessionAt);
-
-  if (input.isFull) {
-    out.push("Your circle is confirmed");
-  }
-
-  if (days === 0) out.push("The meetup is today");
-  else if (days === 1) out.push("The meetup is tomorrow");
-  else if (days != null && days > 1 && days <= 3) out.push(`The meetup is in ${days} days`);
-
-  if (input.plainCount === 0 && input.memberCount > 1) {
-    out.push("Say hi before the meetup starts");
-  }
-
-  if (input.memberCount > 1 && !input.isFull) {
-    out.push("Still room for more — a quick hello helps new people feel welcome");
-  }
-
-  return out.slice(0, 2);
+export function systemPrompts(input: { memberCount: number; plainCount: number }): string[] {
+  if (input.plainCount === 0 && input.memberCount > 1) return ["Say hi to get the conversation started"];
+  return [];
 }
 
 export function silenceRecoveryLines(): string[] {
@@ -129,10 +85,6 @@ export function silenceRecoveryLines(): string[] {
     "Want to break the ice?",
     "A quick hello can make the meetup feel easier",
   ];
-}
-
-export function meetupIsFull(memberCount: number, maxSize: number): boolean {
-  return circleParticipationState(memberCount, maxSize).isFull;
 }
 
 export function ownerOnlyCircle(memberCount: number): boolean {

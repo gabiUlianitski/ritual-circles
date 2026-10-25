@@ -13,7 +13,6 @@ import { parseHobyLevelKey } from "./hobyLevelKey";
 import { FormError } from "./FormError";
 import { CreateCircleVenuePicker } from "./CreateCircleVenuePicker";
 import {
-  buildFirstSessionIso,
   defaultMeetDateIso,
   formatScheduleSummary,
   isMeetDateOnOrAfterToday,
@@ -126,7 +125,7 @@ function CreateCircleSoFarSummary(props: {
 }
 
 export function CreateCircleWizard(props: {
-  onDone: (created: CircleResponse | null, firstSessionAt?: string) => Promise<void> | void;
+  onDone: (created: CircleResponse | null) => Promise<void> | void;
   working: boolean;
   setWorking: (v: boolean) => void;
   error: string | null;
@@ -423,7 +422,6 @@ export function CreateCircleWizard(props: {
         ritualSubtype: isSubcategoryAny(hobySubtype) ? null : hobySubtype.trim() || null,
         modality: "offline",
         recurringTime: recurringFromDateAndHour(meetDate, meetHour),
-        firstSessionAt: buildFirstSessionIso(meetDate, meetHour),
         isRecurring: repeatsWeekly,
         countryCode: countryCode.trim() || null,
         cityName: citySelected.trim() || null,
@@ -436,7 +434,7 @@ export function CreateCircleWizard(props: {
       });
       created = true;
       setCreateLocked(true);
-      await props.onDone(circle.id?.trim() ? circle : null, buildFirstSessionIso(meetDate, meetHour));
+      await props.onDone(circle.id?.trim() ? circle : null);
     } catch (e) {
       if (!created) setError(friendlyCreateError(e, t("createCircle.createFailed")));
       else setError(t("createCircle.openFailed"));
