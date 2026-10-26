@@ -8,11 +8,9 @@ import { circleDisplayTitle } from "./circleDisplay";
 import { formatSessionDateTimeHero } from "./homeDashboardUtils";
 import { HobbyVisual } from "./HomeVisuals";
 import {
-  discoveryImageUrl,
   discoveryCategory,
   pickTodaysHobby,
   rememberDiscovery,
-  scenePrompt,
   todayKey,
 } from "./homeDiscovery";
 import { compactInsight, insightFallbackKey } from "./hobbyInsightSelect";
@@ -46,7 +44,6 @@ export function TodaysDiscovery(props: {
       }),
     [props.hobies, props.userSlugs, props.circleSlugs, props.userId, today],
   );
-  const [imageFailed, setImageFailed] = useState(false);
   const [insight, setInsight] = useState<{ slug: string; text: string } | null>(null);
 
   const featured = props.featuredCircle;
@@ -65,7 +62,6 @@ export function TodaysDiscovery(props: {
 
   useEffect(() => {
     if (pick) rememberDiscovery(props.userId, today, pick);
-    setImageFailed(false);
   }, [pick, props.userId, today]);
 
   const choiceKey = libraryChoices.map((circle) => `${circle.id}:${circle.ritualType}`).join("|");
@@ -139,7 +135,6 @@ export function TodaysDiscovery(props: {
         t,
       })
     : libraryInsight || compactInsight(t(insightFallbackKey(visualPick.slug, today), { name: visualPick.displayName }));
-  const imageUrl = discoveryImageUrl(scenePrompt(visualPick.displayName), `${today}:${visualPick.slug}`);
   const nextActivity = shown?.nextActivity
     ? formatSessionDateTimeHero(shown.nextActivity.startAt)
     : t("homeFeed.nothingScheduledYet");
@@ -151,16 +146,7 @@ export function TodaysDiscovery(props: {
 
   return (
     <section className="home-discovery" aria-label={t("homeFeed.discoveryBadge")}>
-      {imageFailed ? (
-        <HobbyVisual slug={visualPick.slug} icon={visualPick.icon} size="lg" />
-      ) : (
-        <img
-          className="home-discovery-image"
-          src={imageUrl}
-          alt=""
-          onError={() => setImageFailed(true)}
-        />
-      )}
+      <HobbyVisual slug={visualPick.slug} icon={visualPick.icon} size="lg" />
       <div className="home-discovery-shade" />
       <div className="home-discovery-content">
         <span className="home-discovery-badge">{`✨ ${t("homeMoments.badge")}`}</span>

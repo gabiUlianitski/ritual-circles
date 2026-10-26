@@ -8720,7 +8720,6 @@ a.create-venue-map-link {
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.26);
 }
 
-.home-discovery-image,
 .home-discovery .home-visual {
   position: absolute;
   inset: 0;
@@ -9165,16 +9164,9 @@ a.create-venue-map-link {
   cursor: pointer;
 }
 
-.home-recommend-card .home-visual,
-.home-recommend-image {
+.home-recommend-card .home-visual {
   height: 112px;
   border-radius: 0;
-}
-
-.home-recommend-image {
-  display: block;
-  width: 100%;
-  object-fit: cover;
 }
 
 .home-recommend-body {

@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import type { CircleListItem, CommunityStats, HomeActivityItem, HomeResponse, Hoby, UserMeResponse } from "../api/types";
-import { discoveryImageUrl, scenePrompt } from "./homeDiscovery";
 import {
   shouldShowWelcomeTutorial,
 } from "../onboarding/onboardingState";
@@ -89,22 +88,6 @@ function UpcomingStrip(props: {
   );
 }
 
-function CirclePhoto(props: { circle: CircleListItem }) {
-  const [failed, setFailed] = useState(false);
-  const name = props.circle.hobyDisplayName || props.circle.ritualType;
-  if (failed) {
-    return <HobbyVisual slug={props.circle.ritualType} icon={props.circle.hobyIcon} size="sm" />;
-  }
-  return (
-    <img
-      className="home-recommend-image"
-      src={discoveryImageUrl(scenePrompt(name), props.circle.id, { w: 520, h: 320 })}
-      alt=""
-      onError={() => setFailed(true)}
-    />
-  );
-}
-
 function ForYouIntro(props: { guest?: boolean }) {
   const { t, i18n } = useTranslation();
   const [text, setText] = useState<string | null>(null);
@@ -154,7 +137,7 @@ function RecommendStrip(props: {
       <div className="home-carousel">
         {props.circles.map((c) => (
           <button key={c.id} type="button" className="home-recommend-card" onClick={() => props.onOpen(c)}>
-            <CirclePhoto circle={c} />
+            <HobbyVisual slug={c.ritualType} icon={c.hobyIcon} size="sm" />
             <span className="home-recommend-body">
               <span className="home-recommend-name circle-title-wrap">
                 {c.hobyIcon?.trim() ? <span aria-hidden>{c.hobyIcon.trim()} </span> : null}

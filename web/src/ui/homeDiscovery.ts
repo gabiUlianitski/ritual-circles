@@ -167,20 +167,6 @@ export function insightCategoryFor(day: string, slug: string): InsightCategory {
   return INSIGHT_CATEGORIES[total % INSIGHT_CATEGORIES.length];
 }
 
-export function discoveryImageUrl(prompt: string, seed: string, size?: { w: number; h: number }): string {
-  const w = size?.w ?? 960;
-  const h = size?.h ?? 640;
-  const q = encodeURIComponent(prompt);
-  return `https://image.pollinations.ai/prompt/${q}?width=${w}&height=${h}&nologo=true&seed=${hash(seed)}`;
-}
-
-export function scenePrompt(name: string): string {
-  return (
-    `Candid warm photograph of a small diverse group of friends enjoying ${name} together, ` +
-    "natural light, authentic, social and positive, no text, no watermark"
-  );
-}
-
 const COPY_KEY = "ritual_discovery_copy_";
 
 export type DiscoveryCopy = { title: string; body: string; imagePrompt: string; source: "ai" | "catalog" };
