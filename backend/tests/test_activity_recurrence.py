@@ -164,6 +164,20 @@ class RecurringDbCase(unittest.IsolatedAsyncioTestCase):
         self.circle_id = row["circle_id"]
         self.member_id = row["user_id"]
 
+    async def _peer(self) -> UUID:
+        from app.services.circle_members import activate_member
+
+        owner = await self.conn.fetchval("SELECT created_by FROM circles WHERE id = $1", self.circle_id)
+        other = await self.conn.fetchval(
+            "SELECT id FROM users WHERE id <> $1 AND id <> $2 LIMIT 1",
+            self.member_id,
+            owner,
+        )
+        if other is None:
+            self.skipTest("needs another user")
+        await activate_member(self.conn, user_id=other, circle_id=self.circle_id)
+        return other
+
     async def asyncTearDown(self) -> None:
         tx = getattr(self, "tx", None)
         conn = getattr(self, "conn", None)
@@ -364,7 +378,7 @@ class RollingDateTests(RecurringDbCase):
             count = await self.conn.fetchval(
                 "SELECT COUNT(*)::int FROM activity_occurrence_participants WHERE occurrence_id = $1", row["id"]
             )
-            self.assertEqual(count, 0)
+            self.assertEqual(count, 1)
 
     async def test_g_accepted_time_change_is_kept(self) -> None:
         weekly = await self._weekly()
@@ -374,7 +388,7 @@ class RollingDateTests(RecurringDbCase):
         from app.services.activity_suggestions import accept_suggestion
 
         await accept_suggestion(
-            self.conn, user_id=self.member_id, suggestion_id=self._occurrence_suggestion_id(suggested, last.id, "time")
+            self.conn, user_id=await self._peer(), suggestion_id=self._occurrence_suggestion_id(suggested, last.id, "time")
         )
         await self._weeks_pass(weekly.id, 2)
         before = await self.conn.fetchrow("SELECT * FROM activity_occurrences WHERE id = $1", UUID(last.id))
@@ -418,7 +432,7 @@ class RollingDateTests(RecurringDbCase):
         )
         await accept_suggestion(
             self.conn,
-            user_id=self.member_id,
+            user_id=await self._peer(),
             suggestion_id=self._occurrence_suggestion_id(suggested, last.id, "location"),
         )
         await self._weeks_pass(weekly.id, 2)
@@ -507,7 +521,7 @@ class RollingDateTests(RecurringDbCase):
         with self.assertRaises(HTTPException) as refused:
             await accept_suggestion(
                 self.conn,
-                user_id=self.member_id,
+                user_id=await self._peer(),
                 suggestion_id=self._occurrence_suggestion_id(suggested, first.id, "time"),
             )
         self.assertEqual(refused.exception.status_code, 409)
@@ -527,7 +541,7 @@ class RollingDateTests(RecurringDbCase):
         next_week = last.startAt + timedelta(weeks=1)
         suggested = await self._suggest_time(weekly.id, last.id, next_week)
         await accept_suggestion(
-            self.conn, user_id=self.member_id, suggestion_id=self._occurrence_suggestion_id(suggested, last.id, "time")
+            self.conn, user_id=await self._peer(), suggestion_id=self._occurrence_suggestion_id(suggested, last.id, "time")
         )
         await self._weeks_pass(weekly.id, 2)
         moved = await self.conn.fetchrow("SELECT * FROM activity_occurrences WHERE id = $1", UUID(last.id))
@@ -579,6 +593,33 @@ class RollingDateTests(RecurringDbCase):
                 activity_id,
             )
             self.assertEqual(int(ahead), ROLLING_DATES)
+            duplicates = await outside.fetchval(
+                """
+                SELECT COUNT(*)::int FROM (
+                  SELECT occurrence_id
+                  FROM activity_occurrence_participants
+                  WHERE user_id = $2
+                    AND occurrence_id IN (SELECT id FROM activity_occurrences WHERE activity_id = $1)
+                  GROUP BY occurrence_id
+                  HAVING COUNT(*) > 1
+                ) extra
+                """,
+                activity_id,
+                self.member_id,
+            )
+            self.assertEqual(int(duplicates), 0)
+            covered = await outside.fetchval(
+                """
+                SELECT COUNT(*)::int
+                FROM activity_occurrences o
+                JOIN activity_occurrence_participants p
+                  ON p.occurrence_id = o.id AND p.user_id = $2 AND p.status = 'going'
+                WHERE o.activity_id = $1
+                """,
+                activity_id,
+                self.member_id,
+            )
+            self.assertEqual(int(covered), len(rows))
         finally:
             if activity_id is not None:
                 await outside.execute("DELETE FROM activities WHERE id = $1", activity_id)

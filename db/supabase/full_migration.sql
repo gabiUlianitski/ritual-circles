@@ -431,7 +431,8 @@ CREATE TABLE IF NOT EXISTS activity_notifications (
     'reconfirmation_required',
     'upcoming_activity',
     'suggestion_accepted',
-    'suggestion_declined'
+    'suggestion_declined',
+    'suggestion_created'
   )),
   activity_id UUID NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
   occurrence_id UUID NULL REFERENCES activity_occurrences(id) ON DELETE CASCADE,
@@ -451,6 +452,23 @@ ALTER TABLE activity_participants
 ALTER TABLE activity_occurrence_participants
   ADD COLUMN IF NOT EXISTS attendance_status TEXT NOT NULL DEFAULT 'pending'
   CHECK (attendance_status IN ('pending', 'attended', 'no_show'));
+
+ALTER TABLE activities
+  ADD COLUMN IF NOT EXISTS min_participants INTEGER;
+
+UPDATE activities
+SET min_participants = group_size
+WHERE min_participants IS NULL;
+
+ALTER TABLE activities
+  ALTER COLUMN min_participants SET NOT NULL;
+
+ALTER TABLE activities
+  DROP CONSTRAINT IF EXISTS activities_min_participants_check;
+
+ALTER TABLE activities
+  ADD CONSTRAINT activities_min_participants_check
+  CHECK (min_participants >= 1 AND min_participants <= group_size);
 
 ALTER TABLE hobies ADD COLUMN IF NOT EXISTS discovery_description TEXT NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS for_you_intro_json JSONB NULL;

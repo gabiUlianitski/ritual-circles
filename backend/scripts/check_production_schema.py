@@ -1,4 +1,4 @@
-"""Read-only check that the target database has the objects from migrations 031-046.
+"""Read-only check that the target database has the objects from migrations 031-047.
 
 Uses DATABASE_URL from backend/.env. Never prints the connection string or host.
 The session is set to READ ONLY, and only catalog SELECTs run, so nothing is
@@ -28,7 +28,7 @@ REQUIRED_COLUMNS: dict[str, tuple[str, ...]] = {
     "circle_members": ("id", "circle_id", "user_id", "status", "joined_at"),
     "activities": (
         "id", "circle_id", "title", "start_at", "end_at", "recurrence_type", "recurrence_rule",
-        "location_name", "location_address", "group_size", "payment_type", "status", "created_by",
+        "location_name", "location_address", "group_size", "min_participants", "payment_type", "status", "created_by",
         "cancellation_reason",
     ),
     "activity_participants": (
@@ -57,6 +57,7 @@ NOT_NULL_COLUMNS: tuple[tuple[str, str], ...] = (
     ("activity_participants", "attendance_status"),
     ("activity_occurrence_participants", "confirmation_required"),
     ("activity_occurrence_participants", "attendance_status"),
+    ("activities", "min_participants"),
 )
 
 UNIQUE_COLUMN_SETS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -81,6 +82,7 @@ CHECK_CONTAINS: tuple[tuple[str, str, str], ...] = (
     ("activities", "activities_status_check", "confirmed"),
     ("activity_participants", "attendance_status", "no_show"),
     ("activity_occurrence_participants", "attendance_status", "no_show"),
+    ("activities", "min_participants", "group_size"),
 )
 
 
@@ -182,7 +184,7 @@ async def main() -> int:
         for problem in problems:
             print(f"  {problem}")
         return 1
-    print(f"Schema check OK: {checked} checks for migrations 031-046 passed.")
+    print(f"Schema check OK: {checked} checks for migrations 031-047 passed.")
     return 0
 
 

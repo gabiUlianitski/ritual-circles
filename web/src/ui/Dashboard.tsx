@@ -14,6 +14,7 @@ import { HobbyVisual } from "./HomeVisuals";
 import { BidiText } from "./BidiText";
 import { HomeActivityReconfirm } from "./HomeActivityReconfirm";
 import { homeActivityKey, homeActivityPlace, needsReconfirmation, upcomingHomeActivities } from "./homeActivities";
+import { activityReadinessLabel } from "./activityDisplay";
 import { formatSessionEventParts, formatUpcomingDateTime, upcomingBadge } from "./homeDashboardUtils";
 import { todayKey } from "./homeDiscovery";
 import { discoverNewInterests, type NewInterestMatch } from "./homeInterestDiscovery";
@@ -23,10 +24,12 @@ import { OnboardingFlow } from "./onboarding/OnboardingFlow";
 
 function activitySignal(item: HomeActivityItem, t: (key: string, options?: Record<string, unknown>) => string): string {
   if (needsReconfirmation(item)) return t("activitySuggestions.activityChanged");
-  return t("activityParticipation.goingCount", {
+  const readiness = activityReadinessLabel(item.participation, t);
+  const count = t("activityParticipation.goingCount", {
     count: item.participation.goingCount,
     size: item.participation.groupSize,
   });
+  return readiness ? `${count} · ${readiness}` : count;
 }
 
 function UpcomingStrip(props: {

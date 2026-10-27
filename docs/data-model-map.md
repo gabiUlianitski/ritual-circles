@@ -91,7 +91,7 @@ Fields:
 - `is_recurring` (019)
 - `city`, `country_code`, `city_name`, `meeting_place` (007)
 - `"maxSize"` integer 1–6, kept in step with `group_size_json`; a fallback for the default Activity size. Not a membership cap.
-- `group_size_json` fixed / max / min / range policy (022): the Circle's typical group size. Descriptive only; it pre-fills a new Activity's `group_size`.
+- `group_size_json` fixed / max / min / range policy (022): the Circle's typical group size. Descriptive only; it pre-fills a new Activity's maximum `group_size`. A new Activity's `min_participants` starts equal to that maximum.
 - `cost_payment_json` (023)
 - `"inviteCode"` unique
 - `invite_only` default true (006). False allows `POST /circles/join-open`.
@@ -111,11 +111,11 @@ One row per user and circle, `status` `active` | `left`. Join inserts or reactiv
 
 `isCreator` is `created_by == current user`, returned on home circle items and circle list items.
 
-### Activities (migrations 039–044)
+### Activities (migrations 039–047)
 
 | Table | Role |
 | --- | --- |
-| `activities` | The gathering: title, start/end, place, group size, payment, `recurrence_type` (`one_time` / `recurring`) + `recurrence_rule`, lifecycle `status` (`draft`, `open`, `confirmed`, `completed`, `cancelled`) |
+| `activities` | The gathering: title, start/end, place, payment, `recurrence_type` (`one_time` / `recurring`) + `recurrence_rule`, lifecycle `status` (`draft`, `open`, `confirmed`, `completed`, `cancelled`). `min_participants` is the readiness threshold and `group_size` is the capacity. Ready and Full are calculated from going participants; neither is stored or used as a lifecycle status. The creator is a normal going participant. |
 | `activity_participants` | Who is going to a one-time Activity. `attendance_status` (`pending` \| `attended` \| `no_show`) records afterwards whether a going person came; it is separate from the RSVP `status`, set only by the creator or Circle owner, and shown only to them |
 | `activity_occurrences` | Dates of a recurring Activity. Topped up to a rolling window by `ensure_future_activity_occurrences` (`activities_service.py`, rules in `activity_recurrence.py`) |
 | `activity_occurrence_participants` | Who is going to one date, with that date's own `attendance_status` |

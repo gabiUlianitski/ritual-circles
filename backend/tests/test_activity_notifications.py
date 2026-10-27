@@ -9,6 +9,7 @@ from uuid import UUID
 
 import asyncpg
 from dotenv import load_dotenv
+from fastapi import HTTPException
 
 from app.schemas import ActivitySuggestionCreate, ActivityUpdateRequest
 from app.services.activities_service import (
@@ -167,7 +168,7 @@ class ActivityNotificationTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(mine[0].recurring)
 
     async def test_b_becoming_full_does_not_confirm(self) -> None:
-        activity = await self._activity(groupSize=2)
+        activity = await self._activity(groupSize=3)
         await self._join(activity, self.a, self.b)
         self.assertEqual(await self._rows(activity.id), [])
 
@@ -232,6 +233,15 @@ class ActivityNotificationTests(unittest.IsolatedAsyncioTestCase):
         await accept_suggestion(self.conn, user_id=self.organizer, suggestion_id=UUID(suggestion.id))
         self.assertEqual(await self._recipients(activity.id, "reconfirmation_required"), {self.a})
         self.assertEqual(await self._rows(activity.id, "activity_changed"), [])
+        organizer_flag = await self.conn.fetchval(
+            """
+            SELECT confirmation_required FROM activity_participants
+            WHERE activity_id = $1 AND user_id = $2
+            """,
+            UUID(activity.id),
+            self.organizer,
+        )
+        self.assertEqual(organizer_flag, False)
 
     async def test_h_still_going_resolves_without_duplicate(self) -> None:
         activity = await self._activity()
@@ -271,33 +281,30 @@ class ActivityNotificationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self._recipients(activity.id, "suggestion_declined"), {self.a})
         self.assertEqual(len(await self._rows(activity.id, "suggestion_declined")), 1)
 
-    async def test_j_competing_suggestion_declined_on_accept(self) -> None:
+    async def test_j_second_suggestion_waits_for_the_open_one(self) -> None:
         activity = await self._activity()
         await self._join(activity, self.a, self.b)
         await create_suggestion(self.conn, user_id=self.a, activity_id=UUID(activity.id), payload=_time())
-        await create_suggestion(
-            self.conn,
-            user_id=self.b,
-            activity_id=UUID(activity.id),
-            payload=_time(proposedStartAt=LATER + timedelta(days=1), proposedEndAt=LATER_END + timedelta(days=1)),
-        )
-        mine = await self.conn.fetchval(
-            "SELECT id FROM activity_suggestions WHERE activity_id = $1 AND created_by = $2",
-            UUID(activity.id),
-            self.a,
-        )
-        await accept_suggestion(self.conn, user_id=self.organizer, suggestion_id=mine)
-        self.assertEqual(await self._recipients(activity.id, "suggestion_accepted"), {self.a})
-        self.assertEqual(await self._recipients(activity.id, "suggestion_declined"), {self.b})
+        with self.assertRaises(HTTPException) as blocked:
+            await create_suggestion(
+                self.conn,
+                user_id=self.b,
+                activity_id=UUID(activity.id),
+                payload=_time(proposedStartAt=LATER + timedelta(days=1), proposedEndAt=LATER_END + timedelta(days=1)),
+            )
+        self.assertEqual(blocked.exception.status_code, 409)
+        self.assertEqual(await self._recipients(activity.id, "suggestion_created"), {self.organizer, self.b})
 
     async def test_k_create_support_and_withdraw_stay_quiet(self) -> None:
         activity = await self._activity()
         await self._join(activity, self.a, self.b)
         suggested = await create_suggestion(self.conn, user_id=self.a, activity_id=UUID(activity.id), payload=_time())
         suggestion = next(item for item in suggested.suggestions if item.status == "open")
+        self.assertEqual(await self._recipients(activity.id, "suggestion_created"), {self.organizer, self.b})
         await support_suggestion(self.conn, user_id=self.b, suggestion_id=UUID(suggestion.id))
         await withdraw_suggestion(self.conn, user_id=self.a, suggestion_id=UUID(suggestion.id))
-        self.assertEqual(await self._rows(activity.id), [])
+        self.assertEqual(await self._recipients(activity.id, "suggestion_created"), {self.organizer, self.b})
+        self.assertEqual(len(await self._rows(activity.id)), 2)
 
     async def test_l_upcoming_reminder_exactly_once(self) -> None:
         activity = await self._activity(startAt=_soon())
@@ -390,8 +397,14 @@ class ActivityNotificationTests(unittest.IsolatedAsyncioTestCase):
         suggestion = next(item for item in suggested.suggestions if item.status == "open")
         await accept_suggestion(self.conn, user_id=self.organizer, suggestion_id=UUID(suggestion.id))
         users = await self.conn.fetch(
-            "SELECT user_name, first_name, last_name FROM users WHERE id = ANY($1::uuid[])",
+            "SELECT id, user_name, first_name, last_name FROM users WHERE id = ANY($1::uuid[])",
             [self.a, self.b, self.organizer],
+        )
+        by_id = {row["id"]: row for row in users}
+        suggester = user_display_label(
+            user_name=by_id[self.a]["user_name"],
+            first_name=by_id[self.a]["first_name"],
+            last_name=by_id[self.a]["last_name"],
         )
         display_names = [
             user_display_label(
@@ -406,6 +419,10 @@ class ActivityNotificationTests(unittest.IsolatedAsyncioTestCase):
                 text = item.model_dump_json()
                 for secret in ("Private Road 1", "Hidden Street 7", "Secret note", "Fluntern Courts"):
                     self.assertNotIn(secret, text)
+                if item.type == "suggestion_created":
+                    self.assertEqual(item.suggestedByName, suggester)
+                    continue
+                self.assertIsNone(item.suggestedByName)
                 for name in display_names:
                     if len(name) > 3:
                         self.assertNotIn(f'"{name}"', text)

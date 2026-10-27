@@ -38,7 +38,7 @@ export function ActivityEdit(props: {
       const target =
         first === "title"
           ? titleId
-          : first === "groupSize"
+          : first === "groupSize" || first === "minParticipants"
             ? `${formId}-size`
             : first === "amount"
               ? `${formId}-amount`

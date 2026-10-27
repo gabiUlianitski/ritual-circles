@@ -72,6 +72,7 @@ def _response(row: asyncpg.Record) -> ActivityResponse:
         locationName=row["location_name"],
         locationAddress=row["location_address"],
         groupSize=int(row["group_size"]),
+        minParticipants=int(row["min_participants"]),
         paymentType=row["payment_type"],
         priceAmount=row["price_amount"],
         currency=row["currency"],
@@ -92,6 +93,7 @@ def _flags(
     row: asyncpg.Record,
     *,
     is_editor: bool,
+    can_edit: bool,
     series: bool,
     joinable: bool,
     going: bool,
@@ -106,7 +108,7 @@ def _flags(
     return ActivityActions(
         canJoin=joinable and live and not has_ended and not going and not is_full,
         canLeave=joinable and live and going,
-        canEdit=is_editor and status in ("draft", "open", "confirmed"),
+        canEdit=can_edit and status in ("draft", "open", "confirmed"),
         canPublish=is_editor and status == "draft",
         canConfirm=is_editor and status == "open" and not series,
         canComplete=is_editor and status == "confirmed" and has_ended and not series,
@@ -228,11 +230,13 @@ async def _present(
 ) -> ActivityResponse:
     summary = await summary_for(conn, user_id=user_id, row=row, include_people=include_people)
     circle = await _circle(conn, row["circle_id"])
-    is_editor = row["created_by"] == user_id or circle["created_by"] == user_id
+    is_creator = row["created_by"] == user_id
+    is_editor = is_creator or circle["created_by"] == user_id
     series = row["recurrence_type"] == "recurring"
     actions = _flags(
         row,
         is_editor=is_editor,
+        can_edit=is_creator,
         series=series,
         joinable=not series,
         going=summary.currentUserStatus == "going",
@@ -243,9 +247,7 @@ async def _present(
     if include_people:
         from app.services.activity_suggestions import grouped_suggestions
 
-        parent_suggestions, by_occurrence = await grouped_suggestions(
-            conn, user_id=user_id, activity=row, is_editor=is_editor
-        )
+        parent_suggestions, by_occurrence = await grouped_suggestions(conn, user_id=user_id, activity=row)
     occurrences = (
         await _occurrence_views(
             conn,
@@ -321,6 +323,12 @@ def _require_editor(*, user_id: UUID, activity: asyncpg.Record, circle: asyncpg.
     raise HTTPException(status_code=403, detail="Only the activity creator or circle owner can change this activity")
 
 
+def _require_creator(*, user_id: UUID, activity: asyncpg.Record) -> None:
+    if activity["created_by"] == user_id:
+        return
+    raise HTTPException(status_code=403, detail="Only the activity creator can edit this activity")
+
+
 async def activity_defaults_for_circle(conn: asyncpg.Connection, *, circle_id: UUID) -> ActivityDefaults:
     """Copy the circle's place and preferred size. The activity stores its own values after that."""
     return _defaults_from_circle(await _circle(conn, circle_id))
@@ -360,9 +368,9 @@ async def _insert(
         INSERT INTO activities (
           id, circle_id, title, description, start_at, end_at,
           recurrence_type, recurrence_rule, location_name, location_address,
-          group_size, payment_type, price_amount, currency, status, created_by
+          group_size, min_participants, payment_type, price_amount, currency, status, created_by
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
         RETURNING *
         """,
         activity_id,
@@ -376,6 +384,7 @@ async def _insert(
         fields["location_name"],
         fields["location_address"],
         fields["group_size"],
+        fields["min_participants"],
         fields["payment_type"],
         fields["price_amount"],
         fields["currency"],
@@ -407,16 +416,84 @@ async def create_activity(
         location_name=location_name if location_name is not None else defaults.location_name,
         location_address=location_address if location_address is not None else defaults.location_address,
         group_size=payload.groupSize if payload.groupSize is not None else defaults.group_size,
+        min_participants=payload.minParticipants,
         payment_type=payload.paymentType,
         price_amount=payload.priceAmount,
         currency=payload.currency,
         status="draft",
         require_group_size=True,
     )
-    return await _insert(conn, activity_id=uuid4(), circle_id=circle_id, user_id=user_id, fields=fields, include_people=False)
+    async with conn.transaction():
+        created = await _insert(
+            conn, activity_id=uuid4(), circle_id=circle_id, user_id=user_id, fields=fields, include_people=False
+        )
+        if payload.recurrenceType == "one_time":
+            await conn.execute(
+                """
+                INSERT INTO activity_participants (
+                  id, activity_id, user_id, status, confirmation_required, attendance_status, joined_at
+                )
+                VALUES ($1, $2, $3, 'going', FALSE, 'pending', NOW())
+                ON CONFLICT (activity_id, user_id) DO UPDATE
+                SET status = 'going', confirmation_required = FALSE, updated_at = NOW()
+                """,
+                uuid4(),
+                UUID(created.id),
+                user_id,
+            )
+        row = await conn.fetchrow("SELECT * FROM activities WHERE id = $1", UUID(created.id))
+    return await _present(conn, user_id=user_id, row=row, include_people=False)
+
+
+async def restore_confirmed_after_suggestion(
+    conn: asyncpg.Connection, *, activity_id: UUID | None = None, circle_id: UUID | None = None
+) -> None:
+    """An accepted suggestion keeps a confirmed activity confirmed.
+
+    Older accepts moved it back to open. A saved reconfirmation notice is the mark of that case.
+    """
+    if activity_id is None and circle_id is None:
+        return
+    await conn.execute(
+        """
+        UPDATE activities a
+        SET status = 'confirmed', updated_at = NOW()
+        WHERE a.status = 'open'
+          AND a.recurrence_type = 'one_time'
+          AND ($1::uuid IS NULL OR a.id = $1)
+          AND ($2::uuid IS NULL OR a.circle_id = $2)
+          AND EXISTS (
+            SELECT 1 FROM activity_notifications n
+            WHERE n.activity_id = a.id
+              AND n.occurrence_id IS NULL
+              AND n.type = 'reconfirmation_required'
+          )
+        """,
+        activity_id,
+        circle_id,
+    )
+    await conn.execute(
+        """
+        UPDATE activity_occurrences o
+        SET status = 'confirmed', updated_at = NOW()
+        FROM activities a
+        WHERE o.activity_id = a.id
+          AND o.status = 'open'
+          AND ($1::uuid IS NULL OR a.id = $1)
+          AND ($2::uuid IS NULL OR a.circle_id = $2)
+          AND EXISTS (
+            SELECT 1 FROM activity_notifications n
+            WHERE n.occurrence_id = o.id
+              AND n.type = 'reconfirmation_required'
+          )
+        """,
+        activity_id,
+        circle_id,
+    )
 
 
 async def get_activity(conn: asyncpg.Connection, *, user_id: UUID, activity_id: UUID) -> ActivityResponse:
+    await restore_confirmed_after_suggestion(conn, activity_id=activity_id)
     row = await conn.fetchrow("SELECT * FROM activities WHERE id = $1", activity_id)
     if not row:
         raise HTTPException(status_code=404, detail="activity not found")
@@ -434,6 +511,7 @@ async def list_activities_for_circle(
 ) -> list[ActivityResponse]:
     circle = await _circle(conn, circle_id)
     await _require_member_or_owner(conn, user_id=user_id, circle=circle)
+    await restore_confirmed_after_suggestion(conn, circle_id=circle_id)
     rows = await conn.fetch(
         """
         SELECT *
@@ -517,10 +595,12 @@ async def _present_circle_list(
     presented: list[ActivityResponse] = []
     for row in rows:
         series = row["recurrence_type"] == "recurring"
-        is_editor = row["created_by"] == user_id or circle["created_by"] == user_id
+        is_creator = row["created_by"] == user_id
+        is_editor = is_creator or circle["created_by"] == user_id
         actions = _flags(
             row,
             is_editor=is_editor,
+            can_edit=is_creator,
             series=series,
             joinable=not series,
             going=parent_summaries[row["id"]].currentUserStatus == "going",
@@ -605,8 +685,7 @@ async def update_activity(
     row = await conn.fetchrow("SELECT * FROM activities WHERE id = $1", activity_id)
     if not row:
         raise HTTPException(status_code=404, detail="activity not found")
-    circle = await _circle(conn, row["circle_id"])
-    _require_editor(user_id=user_id, activity=row, circle=circle)
+    _require_creator(user_id=user_id, activity=row)
     if row["status"] in ("cancelled", "completed"):
         raise HTTPException(status_code=400, detail="This activity can no longer be changed")
     sent = payload.model_fields_set
@@ -616,6 +695,7 @@ async def update_activity(
         raise HTTPException(status_code=400, detail="These dates are already set and cannot be moved")
     next_status = row["status"]
     group_size = payload.groupSize if "groupSize" in sent else int(row["group_size"])
+    min_participants = payload.minParticipants if "minParticipants" in sent else int(row["min_participants"])
     fields = _checked(
         title=payload.title if "title" in sent else row["title"],
         description=payload.description if "description" in sent else row["description"],
@@ -626,6 +706,7 @@ async def update_activity(
         location_name=payload.locationName if "locationName" in sent else row["location_name"],
         location_address=payload.locationAddress if "locationAddress" in sent else row["location_address"],
         group_size=group_size,
+        min_participants=min_participants,
         payment_type=payload.paymentType if "paymentType" in sent else row["payment_type"],
         price_amount=payload.priceAmount if "priceAmount" in sent else row["price_amount"],
         currency=payload.currency if "currency" in sent else row["currency"],
@@ -645,10 +726,11 @@ async def update_activity(
                 location_name = $8,
                 location_address = $9,
                 group_size = $10,
-                payment_type = $11,
-                price_amount = $12,
-                currency = $13,
-                status = $14,
+                min_participants = $11,
+                payment_type = $12,
+                price_amount = $13,
+                currency = $14,
+                status = $15,
                 updated_at = NOW()
             WHERE id = $1
             RETURNING *
@@ -663,6 +745,7 @@ async def update_activity(
             fields["location_name"],
             fields["location_address"],
             fields["group_size"],
+            fields["min_participants"],
             fields["payment_type"],
             fields["price_amount"],
             fields["currency"],
@@ -750,20 +833,33 @@ async def _add_missing_dates(conn: asyncpg.Connection, row: asyncpg.Record) -> i
     ):
         if added == missing:
             break
-        result = await conn.execute(
+        occurrence_id = await conn.fetchval(
             """
             INSERT INTO activity_occurrences (
               id, activity_id, start_at, end_at, status, scheduled_at
             )
             VALUES ($1, $2, $3, $4, 'open', $3)
             ON CONFLICT DO NOTHING
+            RETURNING id
             """,
             uuid4(),
             row["id"],
             begin,
             finish,
         )
-        if result.endswith(" 1"):
+        if occurrence_id is not None:
+            await conn.execute(
+                """
+                INSERT INTO activity_occurrence_participants (
+                  id, occurrence_id, user_id, status, confirmation_required, attendance_status, joined_at
+                )
+                VALUES ($1, $2, $3, 'going', FALSE, 'pending', NOW())
+                ON CONFLICT (occurrence_id, user_id) DO NOTHING
+                """,
+                uuid4(),
+                occurrence_id,
+                row["created_by"],
+            )
             added += 1
     return added
 

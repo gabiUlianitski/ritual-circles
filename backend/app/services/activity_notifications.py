@@ -14,6 +14,7 @@ import asyncpg
 
 from app.hoby_i18n import localized_display_name
 from app.schemas import ActivityNotification
+from app.user_fields import user_display_label
 
 REMINDER_HOURS = 24
 _LIST_LIMIT = 100
@@ -166,6 +167,26 @@ async def notify_edited(
     return added
 
 
+async def notify_suggestion_created(
+    conn: asyncpg.Connection,
+    *,
+    activity_id: UUID,
+    occurrence_id: UUID | None,
+    suggestion_id: UUID,
+    actor: UUID,
+) -> int:
+    """Other people who are going hear that a new time or place was suggested. The suggester does not."""
+    return await notify_going(
+        conn,
+        kind="suggestion_created",
+        activity_id=activity_id,
+        occurrence_id=occurrence_id,
+        source=str(suggestion_id),
+        suggestion_id=suggestion_id,
+        skip=(actor,),
+    )
+
+
 async def notify_suggestion_accepted(
     conn: asyncpg.Connection,
     *,
@@ -306,6 +327,9 @@ SELECT n.id, n.type, n.activity_id, n.occurrence_id, n.created_at,
        a.title, a.circle_id, a.recurrence_type,
        COALESCE(o.start_at, a.start_at) AS start_at,
        s.type AS suggestion_type,
+       CASE WHEN n.type = 'suggestion_created' THEN su.first_name END AS suggester_first_name,
+       CASE WHEN n.type = 'suggestion_created' THEN su.last_name END AS suggester_last_name,
+       CASE WHEN n.type = 'suggestion_created' THEN su.user_name END AS suggester_user_name,
        CASE WHEN n.type = 'activity_cancelled'
             THEN COALESCE(o.cancellation_reason, a.cancellation_reason) END AS cancellation_note,
        CASE WHEN n.occurrence_id IS NULL
@@ -321,6 +345,7 @@ JOIN circles c ON c.id = a.circle_id
 LEFT JOIN hobies h ON lower(trim(h.slug)) = lower(trim(c."ritualType"))
 LEFT JOIN activity_occurrences o ON o.id = n.occurrence_id
 LEFT JOIN activity_suggestions s ON s.id = n.suggestion_id
+LEFT JOIN users su ON su.id = s.created_by
 LEFT JOIN activity_participants p ON p.activity_id = n.activity_id AND p.user_id = n.user_id
 LEFT JOIN activity_occurrence_participants op ON op.occurrence_id = n.occurrence_id AND op.user_id = n.user_id
 WHERE n.user_id = $1
@@ -360,6 +385,15 @@ async def list_activity_notifications(
             recurring=row["recurrence_type"] == "recurring",
             startAt=row["start_at"],
             suggestionType=row["suggestion_type"],
+            suggestedByName=(
+                user_display_label(
+                    user_name=row["suggester_user_name"],
+                    first_name=row["suggester_first_name"],
+                    last_name=row["suggester_last_name"],
+                )
+                if row["type"] == "suggestion_created"
+                else None
+            ),
             cancellationNote=row["cancellation_note"],
             resolved=row["type"] == "reconfirmation_required" and not row["needs_reconfirmation"],
             createdAt=row["created_at"],

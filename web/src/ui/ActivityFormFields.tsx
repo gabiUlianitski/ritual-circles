@@ -16,6 +16,7 @@ function issueText(code: ActivityIssueCode, t: (key: string) => string): string 
   if (code === "date") return t("activityForm.dateRequired");
   if (code === "end") return t("activityForm.endAfterStart");
   if (code === "groupSize") return t("activityForm.groupRequired");
+  if (code === "minParticipants") return t("activityForm.minimumRequired");
   if (code === "amount") return t("activityForm.amountRequired");
   return t("activityForm.currencyRequired");
 }
@@ -180,21 +181,65 @@ export function ActivityFormFields(props: {
       </fieldset>
 
       <fieldset className="activity-form-section">
-        <legend id={`${props.formId}-size`}>{t("activityForm.groupSize")}</legend>
+        <legend id={`${props.formId}-size`}>{t("activityForm.minParticipants")}</legend>
         <div className="activity-form-stepper" role="group" aria-labelledby={`${props.formId}-size`}>
           <button
             type="button"
             aria-label={t("activityForm.decrease")}
-            disabled={draft.groupSize == null || draft.groupSize <= 1}
+            disabled={draft.minParticipants == null || draft.minParticipants <= 1}
             onClick={() =>
-              props.onChange({ groupSize: draft.groupSize == null ? null : Math.max(1, draft.groupSize - 1) })
+              props.onChange({
+                minParticipants: draft.minParticipants == null ? null : Math.max(1, draft.minParticipants - 1),
+              })
             }
           >
             −
           </button>
           <span className="activity-form-stepper-value" aria-live="polite">
-            {draft.groupSize ?? "–"}
+            {draft.minParticipants ?? "–"}
           </span>
+          <button
+            type="button"
+            aria-label={t("activityForm.increase")}
+            onClick={() =>
+              props.onChange({
+                minParticipants:
+                  draft.minParticipants == null
+                    ? 1
+                    : Math.min(draft.groupSize ?? draft.minParticipants + 1, draft.minParticipants + 1),
+              })
+            }
+          >
+            +
+          </button>
+        </div>
+        <p className="muted activity-form-help">{t("activityForm.minParticipantsHelp")}</p>
+      </fieldset>
+      {shownIssues.has("minParticipants") ? (
+        <p className="activity-form-field-error" role="alert">
+          {issueText("minParticipants", t)}
+        </p>
+      ) : null}
+      <fieldset className="activity-form-section">
+        <legend id={`${props.formId}-group-size`}>{t("activityForm.groupSize")}</legend>
+        <div className="activity-form-stepper" role="group" aria-labelledby={`${props.formId}-group-size`}>
+          <button
+            type="button"
+            aria-label={t("activityForm.decrease")}
+            disabled={draft.groupSize == null || draft.groupSize <= 1}
+            onClick={() =>
+              props.onChange({
+                groupSize: draft.groupSize == null ? null : Math.max(1, draft.groupSize - 1),
+                minParticipants:
+                  draft.minParticipants != null && draft.groupSize != null && draft.minParticipants > draft.groupSize - 1
+                    ? Math.max(1, draft.groupSize - 1)
+                    : draft.minParticipants,
+              })
+            }
+          >
+            −
+          </button>
+          <span className="activity-form-stepper-value" aria-live="polite">{draft.groupSize ?? "–"}</span>
           <button
             type="button"
             aria-label={t("activityForm.increase")}
@@ -203,11 +248,10 @@ export function ActivityFormFields(props: {
             +
           </button>
         </div>
+        <p className="muted activity-form-help">{t("activityForm.groupSizeHelp")}</p>
       </fieldset>
       {shownIssues.has("groupSize") ? (
-        <p className="activity-form-field-error" role="alert">
-          {issueText("groupSize", t)}
-        </p>
+        <p className="activity-form-field-error" role="alert">{issueText("groupSize", t)}</p>
       ) : null}
 
       <fieldset className="activity-form-section">

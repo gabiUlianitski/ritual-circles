@@ -1,7 +1,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import type { HomeActivityItem } from "../api/types";
-import { activityPriceLabel } from "./activityDisplay";
+import { activityPriceLabel, activityReadinessLabel } from "./activityDisplay";
 import { BidiText } from "./BidiText";
 import { HomeActivityReconfirm } from "./HomeActivityReconfirm";
 import { homeActivityPlace, needsReconfirmation } from "./homeActivities";
@@ -44,6 +44,7 @@ export function HomeNextActivityCard(props: {
   const price = activityPriceLabel(next);
   const meta = [
     t("activityParticipation.goingCount", { count: next.participation.goingCount, size: next.participation.groupSize }),
+    activityReadinessLabel(next.participation, t),
     place ? `📍 ${place}` : null,
     price,
   ].filter(Boolean);

@@ -14,7 +14,7 @@ When a task touches users, visuals, or flows, explicitly consider **which agent�
 |-------|----------------|------|
 | Web (primary client) | `web/` — React 19 + Vite + MUI + i18n | Home hub, Circles, Activities |
 | API | `backend/` — FastAPI + asyncpg + JWT | Stateless REST; prefer `GET /home` |
-| DB | `db/` — PostgreSQL (Supabase) | `schema.sql` + `migrations/` (through `046`) |
+| DB | `db/` — PostgreSQL (Supabase) | `schema.sql` + `migrations/` (through `047`) |
 | Deploy | `DEPLOYMENT.md`, `vercel.json`, `render.yaml` | Vercel (web) + Render (API) + Supabase (PG) |
 | Mobile | `ios/`, `android/` | Stale source skeletons (not built; use the retired Session API — see their READMEs) |
 

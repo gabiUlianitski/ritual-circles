@@ -336,10 +336,17 @@ async def add_circle_members(conn: asyncpg.Connection, circle_ids: list[UUID], u
 async def sprinkle_attendance(conn: asyncpg.Connection) -> int:
     rows = await conn.fetch(
         """
-        SELECT a."userId", a."sessionId"
-        FROM attendance a
-        JOIN sessions s ON s.id = a."sessionId"
-        WHERE s."dateTime" >= NOW()
+        SELECT m.user_id AS "userId", s.id AS "sessionId"
+        FROM circle_members m
+        JOIN LATERAL (
+            SELECT id
+            FROM sessions
+            WHERE "circleId" = m.circle_id
+              AND "dateTime" >= NOW()
+            ORDER BY "dateTime" ASC
+            LIMIT 1
+        ) s ON true
+        WHERE m.status = 'active'
         ORDER BY random()
         LIMIT 120
         """
@@ -350,8 +357,9 @@ async def sprinkle_attendance(conn: asyncpg.Connection) -> int:
             continue
         await conn.execute(
             """
-            UPDATE attendance SET status = 'attending'
-            WHERE "userId" = $1 AND "sessionId" = $2
+            INSERT INTO attendance ("userId", "sessionId", status)
+            VALUES ($1, $2, 'attending')
+            ON CONFLICT ("userId", "sessionId") DO UPDATE SET status = 'attending'
             """,
             row["userId"],
             row["sessionId"],
@@ -413,4 +421,8 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
+    # LEGACY: writes and deletes rows in the read-only sessions/attendance tables.
+    # Not part of the release. Never run against production.
+    if os.getenv("ALLOW_LEGACY_SCRIPT", "").strip().lower() not in {"1", "true", "yes"}:
+        raise SystemExit("Legacy script: it writes sessions/attendance. Set ALLOW_LEGACY_SCRIPT=1 to run it locally.")
     asyncio.run(main())

@@ -131,6 +131,7 @@ export function ActivitySuggestions(props: {
   function problem(err: unknown): string {
     const raw = err instanceof Error ? err.message : "";
     if (raw.includes("403")) return t("activityForm.forbidden");
+    if (raw.includes("409") && raw.toLowerCase().includes("wait until")) return t("activitySuggestions.oneAtATime");
     if (raw.includes("409")) return t("activitySuggestions.duplicate");
     if (raw.toLowerCase().includes("no longer available") || raw.toLowerCase().includes("not available")) {
       return t("activitySuggestions.unavailable");
@@ -285,7 +286,7 @@ export function ActivitySuggestions(props: {
       ) : (
         <div className="activity-suggestion-list">{openItems.map(renderSuggestion)}</div>
       )}
-      {props.canSuggest ? (
+      {props.canSuggest && openItems.length === 0 ? (
         <div className="activity-suggestion-actions">
           <button type="button" disabled={busy} onClick={() => openForm("time")}>
             {t("activitySuggestions.suggestTime")}
@@ -295,6 +296,7 @@ export function ActivitySuggestions(props: {
           </button>
         </div>
       ) : null}
+      {props.canSuggest && openItems.length > 0 ? <p className="muted">{t("activitySuggestions.oneAtATime")}</p> : null}
       {earlier.length > 0 ? (
         <details className="activity-suggestion-earlier">
           <summary>{t("activitySuggestions.earlier")}</summary>

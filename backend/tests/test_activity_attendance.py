@@ -294,7 +294,7 @@ class ActivityAttendanceTests(unittest.IsolatedAsyncioTestCase):
         saved = await self._mark_date(weekly.id, first.id, participant, "attended")
         view = next(item for item in saved.occurrences if item.id == first.id)
         self.assertTrue(view.hasEnded)
-        self.assertEqual([entry.attendanceStatus for entry in view.attendance], ["attended"])
+        self.assertEqual(sorted(entry.attendanceStatus for entry in view.attendance), ["attended", "pending"])
 
     async def test_k_outcome_can_be_corrected(self) -> None:
         activity = await self._ended_one_time(self.a)
@@ -424,7 +424,7 @@ class ActivityAttendanceTests(unittest.IsolatedAsyncioTestCase):
         for user in (self.organizer, self.owner_id):
             view = await get_activity(self.conn, user_id=user, activity_id=UUID(activity.id))
             outcomes = sorted(entry.attendanceStatus for entry in view.attendance)
-            self.assertEqual(outcomes, ["no_show", "pending"])
+            self.assertEqual(outcomes, ["no_show", "pending", "pending"])
             self.assertTrue(all(entry.participantId for entry in view.attendance))
         upcoming = await self._activity()
         await join_activity(self.conn, user_id=self.a, activity_id=UUID(upcoming.id))

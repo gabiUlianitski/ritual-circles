@@ -70,6 +70,7 @@ def prepare_activity_fields(
     currency: object,
     status: str,
     require_group_size: bool,
+    min_participants: int | None = None,
 ) -> dict[str, object]:
     clean_title = _blank(title)
     if not clean_title:
@@ -103,6 +104,14 @@ def prepare_activity_fields(
             raise ValueError("Group size is required")
     elif not isinstance(size, int) or isinstance(size, bool) or size <= 0:
         raise ValueError("Group size must be greater than zero")
+    minimum = min_participants if min_participants is not None else size
+    if minimum is None:
+        if require_group_size:
+            raise ValueError("Minimum participants is required")
+    elif not isinstance(minimum, int) or isinstance(minimum, bool) or minimum <= 0:
+        raise ValueError("Minimum participants must be greater than zero")
+    elif size is not None and minimum > size:
+        raise ValueError("Minimum participants cannot be greater than group size")
 
     amount = _money(price_amount)
     code = _blank(currency)
@@ -131,6 +140,7 @@ def prepare_activity_fields(
         "location_name": _blank(location_name),
         "location_address": _blank(location_address),
         "group_size": size,
+        "min_participants": minimum,
         "payment_type": payment_type,
         "price_amount": amount,
         "currency": code,

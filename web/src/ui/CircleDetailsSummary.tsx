@@ -40,6 +40,8 @@ export function CircleDetailsSummary(props: {
   memberCount?: number;
   /** Invitation preview shows schedule and place in their own sections. */
   hideFacts?: boolean;
+  /** Circle Details shows the place only. Schedule and cost stay in Circle information. */
+  facts?: "all" | "place";
   hideDescription?: boolean;
   hidePeople?: boolean;
   hideStatus?: boolean;
@@ -140,18 +142,22 @@ export function CircleDetailsSummary(props: {
 
         {props.hideFacts ? null : (
           <ul className="circle-details-hero-facts" aria-label={t("circleDetails.chipsAria")}>
-            <li>
-              <DetailIcon kind="when" />
-              <span>{scheduleChip}</span>
-            </li>
+            {props.facts === "place" ? null : (
+              <li>
+                <DetailIcon kind="when" />
+                <span>{scheduleChip}</span>
+              </li>
+            )}
             <li>
               <DetailIcon kind="where" />
-              <span>{locationChip}</span>
+              <BidiText as="span">{locationChip}</BidiText>
             </li>
-            <li>
-              <DetailIcon kind="cost" />
-              <span>{costChip}</span>
-            </li>
+            {props.facts === "place" ? null : (
+              <li>
+                <DetailIcon kind="cost" />
+                <span>{costChip}</span>
+              </li>
+            )}
           </ul>
         )}
       </header>

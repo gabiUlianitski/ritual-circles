@@ -5,7 +5,7 @@ import type { Activity, CircleResponse, Hoby } from "../api/types";
 import { BidiText } from "./BidiText";
 import { ActivityAttendance } from "./ActivityAttendance";
 import { ActivityEdit } from "./ActivityEdit";
-import { activityDetailWhen, activityPriceLabel, occurrenceWhen } from "./activityDisplay";
+import { activityDetailWhen, activityParticipationDisplay, activityPriceLabel, occurrenceWhen } from "./activityDisplay";
 import { ActivityParticipationPanel } from "./ActivityParticipation";
 import { ActivityChanged, ActivitySuggestions } from "./ActivitySuggestions";
 import { circleDisplayTitle, discoverSubtitleParts } from "./circleDisplay";
@@ -301,6 +301,7 @@ export function ActivityDetails(props: {
     if (!activity) return null;
     const when = occurrenceWhen(item.startAt, item.endAt);
     const places = item.participation;
+    const facts = places ? activityParticipationDisplay(places, t) : null;
     const going = places?.currentUserStatus === "going";
     const busy = dateWorking === item.id || working;
     const live = item.status === "open" || item.status === "confirmed";
@@ -327,21 +328,12 @@ export function ActivityDetails(props: {
           </p>
         ) : null}
         {item.hasEnded && live ? <p className="muted">{t("activityParticipation.dateEnded")}</p> : null}
-        {places ? (
+        {facts ? (
           <p>
-            {t("activityParticipation.goingCount", {
-              count: places.goingCount,
-              size: places.groupSize,
-            })}
-            {places.isFull && live && !item.hasEnded ? <span> {t("activityParticipation.full")}</span> : null}
-            {!places.isFull && live && !item.hasEnded ? (
-              <span>
-                {" "}
-                {places.remainingPlaces === 1
-                  ? t("activityParticipation.spotLeft")
-                  : t("activityParticipation.spotsLeft", { count: places.remainingPlaces })}
-              </span>
-            ) : null}
+            {facts.countLabel}
+            {facts.secondaryLabel ? <span> {facts.secondaryLabel}</span> : null}
+            {facts.readinessLabel ? <span> {facts.readinessLabel}</span> : null}
+            {facts.fullLabel ? <span> {facts.fullLabel}</span> : null}
           </p>
         ) : null}
         {item.locationName ? (
@@ -505,6 +497,10 @@ export function ActivityDetails(props: {
 
           <div className="activity-details-facts">
             <p>
+              <span className="muted">{t("activityForm.minParticipants")}</span>
+              <span>{activity.minParticipants}</span>
+            </p>
+            <p>
               <span className="muted">{t("activityDetails.groupSize")}</span>
               <span>{activity.groupSize}</span>
             </p>
@@ -517,7 +513,7 @@ export function ActivityDetails(props: {
           {activity.recurrenceType === "one_time" ? (
             <ActivityParticipationPanel
               activity={activity}
-              onParticipation={(participation) => setActivity({ ...activity, participation })}
+              onActivity={setActivity}
               onChanged={props.onChanged}
               onNotice={setNotice}
             />

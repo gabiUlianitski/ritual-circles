@@ -113,7 +113,7 @@ If the API is cold on Render, wait for the first request to finish.
 
 ---
 
-## 6. Activities release (migrations 031–046)
+## 6. Activities release (migrations 031–047)
 
 This release moves meetups from legacy Sessions to Circle Activities. A push to `main` deploys immediately, so **the production schema must be updated before the push**. `scripts/deploy-production.ps1` runs its steps in this order and only the ones you pass.
 
@@ -131,7 +131,7 @@ This release moves meetups from legacy Sessions to Circle Activities. A push to 
 
 **Migration runner** (`backend/scripts/apply_production_migrations.py`): refuses localhost (unless `ALLOW_LOCAL_MIGRATE=1`), never prints the connection string, prints each file before running it, stops at the first failed statement with the file name and statement number, exits non-zero, and prints a summary. Statements run one at a time in autocommit mode — **a file is not atomic**: statements before a failure stay applied. Every statement uses `IF NOT EXISTS` (or drops and re-adds a superset check), so fixing the cause and re-running is safe.
 
-**Read-only schema check** (`backend/scripts/check_production_schema.py`): there is no migration ledger, so it inspects real objects — tables, required columns, `NOT NULL` slots, unique keys, the partial unique indexes, and the status/attendance checks from 031–046. The session is `READ ONLY`; it never creates, alters, inserts, updates or deletes. Run it alone with `-CheckSchema`.
+**Read-only schema check** (`backend/scripts/check_production_schema.py`): there is no migration ledger, so it inspects real objects — tables, required columns, `NOT NULL` slots, unique keys, the partial unique indexes, and the status/attendance/readiness checks from 031–047. The session is `READ ONLY`; it never creates, alters, inserts, updates or deletes. Run it alone with `-CheckSchema`.
 
 **Config check** (`backend/scripts/check_release_config.py`): reports `ENVIRONMENT`, `JWT_SECRET`, `ALLOW_DEV_USER_HEADER`, `HOBBY_ADMIN_USER_IDS`, `DATABASE_URL`, `DATABASE_SSL`, `ALLOWED_ORIGINS` as configured / missing / unsafe. It does not read `backend/.env` unless you pass it with `--env-file`, and it does not contact Render.
 

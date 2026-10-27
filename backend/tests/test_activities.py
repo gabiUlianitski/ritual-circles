@@ -20,6 +20,7 @@ from app.schemas import ActivityCreateRequest, ActivityUpdateRequest
 from app.services.activities_service import (
     activity_defaults_for_circle,
     cancel_activity,
+    confirm_activity,
     create_activity,
     get_activity,
     publish_activity,
@@ -116,6 +117,14 @@ class ActivityRuleTests(unittest.TestCase):
             _create_payload(groupSize=-2)
         with self.assertRaises(ValidationError):
             ActivityUpdateRequest.model_validate({"groupSize": 0})
+
+    def test_min_participants_validation(self) -> None:
+        with self.assertRaises(ValidationError):
+            _create_payload(groupSize=4, minParticipants=0)
+        with self.assertRaises(ValidationError):
+            _create_payload(groupSize=4, minParticipants=5)
+        payload = _create_payload(groupSize=4, minParticipants=3)
+        self.assertEqual(payload.minParticipants, 3)
 
     def test_new_files_use_activity_names(self) -> None:
         blob = "\n".join(path.read_text(encoding="utf-8") for path in NEW_ACTIVITY_FILES)
@@ -595,3 +604,37 @@ class ActivityDatabaseTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(reopened.exception.status_code, 400)
         self.assertEqual(await self._counts(), before)
+
+    async def test_only_the_activity_creator_can_edit(self) -> None:
+        creator = self.member_id
+        if creator == self.owner_id:
+            creator = await self.conn.fetchval("SELECT id FROM users WHERE id <> $1 LIMIT 1", self.owner_id)
+            if creator is None:
+                self.skipTest("needs a member who is not the circle owner")
+            await activate_member(self.conn, circle_id=self.circle_id, user_id=creator)
+        created = await create_activity(
+            self.conn,
+            user_id=creator,
+            circle_id=self.circle_id,
+            payload=_create_payload(title="Great Game"),
+        )
+        opened = await publish_activity(self.conn, user_id=creator, activity_id=UUID(created.id))
+        confirmed = await confirm_activity(self.conn, user_id=creator, activity_id=UUID(opened.id))
+        self.assertTrue(confirmed.actions.canEdit)
+        owner_view = await get_activity(self.conn, user_id=self.owner_id, activity_id=UUID(created.id))
+        self.assertFalse(owner_view.actions.canEdit)
+        self.assertTrue(owner_view.actions.canCancel)
+        listed = await list_activities_for_circle(self.conn, user_id=self.owner_id, circle_id=self.circle_id)
+        listed_item = next(item for item in listed if item.id == created.id)
+        self.assertFalse(listed_item.actions.canEdit)
+        with self.assertRaises(HTTPException) as denied:
+            await update_activity(
+                self.conn,
+                user_id=self.owner_id,
+                activity_id=UUID(created.id),
+                payload=ActivityUpdateRequest(title="Owner edit"),
+            )
+        self.assertEqual(denied.exception.status_code, 403)
+        kept = await get_activity(self.conn, user_id=creator, activity_id=UUID(created.id))
+        self.assertEqual(kept.title, "Great Game")
+        self.assertTrue(kept.actions.canEdit)

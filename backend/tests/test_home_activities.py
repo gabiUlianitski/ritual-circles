@@ -43,6 +43,14 @@ class HomeActivitiesTests(unittest.IsolatedAsyncioTestCase):
         self.circle_id = row["circle_id"]
         self.member_id = row["user_id"]
         self.owner_id = row["created_by"]
+        self.viewer_id = await self.conn.fetchval(
+            "SELECT id FROM users WHERE id <> $1 AND id <> $2 LIMIT 1",
+            self.member_id,
+            self.owner_id,
+        )
+        if self.viewer_id is None:
+            self.skipTest("needs a second active member")
+        await activate_member(self.conn, user_id=self.viewer_id, circle_id=self.circle_id)
 
     async def asyncTearDown(self) -> None:
         tx = getattr(self, "tx", None)
@@ -66,13 +74,13 @@ class HomeActivitiesTests(unittest.IsolatedAsyncioTestCase):
     async def _join_date(self, activity_id: str, occurrence_id: str, user_id: UUID | None = None) -> None:
         await join_occurrence(
             self.conn,
-            user_id=user_id or self.member_id,
+            user_id=user_id or self.viewer_id,
             activity_id=UUID(activity_id),
             occurrence_id=UUID(occurrence_id),
         )
 
     async def _mine(self, user_id: UUID | None = None, *, ids: set[str]) -> list:
-        items = await fetch_home_activities(self.conn, user_id or self.member_id)
+        items = await fetch_home_activities(self.conn, user_id or self.viewer_id)
         return [item for item in items if item.activityId in ids]
 
     async def _other(self) -> UUID:
@@ -93,7 +101,7 @@ class HomeActivitiesTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_joined_one_time_activity_appears(self) -> None:
         plan = await self._one_time(title="Court booking", locationName="Club", locationAddress="Main St 1")
-        await join_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
+        await join_activity(self.conn, user_id=self.viewer_id, activity_id=UUID(plan.id))
         items = await self._mine(ids={plan.id})
         self.assertEqual(len(items), 1)
         item = items[0]
@@ -105,9 +113,9 @@ class HomeActivitiesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(item.locationName, "Club")
         self.assertEqual(item.locationAddress, "Main St 1")
         self.assertEqual(item.participation.currentUserStatus, "going")
-        self.assertEqual(item.participation.goingCount, 1)
+        self.assertEqual(item.participation.goingCount, 2)
         self.assertEqual(item.participation.groupSize, 4)
-        self.assertEqual(item.participation.remainingPlaces, 3)
+        self.assertEqual(item.participation.remainingPlaces, 2)
         self.assertTrue(item.circleName)
 
     async def test_b_membership_without_joining_shows_nothing(self) -> None:
@@ -138,7 +146,7 @@ class HomeActivitiesTests(unittest.IsolatedAsyncioTestCase):
     async def test_e_mixed_entries_are_chronological(self) -> None:
         weekly = await self._weekly()
         plan = await self._one_time(startAt=_start() + timedelta(days=7, hours=1))
-        await join_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
+        await join_activity(self.conn, user_id=self.viewer_id, activity_id=UUID(plan.id))
         await self._join_date(weekly.id, weekly.occurrences[0].id)
         await self._join_date(weekly.id, weekly.occurrences[2].id)
         items = await self._mine(ids={weekly.id, plan.id})
@@ -155,7 +163,7 @@ class HomeActivitiesTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_f_cancelled_activities_and_dates_are_excluded(self) -> None:
         plan = await self._one_time()
-        await join_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
+        await join_activity(self.conn, user_id=self.viewer_id, activity_id=UUID(plan.id))
         await cancel_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
         weekly = await self._weekly()
         first, second = weekly.occurrences[0], weekly.occurrences[1]
@@ -170,7 +178,7 @@ class HomeActivitiesTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_g_completed_activities_are_excluded(self) -> None:
         plan = await self._one_time()
-        await join_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
+        await join_activity(self.conn, user_id=self.viewer_id, activity_id=UUID(plan.id))
         await self.conn.execute("UPDATE activities SET status = 'completed' WHERE id = $1", UUID(plan.id))
         weekly = await self._weekly()
         await self._join_date(weekly.id, weekly.occurrences[0].id)
@@ -181,7 +189,7 @@ class HomeActivitiesTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_h_ended_entries_are_excluded(self) -> None:
         plan = await self._one_time()
-        await join_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
+        await join_activity(self.conn, user_id=self.viewer_id, activity_id=UUID(plan.id))
         weekly = await self._weekly()
         first, second = weekly.occurrences[0], weekly.occurrences[1]
         await self._join_date(weekly.id, first.id)
@@ -197,8 +205,8 @@ class HomeActivitiesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([item.occurrenceId for item in await self._mine(ids={plan.id, weekly.id})], [second.id])
 
     async def test_i_full_activity_still_shows_for_a_joined_user(self) -> None:
-        plan = await self._one_time(groupSize=1)
-        await join_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
+        plan = await self._one_time(groupSize=2)
+        await join_activity(self.conn, user_id=self.viewer_id, activity_id=UUID(plan.id))
         items = await self._mine(ids={plan.id})
         self.assertEqual(len(items), 1)
         self.assertTrue(items[0].participation.isFull)
@@ -206,7 +214,7 @@ class HomeActivitiesTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_j_confirmation_required_is_exposed(self) -> None:
         plan = await self._one_time()
-        await join_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
+        await join_activity(self.conn, user_id=self.viewer_id, activity_id=UUID(plan.id))
         weekly = await self._weekly()
         first = weekly.occurrences[0]
         await self._join_date(weekly.id, first.id)
@@ -269,7 +277,7 @@ class HomeActivitiesTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_m_reading_home_activities_writes_no_sessions_or_attendance(self) -> None:
         plan = await self._one_time()
-        await join_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
+        await join_activity(self.conn, user_id=self.viewer_id, activity_id=UUID(plan.id))
         weekly = await self._weekly()
         await self._join_date(weekly.id, weekly.occurrences[0].id)
         before = await self._counts()

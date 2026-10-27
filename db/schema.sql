@@ -188,6 +188,7 @@ CREATE TABLE IF NOT EXISTS activities (
   location_name TEXT NULL,
   location_address TEXT NULL,
   group_size INTEGER NOT NULL CHECK (group_size > 0),
+  min_participants INTEGER NOT NULL CHECK (min_participants >= 1 AND min_participants <= group_size),
   payment_type TEXT NOT NULL CHECK (payment_type IN ('free', 'paid')),
   price_amount NUMERIC(12, 2) NULL,
   currency TEXT NULL,
@@ -381,7 +382,8 @@ CREATE TABLE IF NOT EXISTS activity_notifications (
     'reconfirmation_required',
     'upcoming_activity',
     'suggestion_accepted',
-    'suggestion_declined'
+    'suggestion_declined',
+    'suggestion_created'
   )),
   activity_id UUID NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
   occurrence_id UUID NULL REFERENCES activity_occurrences(id) ON DELETE CASCADE,

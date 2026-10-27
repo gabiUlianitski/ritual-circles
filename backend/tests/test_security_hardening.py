@@ -99,7 +99,9 @@ class SecurityConfigurationTests(unittest.TestCase):
     def test_altered_token_is_rejected(self) -> None:
         with _environment():
             token = create_token(uuid4())
-            altered = token[:-1] + ("a" if token[-1] != "a" else "b")
+            header, payload, signature = token.split(".")
+            altered_signature = ("a" if signature[0] != "a" else "b") + signature[1:]
+            altered = f"{header}.{payload}.{altered_signature}"
             with self.assertRaises(Exception):
                 decode_token(altered)
 

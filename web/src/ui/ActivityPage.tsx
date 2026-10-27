@@ -1,26 +1,14 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { api } from "../api/client";
 import type { HomeActivityItem, HomeResponse } from "../api/types";
 import { CircleDetails } from "./CircleDetails";
-import { HomeActivityEvents } from "./HomeActivityEvents";
-import { HomeCalendar } from "./HomeCalendar";
+import { circleDisplayTitle } from "./circleDisplay";
 import { HomeCirclesList } from "./HomeCirclesList";
-import { HomeEmptyDayPrompt } from "./HomeEmptyDayPrompt";
-import { HomeNextActivityCard } from "./HomeNextActivityCard";
-import { HomeWeekStrip } from "./HomeWeekStrip";
-import { upcomingHomeActivities } from "./homeActivities";
-import { dateToIsoLocal } from "./homeDashboardUtils";
+import { UpcomingActivityCard } from "./UpcomingActivityCard";
+import { homeItemFromCircleActivity, upcomingActivityCards, upcomingHomeActivities } from "./homeActivities";
 
-function ymdKey(d: Date): string {
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-}
-
-function defaultSelectedDay(items: HomeActivityItem[]): Date {
-  const d = items[0] ? new Date(items[0].startAt) : new Date();
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-/** See-all for Home: joined Activities first, then the circles you belong to. */
+/** Joined Activities first. Circles stay available underneath, without standing in for an Activity. */
 export function ActivityPage(props: {
   home: HomeResponse;
   onRefresh: () => Promise<void> | void;
@@ -28,23 +16,52 @@ export function ActivityPage(props: {
   onGoFindCircles: (prefillDateIso?: string) => void;
 }) {
   const { t } = useTranslation();
-  const activities = useMemo(
-    () => upcomingHomeActivities(props.home.upcomingActivities),
-    [props.home.upcomingActivities],
-  );
   const myCircles = props.home.myCircles ?? [];
-  const hasActivities = activities.length > 0;
+  const circleKey = myCircles.map((item) => item.circle.id).join(",");
+  const [loaded, setLoaded] = useState<HomeActivityItem[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (myCircles.length === 0) {
+      setLoaded([]);
+      setFailed(false);
+      return;
+    }
+    setFailed(false);
+    void Promise.allSettled(
+      myCircles.map(async (entry) => {
+        const rows = await api.listActivities(entry.circle.id);
+        const circle = {
+          name: circleDisplayTitle(entry.circle),
+          icon: entry.circle.hobyIcon,
+          ritualType: entry.circle.ritualType,
+        };
+        return (Array.isArray(rows) ? rows : [])
+          .map((activity) => homeItemFromCircleActivity(activity, circle))
+          .filter((item): item is HomeActivityItem => item != null);
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      const found = results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
+      const allFailed = results.length > 0 && results.every((result) => result.status === "rejected");
+      setFailed(allFailed);
+      setLoaded(allFailed ? [] : upcomingHomeActivities(found));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [circleKey, props.home, retry]);
+
+  const cards = useMemo(() => upcomingActivityCards(loaded ?? []), [loaded]);
+  const membersByCircle = useMemo(
+    () => new Map(myCircles.map((item) => [item.circle.id, item.memberCount])),
+    [myCircles],
+  );
   const [detailsCircleId, setDetailsCircleId] = useState<string | null>(null);
   const [detailsActivityId, setDetailsActivityId] = useState<string | null>(null);
   const [detailsInitialTab, setDetailsInitialTab] = useState<"details" | "chat" | "scheduled">("details");
-  const [showFullCalendar, setShowFullCalendar] = useState(false);
-  const [selectedDay, setSelectedDay] = useState<Date | null>(() => defaultSelectedDay(activities));
-
-  const selectedDayActivities = useMemo(() => {
-    if (!selectedDay) return [];
-    const key = ymdKey(selectedDay);
-    return activities.filter((item) => ymdKey(new Date(item.startAt)) === key);
-  }, [activities, selectedDay]);
 
   function openCircle(circleId: string, tab: "details" | "chat" | "scheduled" = "details") {
     setDetailsActivityId(null);
@@ -83,8 +100,6 @@ export function ActivityPage(props: {
     );
   }
 
-  const showEmptyDayPrompt = selectedDay != null && selectedDayActivities.length === 0 && hasActivities;
-
   return (
     <div className="stack dashboard-home activity-page">
       <header className="home-welcome">
@@ -94,48 +109,44 @@ export function ActivityPage(props: {
 
       <section className="home-primary-section stack" aria-label={t("activityPage.upcoming")}>
         <h2 className="home-section-title">{t("activityPage.upcoming")}</h2>
-        <HomeNextActivityCard
-          items={activities}
-          onOpen={openActivity}
-          onRefresh={props.onRefresh}
-          onFindCircles={() => props.onGoFindCircles()}
-          onCreateCircle={() => props.onGoCreateJoin()}
-        />
+        {loaded == null ? (
+          <p className="muted">{t("common.loading")}</p>
+        ) : failed ? (
+          <div className="circle-activities-note" role="alert">
+            <p>{t("circleActivities.loadFailed")}</p>
+            <button type="button" className="onboarding-secondary" onClick={() => setRetry((n) => n + 1)}>
+              {t("circleActivities.tryAgain")}
+            </button>
+          </div>
+        ) : cards.length > 0 ? (
+          <div className="activity-decision-list stack">
+            {cards.map(({ item }) => (
+              <UpcomingActivityCard
+                key={item.occurrenceId ? `${item.activityId}:${item.occurrenceId}` : item.activityId}
+                item={item}
+                memberCount={membersByCircle.get(item.circleId)}
+                onOpen={() => openActivity(item)}
+                onRefresh={props.onRefresh}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="stack onboarding-empty-guidance">
+            <p className="onboarding-empty-title">{t("emptyStates.activitiesTitle")}</p>
+            <p className="muted">{t("activityPage.emptyBody")}</p>
+            <div className="onboarding-empty-actions row">
+              <button type="button" className="primary" onClick={() => props.onGoFindCircles()}>
+                {t("activityPage.findActivity")}
+              </button>
+              {myCircles.length > 0 ? (
+                <button type="button" className="onboarding-secondary" onClick={() => props.onGoCreateJoin()}>
+                  {t("activityPage.planActivity")}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        )}
       </section>
-
-      {hasActivities ? (
-        <section className="home-schedule stack" aria-labelledby="activity-schedule-title">
-          <header className="home-schedule-head">
-            <h2 id="activity-schedule-title" className="home-section-title">
-              {t("home.yourSchedule")}
-            </h2>
-            <p className="home-schedule-support">{t("home.yourScheduleSupport")}</p>
-          </header>
-          <HomeWeekStrip items={activities} selectedDay={selectedDay} onSelectDay={setSelectedDay} />
-          {showEmptyDayPrompt && selectedDay ? (
-            <HomeEmptyDayPrompt
-              selectedDay={selectedDay}
-              onFindCircles={() => props.onGoFindCircles(dateToIsoLocal(selectedDay))}
-              onCreateCircle={() => props.onGoCreateJoin(dateToIsoLocal(selectedDay))}
-            />
-          ) : null}
-          <button
-            type="button"
-            className="home-btn-text home-calendar-toggle"
-            aria-expanded={showFullCalendar}
-            onClick={() => setShowFullCalendar((v) => !v)}
-          >
-            {showFullCalendar ? t("home.hideFullCalendar") : t("home.viewFullCalendar")}
-          </button>
-          <HomeCalendar
-            expanded={showFullCalendar}
-            items={activities}
-            selectedDay={selectedDay}
-            onSelectDay={setSelectedDay}
-          />
-          <HomeActivityEvents items={selectedDayActivities} selectedDay={selectedDay} onOpen={openActivity} />
-        </section>
-      ) : null}
 
       {myCircles.length > 0 ? (
         <section className="home-secondary-section stack" aria-label={t("activityPage.yourCircles")}>

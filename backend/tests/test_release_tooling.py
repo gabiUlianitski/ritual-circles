@@ -65,7 +65,7 @@ class MigrationRunnerTests(unittest.IsolatedAsyncioTestCase):
     def test_pending_list_is_ordered_and_every_file_exists(self) -> None:
         self.assertEqual(runner.PENDING, sorted(runner.PENDING))
         self.assertEqual(runner.PENDING[0][:3], "031")
-        self.assertEqual(runner.PENDING[-1][:3], "046")
+        self.assertEqual(runner.PENDING[-1][:3], "048")
         for name in runner.PENDING:
             self.assertTrue((runner.MIGRATIONS / name).is_file(), name)
             self.assertNotIn("$$", (runner.MIGRATIONS / name).read_text(encoding="utf-8"), name)
@@ -258,7 +258,7 @@ class ReleasePackagingTests(unittest.TestCase):
             '".gitignore"',
         ):
             self.assertIn(path, self.deploy)
-        for number in range(31, 47):
+        for number in range(31, 49):
             self.assertTrue(any(name.startswith(f"{number:03d}_") for name in runner.PENDING))
             self.assertIn(f'"{number:03d}_', self.deploy)
 

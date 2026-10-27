@@ -83,15 +83,10 @@ class RecurringLifecycleTests(RecurringDbCase):
         weekly = await self._weekly()
         first = weekly.occurrences[0]
         self.assertEqual(first.status, "open")
-        self.assertTrue(first.actions.canJoin)
+        self.assertEqual(first.participation.currentUserStatus, "going")
+        self.assertFalse(first.actions.canJoin)
+        self.assertTrue(first.actions.canLeave)
         self.assertFalse(first.actions.canConfirm)
-        joined = await join_occurrence(
-            self.conn, user_id=self.member_id, activity_id=UUID(weekly.id), occurrence_id=UUID(first.id)
-        )
-        saved = next(item for item in joined.occurrences if item.id == first.id)
-        self.assertEqual(saved.participation.currentUserStatus, "going")
-        self.assertEqual(saved.status, "open")
-        self.assertTrue(saved.actions.canLeave)
 
     async def test_b_open_date_becomes_past_after_it_ends(self) -> None:
         weekly = await self._weekly()
@@ -149,7 +144,7 @@ class RecurringLifecycleTests(RecurringDbCase):
         self.assertFalse(by_id[second.id].actions.canJoin)
         others = [item for item in updated.occurrences if item.id != second.id]
         self.assertTrue(all(item.status == "open" for item in others))
-        self.assertTrue(by_id[first.id].actions.canJoin)
+        self.assertTrue(by_id[first.id].actions.canLeave)
         self.assertEqual(await self._history(weekly.id), before)
 
     async def test_e_ended_date_cannot_be_marked_not_happening(self) -> None:
@@ -212,7 +207,7 @@ class RecurringLifecycleTests(RecurringDbCase):
         await leave_occurrence(self.conn, user_id=self.member_id, activity_id=UUID(weekly.id), occurrence_id=UUID(dates[2].id))
         await self._weeks_pass(weekly.id, 1)
         people_before, _, _ = await self._history(weekly.id)
-        self.assertEqual(len(people_before), 3)
+        self.assertEqual(len(people_before), len(dates))
         await cancel_activity(self.conn, user_id=self.member_id, activity_id=UUID(weekly.id))
         people_after, _, _ = await self._history(weekly.id)
         self.assertEqual(people_after, people_before)
@@ -228,7 +223,7 @@ class RecurringLifecycleTests(RecurringDbCase):
             payload=_time(target.startAt + timedelta(hours=3)),
         )
         suggestion_id = self._occurrence_suggestion_id(suggested, target.id, "time")
-        await support_suggestion(self.conn, user_id=self.member_id, suggestion_id=suggestion_id)
+        await support_suggestion(self.conn, user_id=await self._other(), suggestion_id=suggestion_id)
         before = await self._history(weekly.id)
         cancelled = await cancel_activity(self.conn, user_id=self.member_id, activity_id=UUID(weekly.id))
         self.assertEqual(await self._history(weekly.id), before)
@@ -307,13 +302,14 @@ class RecurringLifecycleTests(RecurringDbCase):
             occurrence_id=UUID(second.id),
             payload=_time(second.startAt + timedelta(hours=1)),
         )
-        moved = await accept_suggestion(
+        await accept_suggestion(
             self.conn,
-            user_id=self.member_id,
+            user_id=await self._other(),
             suggestion_id=self._occurrence_suggestion_id(suggested, second.id, "time"),
         )
+        moved = await get_activity(self.conn, user_id=self.member_id, activity_id=UUID(weekly.id))
         changed = next(item for item in moved.occurrences if item.id == second.id)
-        self.assertEqual(changed.status, "open")
+        self.assertEqual(changed.status, "confirmed")
         self.assertTrue(changed.participation.confirmationRequired)
         confirmed_again = await reconfirm_occurrence(
             self.conn, user_id=self.member_id, activity_id=UUID(weekly.id), occurrence_id=UUID(second.id)

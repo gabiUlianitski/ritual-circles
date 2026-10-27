@@ -37,12 +37,14 @@ PENDING = [
     "044_activity_occurrence_slots.sql",
     "045_activity_notifications.sql",
     "046_activity_attendance_outcomes.sql",
+    "047_activity_min_participants.sql",
+    "048_suggestion_created_notification.sql",
 ]
 TRUE_VALUES = {"1", "true", "yes"}
 
 
 def statements(sql: str) -> list[str]:
-    """Split on lines ending with ';'. Does not understand $$ blocks; 031-046 have none."""
+    """Split on lines ending with ';'. Does not understand $$ blocks; 031-047 have none."""
     buf: list[str] = []
     out: list[str] = []
     for line in sql.splitlines():

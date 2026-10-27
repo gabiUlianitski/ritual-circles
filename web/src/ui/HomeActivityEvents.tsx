@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { HomeActivityItem } from "../api/types";
 import { BidiText } from "./BidiText";
 import { homeActivityKey, homeActivityPlace, needsReconfirmation } from "./homeActivities";
+import { activityReadinessLabel } from "./activityDisplay";
 import { activityTypeClass, formatDayLabel, formatSessionDateTimeHero } from "./homeDashboardUtils";
 
 /** Joined Activity dates on the selected day. Opening one shows its Activity Details. */
@@ -20,6 +21,7 @@ export function HomeActivityEvents(props: {
       {props.items.map((item) => {
         const changed = needsReconfirmation(item);
         const place = homeActivityPlace(item);
+        const readiness = activityReadinessLabel(item.participation, t);
         return (
           <article
             key={homeActivityKey(item)}
@@ -42,6 +44,7 @@ export function HomeActivityEvents(props: {
                       count: item.participation.goingCount,
                       size: item.participation.groupSize,
                     })}
+                    {readiness ? ` · ${readiness}` : null}
                   </div>
                 </div>
               </div>

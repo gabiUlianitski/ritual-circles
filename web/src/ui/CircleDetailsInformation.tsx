@@ -1,6 +1,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import type { CircleResponse } from "../api/types";
+import { BidiText } from "./BidiText";
 import {
   formatCircleCostChip,
   formatCircleLocationShort,
@@ -52,6 +53,11 @@ export function CircleDetailsInformation(props: { circle: CircleResponse }) {
           <h2 id="circle-information-title">{t("circleDetails.information")}</h2>
         </div>
       </div>
+      {circle.description?.trim() ? (
+        <BidiText as="p" className="circle-details-about">
+          {circle.description.trim()}
+        </BidiText>
+      ) : null}
       <dl className="circle-details-info-list">
         {rows.map((row) => (
           <div key={row.label}>

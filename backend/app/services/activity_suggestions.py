@@ -58,10 +58,10 @@ async def _gate(conn: asyncpg.Connection, *, user_id: UUID, activity: asyncpg.Re
     return circle, editor
 
 
-def _require_editor(*, user_id: UUID, activity: asyncpg.Record, circle: asyncpg.Record) -> None:
-    from app.services.activities_service import _require_editor as editor
-
-    editor(user_id=user_id, activity=activity, circle=circle)
+def _reject_own_decision(suggestion: asyncpg.Record, user_id: UUID) -> None:
+    """The person who suggested a change does not approve or decline it."""
+    if suggestion["created_by"] == user_id:
+        raise HTTPException(status_code=403, detail="Someone else in the activity decides on this suggestion.")
 
 
 async def _lock_occurrence(
@@ -185,6 +185,28 @@ async def _duplicate(
         raise HTTPException(status_code=409, detail="You already suggested this.")
 
 
+async def _require_no_open_suggestion(
+    conn: asyncpg.Connection, *, activity_id: UUID, occurrence_id: UUID | None
+) -> None:
+    """One open suggestion at a time. The next one waits until it is settled."""
+    found = await conn.fetchval(
+        """
+        SELECT 1
+        FROM activity_suggestions
+        WHERE activity_id = $1
+          AND occurrence_id IS NOT DISTINCT FROM $2
+          AND status = 'open'
+        """,
+        activity_id,
+        occurrence_id,
+    )
+    if found:
+        raise HTTPException(
+            status_code=409,
+            detail="Wait until this suggestion is accepted, declined, or withdrawn.",
+        )
+
+
 async def _insert(
     conn: asyncpg.Connection,
     *,
@@ -192,7 +214,8 @@ async def _insert(
     occurrence_id: UUID | None,
     user_id: UUID,
     values: dict[str, object],
-) -> None:
+) -> UUID:
+    await _require_no_open_suggestion(conn, activity_id=activity_id, occurrence_id=occurrence_id)
     await _duplicate(
         conn,
         activity_id=activity_id,
@@ -200,6 +223,7 @@ async def _insert(
         user_id=user_id,
         values=values,
     )
+    suggestion_id = uuid4()
     try:
         await conn.execute(
             """
@@ -209,7 +233,7 @@ async def _insert(
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             """,
-            uuid4(),
+            suggestion_id,
             activity_id,
             occurrence_id,
             user_id,
@@ -222,6 +246,7 @@ async def _insert(
         )
     except UniqueViolationError as exc:
         raise HTTPException(status_code=409, detail="You already suggested this.") from exc
+    return suggestion_id
 
 
 async def create_suggestion(
@@ -238,7 +263,10 @@ async def create_suggestion(
         if activity["recurrence_type"] != "one_time":
             raise HTTPException(status_code=400, detail="Choose a date for this suggestion.")
         _ensure_open_target(activity, date=False)
-        await _insert(conn, activity_id=activity_id, occurrence_id=None, user_id=user_id, values=values)
+        suggestion_id = await _insert(conn, activity_id=activity_id, occurrence_id=None, user_id=user_id, values=values)
+        await _notify_created(
+            conn, activity_id=activity_id, occurrence_id=None, suggestion_id=suggestion_id, actor=user_id
+        )
     return await _refreshed(conn, user_id=user_id, activity_id=activity_id)
 
 
@@ -259,14 +287,43 @@ async def create_occurrence_suggestion(
         _ensure_live_activity(activity)
         occurrence = await _lock_occurrence(conn, activity_id=activity_id, occurrence_id=occurrence_id)
         _ensure_open_target(occurrence, date=True)
-        await _insert(
+        suggestion_id = await _insert(
             conn,
             activity_id=activity_id,
             occurrence_id=occurrence_id,
             user_id=user_id,
             values=values,
         )
+        await _notify_created(
+            conn,
+            activity_id=activity_id,
+            occurrence_id=occurrence_id,
+            suggestion_id=suggestion_id,
+            actor=user_id,
+        )
     return await _refreshed(conn, user_id=user_id, activity_id=activity_id)
+
+
+async def _notify_created(
+    conn: asyncpg.Connection,
+    *,
+    activity_id: UUID,
+    occurrence_id: UUID | None,
+    suggestion_id: UUID,
+    actor: UUID,
+) -> None:
+    """Tell the other people who are going. A database that has not taken migration 048 keeps the suggestion."""
+    try:
+        async with conn.transaction():
+            await notifications.notify_suggestion_created(
+                conn,
+                activity_id=activity_id,
+                occurrence_id=occurrence_id,
+                suggestion_id=suggestion_id,
+                actor=actor,
+            )
+    except asyncpg.PostgresError:
+        return
 
 
 async def _locked_suggestion(conn: asyncpg.Connection, suggestion_id: UUID) -> asyncpg.Record:
@@ -298,7 +355,6 @@ async def grouped_suggestions(
     *,
     user_id: UUID,
     activity: asyncpg.Record,
-    is_editor: bool,
 ) -> tuple[list[ActivitySuggestion], dict[UUID, list[ActivitySuggestion]]]:
     rows = await conn.fetch(
         """
@@ -360,9 +416,9 @@ async def grouped_suggestions(
             suggestedByAvatarUrl=row["avatar_url"],
             supportCount=int(row["support_count"]),
             supportedByMe=bool(row["supported_by_me"]),
-            canSupport=open_row and actionable_target,
+            canSupport=open_row and actionable_target and row["created_by"] != user_id,
             canWithdraw=open_row and row["created_by"] == user_id,
-            canDecide=open_row and actionable_target and is_editor,
+            canDecide=open_row and actionable_target and row["created_by"] != user_id,
             actionable=open_row and actionable_target,
             createdAt=row["created_at"],
         )
@@ -395,6 +451,7 @@ async def support_suggestion(conn: asyncpg.Connection, *, user_id: UUID, suggest
         _ensure_live_activity(activity)
         target = await _target_row(conn, current, activity)
         _ensure_open_target(target, date=current["occurrence_id"] is not None)
+        _reject_own_decision(current, user_id)
         await conn.execute(
             """
             INSERT INTO activity_suggestion_support (id, suggestion_id, user_id)
@@ -462,11 +519,11 @@ async def decline_suggestion(conn: asyncpg.Connection, *, user_id: UUID, suggest
         if not suggestion:
             raise HTTPException(status_code=404, detail=_UNAVAILABLE)
         activity = await _lock_activity(conn, suggestion["activity_id"])
-        circle, _editor = await _gate(conn, user_id=user_id, activity=activity)
-        _require_editor(user_id=user_id, activity=activity, circle=circle)
+        await _gate(conn, user_id=user_id, activity=activity)
         current = await _locked_suggestion(conn, suggestion_id)
         if current["status"] != "open":
             raise HTTPException(status_code=409, detail=_UNAVAILABLE)
+        _reject_own_decision(current, user_id)
         await conn.execute(
             """
             UPDATE activity_suggestions
@@ -507,7 +564,15 @@ async def _close_competitors(
         await notifications.notify_suggestion_declined(conn, suggestion=other, actor=user_id)
 
 
-async def _apply_time(conn: asyncpg.Connection, *, suggestion: asyncpg.Record, target_id: UUID, occurrence: bool, confirmed: bool) -> None:
+async def _apply_time(
+    conn: asyncpg.Connection,
+    *,
+    suggestion: asyncpg.Record,
+    target_id: UUID,
+    occurrence: bool,
+    confirmed: bool,
+    accepted_by: UUID,
+) -> None:
     if occurrence:
         try:
             await conn.execute(
@@ -515,7 +580,6 @@ async def _apply_time(conn: asyncpg.Connection, *, suggestion: asyncpg.Record, t
                 UPDATE activity_occurrences
                 SET start_at = $2,
                     end_at = $3,
-                    status = CASE WHEN status = 'confirmed' THEN 'open' ELSE status END,
                     updated_at = NOW()
                 WHERE id = $1
                 """,
@@ -526,21 +590,13 @@ async def _apply_time(conn: asyncpg.Connection, *, suggestion: asyncpg.Record, t
         except UniqueViolationError as exc:
             raise HTTPException(status_code=409, detail="Another date already starts at that time.") from exc
         if confirmed:
-            await conn.execute(
-                """
-                UPDATE activity_occurrence_participants
-                SET confirmation_required = TRUE, updated_at = NOW()
-                WHERE occurrence_id = $1 AND status = 'going'
-                """,
-                target_id,
-            )
+            await _ask_others_to_confirm(conn, table="activity_occurrence_participants", column="occurrence_id", target_id=target_id, accepted_by=accepted_by)
         return
     await conn.execute(
         """
         UPDATE activities
         SET start_at = $2,
             end_at = $3,
-            status = CASE WHEN status = 'confirmed' THEN 'open' ELSE status END,
             updated_at = NOW()
         WHERE id = $1
         """,
@@ -549,18 +605,17 @@ async def _apply_time(conn: asyncpg.Connection, *, suggestion: asyncpg.Record, t
         suggestion["proposed_end_at"],
     )
     if confirmed:
-        await conn.execute(
-            """
-            UPDATE activity_participants
-            SET confirmation_required = TRUE, updated_at = NOW()
-            WHERE activity_id = $1 AND status = 'going'
-            """,
-            target_id,
-        )
+        await _ask_others_to_confirm(conn, table="activity_participants", column="activity_id", target_id=target_id, accepted_by=accepted_by)
 
 
 async def _apply_location(
-    conn: asyncpg.Connection, *, suggestion: asyncpg.Record, target_id: UUID, occurrence: bool, confirmed: bool
+    conn: asyncpg.Connection,
+    *,
+    suggestion: asyncpg.Record,
+    target_id: UUID,
+    occurrence: bool,
+    confirmed: bool,
+    accepted_by: UUID,
 ) -> None:
     if occurrence:
         await conn.execute(
@@ -568,7 +623,6 @@ async def _apply_location(
             UPDATE activity_occurrences
             SET location_name_override = $2,
                 location_address_override = $3,
-                status = CASE WHEN status = 'confirmed' THEN 'open' ELSE status END,
                 updated_at = NOW()
             WHERE id = $1
             """,
@@ -577,21 +631,13 @@ async def _apply_location(
             suggestion["proposed_location_address"],
         )
         if confirmed:
-            await conn.execute(
-                """
-                UPDATE activity_occurrence_participants
-                SET confirmation_required = TRUE, updated_at = NOW()
-                WHERE occurrence_id = $1 AND status = 'going'
-                """,
-                target_id,
-            )
+            await _ask_others_to_confirm(conn, table="activity_occurrence_participants", column="occurrence_id", target_id=target_id, accepted_by=accepted_by)
         return
     await conn.execute(
         """
         UPDATE activities
         SET location_name = $2,
             location_address = $3,
-            status = CASE WHEN status = 'confirmed' THEN 'open' ELSE status END,
             updated_at = NOW()
         WHERE id = $1
         """,
@@ -600,14 +646,31 @@ async def _apply_location(
         suggestion["proposed_location_address"],
     )
     if confirmed:
-        await conn.execute(
-            """
-            UPDATE activity_participants
-            SET confirmation_required = TRUE, updated_at = NOW()
-            WHERE activity_id = $1 AND status = 'going'
-            """,
-            target_id,
-        )
+        await _ask_others_to_confirm(conn, table="activity_participants", column="activity_id", target_id=target_id, accepted_by=accepted_by)
+
+
+async def _ask_others_to_confirm(
+    conn: asyncpg.Connection,
+    *,
+    table: str,
+    column: str,
+    target_id: UUID,
+    accepted_by: UUID,
+) -> None:
+    """People who were going confirm the new time or place. The person who accepted it already did."""
+    if table not in ("activity_participants", "activity_occurrence_participants"):
+        raise ValueError(table)
+    if column not in ("activity_id", "occurrence_id"):
+        raise ValueError(column)
+    await conn.execute(
+        f"""
+        UPDATE {table}
+        SET confirmation_required = (user_id <> $2), updated_at = NOW()
+        WHERE {column} = $1 AND status = 'going'
+        """,
+        target_id,
+        accepted_by,
+    )
 
 
 async def accept_suggestion(conn: asyncpg.Connection, *, user_id: UUID, suggestion_id: UUID) -> object:
@@ -616,8 +679,7 @@ async def accept_suggestion(conn: asyncpg.Connection, *, user_id: UUID, suggesti
         if not located:
             raise HTTPException(status_code=404, detail=_UNAVAILABLE)
         activity = await _lock_activity(conn, located["activity_id"])
-        circle, _editor = await _gate(conn, user_id=user_id, activity=activity)
-        _require_editor(user_id=user_id, activity=activity, circle=circle)
+        await _gate(conn, user_id=user_id, activity=activity)
         current = await _locked_suggestion(conn, suggestion_id)
         if current["status"] != "open":
             raise HTTPException(status_code=409, detail=_UNAVAILABLE)
@@ -627,6 +689,7 @@ async def accept_suggestion(conn: asyncpg.Connection, *, user_id: UUID, suggesti
         if target["status"] not in ("open", "confirmed"):
             raise HTTPException(status_code=400, detail=_UNAVAILABLE)
         _ensure_open_target(target, date=date)
+        _reject_own_decision(current, user_id)
         confirmed = target["status"] == "confirmed"
         if current["type"] == "time":
             await _apply_time(
@@ -635,6 +698,7 @@ async def accept_suggestion(conn: asyncpg.Connection, *, user_id: UUID, suggesti
                 target_id=target["id"],
                 occurrence=date,
                 confirmed=confirmed,
+                accepted_by=user_id,
             )
         else:
             await _apply_location(
@@ -643,6 +707,7 @@ async def accept_suggestion(conn: asyncpg.Connection, *, user_id: UUID, suggesti
                 target_id=target["id"],
                 occurrence=date,
                 confirmed=confirmed,
+                accepted_by=user_id,
             )
         updated = await conn.execute(
             """

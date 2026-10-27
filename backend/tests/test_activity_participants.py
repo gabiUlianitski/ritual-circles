@@ -95,7 +95,7 @@ class ActivityParticipantTests(unittest.IsolatedAsyncioTestCase):
     async def test_join_open_activity_does_not_touch_legacy_rows(self) -> None:
         before = await self._counts()
         opened = await self._open(title="Saturday tennis", groupSize=6)
-        self.assertEqual(opened.participation.goingCount, 0)
+        self.assertEqual(opened.participation.goingCount, 1)
         joined = await join_activity(self.conn, user_id=self.member_id, activity_id=UUID(opened.id))
         self.assertEqual(joined.currentUserStatus, "going")
         self.assertEqual(joined.goingCount, 1)
@@ -143,7 +143,7 @@ class ActivityParticipantTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(HTTPException) as raised:
             await join_activity(self.conn, user_id=outsider, activity_id=UUID(opened.id))
         self.assertEqual(raised.exception.status_code, 403)
-        self.assertEqual(await going_count(self.conn, UUID(opened.id)), 0)
+        self.assertEqual(await going_count(self.conn, UUID(opened.id)), 1)
         self.assertEqual(await self._counts(), before)
 
     async def test_second_join_does_not_take_another_place(self) -> None:
@@ -238,10 +238,11 @@ class ActivityParticipantTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await going_count(self.conn, UUID(published.id)), 0)
 
     async def test_another_member_cannot_clear_someone_else(self) -> None:
-        other = (await self._others(1) or [None])[0]
-        if other is None:
-            self.skipTest("needs another user")
-        await activate_member(self.conn, user_id=other, circle_id=self.circle_id)
+        others = await self._others(2)
+        if len(others) < 2:
+            self.skipTest("needs two other users")
+        for other in others:
+            await activate_member(self.conn, user_id=other, circle_id=self.circle_id)
         opened = await self._open(groupSize=4)
         await join_activity(self.conn, user_id=self.member_id, activity_id=UUID(opened.id))
         left = await leave_activity(self.conn, user_id=other, activity_id=UUID(opened.id))
@@ -285,11 +286,37 @@ class ActivityParticipantTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(kept.groupSize, going_n)
         self.assertEqual(kept.participation.goingCount, going_n)
 
-    async def test_publishing_does_not_add_the_creator(self) -> None:
-        opened = await self._open(title="Creator stays out")
-        self.assertEqual(await self._rows(opened.id), 0)
-        self.assertEqual(opened.participation.currentUserStatus, None)
-        self.assertEqual(opened.participation.goingCount, 0)
+    async def test_creator_is_going_without_joining_manually(self) -> None:
+        opened = await self._open(title="Creator joins")
+        self.assertEqual(await self._rows(opened.id), 1)
+        self.assertEqual(opened.participation.currentUserStatus, "going")
+        self.assertEqual(opened.participation.goingCount, 1)
+
+    async def test_readiness_is_calculated_without_changing_lifecycle(self) -> None:
+        others = await self._others(2)
+        if len(others) < 2:
+            self.skipTest("needs two other users")
+        for other in others:
+            await activate_member(self.conn, user_id=other, circle_id=self.circle_id)
+        opened = await self._open(groupSize=4, minParticipants=3)
+        self.assertEqual(opened.status, "open")
+        self.assertFalse(opened.participation.isReady)
+        self.assertEqual(opened.participation.remainingNeeded, 2)
+        await join_activity(self.conn, user_id=others[0], activity_id=UUID(opened.id))
+        saved = await join_activity(self.conn, user_id=others[1], activity_id=UUID(opened.id))
+        self.assertTrue(saved.isReady)
+        self.assertEqual(saved.remainingNeeded, 0)
+        self.assertFalse(saved.isFull)
+        self.assertEqual((await self.conn.fetchrow("SELECT status FROM activities WHERE id = $1", UUID(opened.id)))["status"], "open")
+        left = await leave_activity(self.conn, user_id=others[0], activity_id=UUID(opened.id))
+        self.assertFalse(left.isReady)
+        self.assertEqual((await self.conn.fetchrow("SELECT status FROM activities WHERE id = $1", UUID(opened.id)))["status"], "open")
+
+    async def test_creator_can_leave_without_losing_ownership(self) -> None:
+        opened = await self._open(groupSize=3)
+        left = await leave_activity(self.conn, user_id=self.member_id, activity_id=UUID(opened.id))
+        self.assertEqual(left.currentUserStatus, "cancelled")
+        self.assertEqual(await self.conn.fetchval("SELECT created_by FROM activities WHERE id = $1", UUID(opened.id)), self.member_id)
 
     async def test_draft_is_hidden_until_published(self) -> None:
         other = (await self._others(1) or [None])[0]

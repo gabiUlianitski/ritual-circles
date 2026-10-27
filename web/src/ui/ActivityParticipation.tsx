@@ -1,20 +1,14 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
-import type { Activity, ActivityParticipation as Participation } from "../api/types";
+import type { Activity } from "../api/types";
 import { BidiText } from "./BidiText";
 import { CircleMemberAvatar } from "./CircleMemberAvatar";
-import { activityHasEnded } from "./activityDisplay";
-
-function spotsText(remaining: number, t: (key: string, options?: Record<string, unknown>) => string): string {
-  if (remaining <= 0) return t("activityParticipation.full");
-  if (remaining === 1) return t("activityParticipation.spotLeft");
-  return t("activityParticipation.spotsLeft", { count: remaining });
-}
+import { activityParticipationDisplay } from "./activityDisplay";
 
 export function ActivityParticipationPanel(props: {
   activity: Activity;
-  onParticipation: (participation: Participation) => void;
+  onActivity: (activity: Activity) => void;
   onChanged: () => void;
   onNotice: (message: string) => void;
 }) {
@@ -30,34 +24,38 @@ export function ActivityParticipationPanel(props: {
 
   const oneTime = activity.recurrenceType === "one_time";
   const openOneTime = (activity.status === "open" || activity.status === "confirmed") && oneTime;
-  const ended = activityHasEnded(activity);
   const going = participation.currentUserStatus === "going";
+  const ended = Boolean(activity.hasEnded || activity.actions?.hasEnded);
+  const live = openOneTime && !ended;
+  const showJoin = live && !going && !participation.isFull;
+  const showLeave = live && going && !participation.confirmationRequired;
   const people = participation.going ?? [];
-  const showActions = openOneTime && !ended;
   const showCount = openOneTime || (activity.status === "completed" && oneTime);
+  const facts = activityParticipationDisplay(participation, t);
 
-  async function refreshAfterFull() {
-    try {
-      const fresh = await api.getActivity(activity.id);
-      if (fresh.participation) props.onParticipation(fresh.participation);
-    } catch {
-      /* The full message still stands if the refresh fails. */
-    }
+  async function refreshActivity() {
+    const fresh = await api.getActivity(activity.id);
+    props.onActivity(fresh);
+    return fresh;
   }
 
   async function join() {
     setWorking(true);
     setError(null);
     try {
-      const saved = await api.joinActivity(activity.id);
-      props.onParticipation(saved);
+      await api.joinActivity(activity.id);
+      await refreshActivity();
       props.onNotice(t("activityParticipation.joined"));
       props.onChanged();
     } catch (err) {
       const raw = err instanceof Error ? err.message : "";
       if (raw.includes("409")) {
         setError(t("activityParticipation.justFilled"));
-        await refreshAfterFull();
+        try {
+          await refreshActivity();
+        } catch {
+          /* The full message still stands if the refresh fails. */
+        }
       } else if (raw.includes("403")) {
         setError(t("activityForm.forbidden"));
       } else {
@@ -72,8 +70,8 @@ export function ActivityParticipationPanel(props: {
     setWorking(true);
     setError(null);
     try {
-      const saved = await api.leaveActivity(activity.id);
-      props.onParticipation(saved);
+      await api.leaveActivity(activity.id);
+      await refreshActivity();
       setConfirmLeave(false);
       props.onNotice(t("activityParticipation.left"));
       props.onChanged();
@@ -92,24 +90,16 @@ export function ActivityParticipationPanel(props: {
         <p className="muted activity-participation-note">{t("activityParticipation.recurringLater")}</p>
       ) : null}
 
-      {showCount && participation.goingCount > 0 ? (
-        <p className="activity-participation-count">
-          {t("activityParticipation.goingCount", {
-            count: participation.goingCount,
-            size: participation.groupSize,
-          })}
-        </p>
-      ) : null}
-      {openOneTime && participation.goingCount === 0 ? (
-        <p className="muted activity-participation-note">{t("activityParticipation.nobodyYet")}</p>
+      {showCount ? (
+        <>
+          <p className="activity-participation-count">{facts.countLabel}</p>
+          {facts.secondaryLabel ? <p className="muted activity-participation-note">{facts.secondaryLabel}</p> : null}
+          {facts.readinessLabel ? <p className="activity-participation-ready">{facts.readinessLabel}</p> : null}
+          {facts.fullLabel ? <p className="activity-participation-note">{facts.fullLabel}</p> : null}
+        </>
       ) : null}
       {going && activity.status === "open" ? (
         <p className="activity-participation-yours">{t("activityParticipation.youreGoing")}</p>
-      ) : null}
-      {showActions && !going ? (
-        <p className={participation.remainingPlaces === 1 ? "activity-spots activity-spots--last" : "activity-spots"}>
-          {spotsText(participation.remainingPlaces, t)}
-        </p>
       ) : null}
 
       {oneTime && people.length > 0 ? (
@@ -129,14 +119,14 @@ export function ActivityParticipationPanel(props: {
         </p>
       ) : null}
 
-      {activity.actions?.canLeave && !participation.confirmationRequired ? (
+      {showLeave ? (
         <div className="activity-participation-actions">
           <button type="button" className="circle-details-secondary" disabled={working} onClick={() => setConfirmLeave(true)}>
             {t("activityParticipation.leave")}
           </button>
         </div>
       ) : null}
-      {activity.actions?.canJoin ? (
+      {showJoin ? (
         <div className="activity-participation-actions">
           <button type="button" className="circle-details-primary" disabled={working} onClick={() => void join()}>
             {t("activityParticipation.join")}

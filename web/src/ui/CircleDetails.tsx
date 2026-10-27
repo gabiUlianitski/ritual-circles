@@ -371,6 +371,8 @@ export function CircleDetails(props: {
                   members={members}
                   myUserId={myUserId}
                   memberCount={members.length}
+                  hideDescription
+                  facts="place"
                 />
                 <div className="circle-details-primary-area">
                   <button type="button" className="circle-details-primary" onClick={isCreator ? modifyCircle : openChat}>

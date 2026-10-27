@@ -121,10 +121,10 @@ class OccurrenceParticipantTests(unittest.IsolatedAsyncioTestCase):
         other = next(item for item in joined.occurrences if item.id == second.id)
         self.assertEqual(saved.participation.currentUserStatus, "going")
         self.assertEqual(saved.participation.goingCount, 1)
-        self.assertNotEqual(other.participation.currentUserStatus, "going")
-        self.assertEqual(other.participation.goingCount, 0)
+        self.assertEqual(other.participation.currentUserStatus, "going")
+        self.assertEqual(other.participation.goingCount, 1)
         self.assertEqual(await self._date_rows(first.id, "going"), 1)
-        self.assertEqual(await self._date_rows(second.id), 0)
+        self.assertEqual(await self._date_rows(second.id), 1)
         self.assertEqual(await self._parent_rows(weekly.id), 0)
         self.assertEqual(joined.status, "open")
         self.assertEqual(saved.status, "open")
@@ -156,8 +156,7 @@ class OccurrenceParticipantTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self._date_rows(first.id, "going"), 0)
         self.assertEqual(await self._parent_rows(both.id), 0)
 
-    async def test_full_date_does_not_block_another_date_or_confirm_it(self) -> None:
-        other = await self._other()
+    async def test_creator_fills_each_date_when_group_size_is_one(self) -> None:
         weekly = await self._weekly(groupSize=1)
         first, second = weekly.occurrences[0], weekly.occurrences[1]
         filled = await join_occurrence(
@@ -167,16 +166,8 @@ class OccurrenceParticipantTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(full.participation.isFull)
         self.assertEqual(full.status, "open")
         self.assertEqual(filled.status, "open")
-        with self.assertRaises(HTTPException) as rejected:
-            await join_occurrence(
-                self.conn, user_id=other, activity_id=UUID(weekly.id), occurrence_id=UUID(first.id)
-            )
-        self.assertEqual(rejected.exception.status_code, 409)
-        opened = await join_occurrence(
-            self.conn, user_id=other, activity_id=UUID(weekly.id), occurrence_id=UUID(second.id)
-        )
-        spare = next(item for item in opened.occurrences if item.id == second.id)
-        self.assertEqual(spare.participation.currentUserStatus, "going")
+        spare = next(item for item in filled.occurrences if item.id == second.id)
+        self.assertTrue(spare.participation.isFull)
         self.assertEqual(await self._date_rows(first.id, "going"), 1)
 
     async def test_leaving_a_full_confirmed_date_keeps_it_confirmed(self) -> None:
@@ -375,18 +366,21 @@ class OccurrenceParticipantTests(unittest.IsolatedAsyncioTestCase):
                 occurrence_id=UUID(first.occurrences[0].id),
             )
         self.assertEqual(rejected.exception.status_code, 404)
-        self.assertEqual(await self._date_rows(first.occurrences[0].id), 0)
+        self.assertEqual(await self._date_rows(first.occurrences[0].id), 1)
 
-    async def test_publishing_and_confirming_does_not_add_the_owner(self) -> None:
+    async def test_publishing_adds_creator_to_every_live_date(self) -> None:
         weekly = await self._weekly(groupSize=4)
+        for occurrence in weekly.occurrences:
+            self.assertEqual(occurrence.participation.goingCount, 1)
+            self.assertEqual(occurrence.participation.currentUserStatus, "going")
         first = weekly.occurrences[0]
         confirmed = await confirm_activity(
             self.conn, user_id=self.member_id, activity_id=UUID(weekly.id), occurrence_id=UUID(first.id)
         )
         saved = next(item for item in confirmed.occurrences if item.id == first.id)
         self.assertEqual(saved.status, "confirmed")
-        self.assertEqual(saved.participation.goingCount, 0)
-        self.assertNotEqual(saved.participation.currentUserStatus, "going")
+        self.assertEqual(saved.participation.goingCount, 1)
+        self.assertEqual(saved.participation.currentUserStatus, "going")
         self.assertEqual(await self._parent_rows(weekly.id), 0)
 
     async def test_published_dates_are_not_moved(self) -> None:

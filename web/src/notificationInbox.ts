@@ -24,6 +24,7 @@ const ACTIVITY_TYPES: ReadonlySet<string> = new Set<ActivityNotificationType>([
   "upcoming_activity",
   "suggestion_accepted",
   "suggestion_declined",
+  "suggestion_created",
 ]);
 
 export type StoredNotification = {
@@ -48,6 +49,7 @@ export type StoredNotification = {
   startAt?: string;
   recurring?: boolean;
   suggestionType?: "time" | "location" | null;
+  suggestedByName?: string | null;
   cancellationNote?: string | null;
   resolved?: boolean;
 };
@@ -329,6 +331,7 @@ async function syncActivityNotifications(userId: string, deletedIds: Set<string>
       startAt: row.startAt,
       recurring: row.recurring,
       suggestionType: row.suggestionType ?? null,
+      suggestedByName: row.suggestedByName ?? null,
       cancellationNote: row.cancellationNote ?? null,
       resolved: row.resolved,
     });

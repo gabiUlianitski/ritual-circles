@@ -221,15 +221,29 @@ class ActivitySuggestionTests(unittest.IsolatedAsyncioTestCase):
         other = await self._other()
         suggested = await create_suggestion(self.conn, user_id=self.member_id, activity_id=UUID(plan.id), payload=_time())
         item_id = UUID(self._one(suggested, "time").id)
+        self.assertFalse(self._one(suggested, "time").canSupport)
+        with self.assertRaises(HTTPException) as own:
+            await support_suggestion(self.conn, user_id=self.member_id, suggestion_id=item_id)
+        self.assertEqual(own.exception.status_code, 403)
         once = await support_suggestion(self.conn, user_id=other, suggestion_id=item_id)
         self.assertEqual(self._one(once, "time").supportCount, 1)
         self.assertTrue(self._one(once, "time").supportedByMe)
         mine = await get_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
+        self.assertFalse(self._one(mine, "time").canSupport)
         self.assertFalse(self._one(mine, "time").supportedByMe)
-        twice = await support_suggestion(self.conn, user_id=self.member_id, suggestion_id=item_id)
+        second = await self.conn.fetchval(
+            "SELECT id FROM users WHERE id <> $1 AND id <> $2 AND id <> $3 LIMIT 1",
+            self.member_id,
+            self.owner_id,
+            other,
+        )
+        if second is None:
+            self.skipTest("needs another user")
+        await activate_member(self.conn, user_id=second, circle_id=self.circle_id)
+        twice = await support_suggestion(self.conn, user_id=second, suggestion_id=item_id)
         self.assertEqual(self._one(twice, "time").supportCount, 2)
         self.assertTrue(self._one(twice, "time").supportedByMe)
-        again = await support_suggestion(self.conn, user_id=self.member_id, suggestion_id=item_id)
+        again = await support_suggestion(self.conn, user_id=second, suggestion_id=item_id)
         self.assertEqual(self._one(again, "time").supportCount, 2)
         removed = await remove_support(self.conn, user_id=other, suggestion_id=item_id)
         self.assertEqual(self._one(removed, "time").supportCount, 1)
@@ -250,9 +264,11 @@ class ActivitySuggestionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_accept_time_updates_only_the_chosen_target(self) -> None:
         plan = await self._plan()
+        peer = await self._other()
         suggested = await create_suggestion(self.conn, user_id=self.member_id, activity_id=UUID(plan.id), payload=_time())
+        self.assertFalse(self._one(suggested, "time").canDecide)
         accepted = await accept_suggestion(
-            self.conn, user_id=self.member_id, suggestion_id=UUID(self._one(suggested, "time").id)
+            self.conn, user_id=peer, suggestion_id=UUID(self._one(suggested, "time").id)
         )
         self.assertEqual(accepted.startAt, LATER)
         self.assertEqual(accepted.endAt, LATER_END)
@@ -269,7 +285,7 @@ class ActivitySuggestionTests(unittest.IsolatedAsyncioTestCase):
             payload=_time(),
         )
         moved = await accept_suggestion(
-            self.conn, user_id=self.member_id, suggestion_id=UUID(self._one(dated, "time", first.id).id)
+            self.conn, user_id=peer, suggestion_id=UUID(self._one(dated, "time", first.id).id)
         )
         changed = next(item for item in moved.occurrences if item.id == first.id)
         untouched = next(item for item in moved.occurrences if item.id == second.id)
@@ -281,9 +297,10 @@ class ActivitySuggestionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_accept_location_overrides_only_the_chosen_date(self) -> None:
         plan = await self._plan(locationName="Park courts")
+        peer = await self._other()
         suggested = await create_suggestion(self.conn, user_id=self.member_id, activity_id=UUID(plan.id), payload=_place())
         accepted = await accept_suggestion(
-            self.conn, user_id=self.member_id, suggestion_id=UUID(self._one(suggested, "location").id)
+            self.conn, user_id=peer, suggestion_id=UUID(self._one(suggested, "location").id)
         )
         self.assertEqual(accepted.locationName, "Fluntern Tennis Courts")
         self.assertEqual(accepted.locationAddress, "Zurich")
@@ -298,7 +315,7 @@ class ActivitySuggestionTests(unittest.IsolatedAsyncioTestCase):
             payload=_place(),
         )
         moved = await accept_suggestion(
-            self.conn, user_id=self.member_id, suggestion_id=UUID(self._one(dated, "location", first.id).id)
+            self.conn, user_id=peer, suggestion_id=UUID(self._one(dated, "location", first.id).id)
         )
         changed = next(item for item in moved.occurrences if item.id == first.id)
         untouched = next(item for item in moved.occurrences if item.id == second.id)
@@ -307,24 +324,26 @@ class ActivitySuggestionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(untouched.locationName)
         self.assertEqual(moved.locationName, "Park courts")
 
-    async def test_accepting_one_time_closes_only_the_same_type(self) -> None:
+    async def test_one_open_suggestion_blocks_another_until_it_is_settled(self) -> None:
         plan = await self._plan()
         other = await self._other()
         first = await create_suggestion(self.conn, user_id=self.member_id, activity_id=UUID(plan.id), payload=_time())
-        second = await create_suggestion(
-            self.conn,
-            user_id=other,
-            activity_id=UUID(plan.id),
-            payload=_time(proposedStartAt=LATER + timedelta(days=1), proposedEndAt=LATER_END + timedelta(days=1)),
-        )
-        placed = await create_suggestion(self.conn, user_id=self.member_id, activity_id=UUID(plan.id), payload=_place())
-        accepted = await accept_suggestion(
-            self.conn, user_id=self.member_id, suggestion_id=UUID(self._one(first, "time").id)
-        )
-        self.assertEqual(self._one(accepted, "time", status="accepted").id, self._one(first, "time").id)
-        self.assertEqual(self._one(accepted, "time", status="declined").id, self._one(second, "time").id)
-        self.assertEqual(self._one(accepted, "location").id, self._one(placed, "location").id)
-        self.assertEqual(accepted.locationName, plan.locationName)
+        item_id = UUID(self._one(first, "time").id)
+        with self.assertRaises(HTTPException) as another_time:
+            await create_suggestion(
+                self.conn,
+                user_id=other,
+                activity_id=UUID(plan.id),
+                payload=_time(proposedStartAt=LATER + timedelta(days=1), proposedEndAt=LATER_END + timedelta(days=1)),
+            )
+        self.assertEqual(another_time.exception.status_code, 409)
+        with self.assertRaises(HTTPException) as another_place:
+            await create_suggestion(self.conn, user_id=self.member_id, activity_id=UUID(plan.id), payload=_place())
+        self.assertEqual(another_place.exception.status_code, 409)
+        withdrawn = await withdraw_suggestion(self.conn, user_id=self.member_id, suggestion_id=item_id)
+        self.assertEqual(self._one(withdrawn, "time", status="withdrawn").status, "withdrawn")
+        placed = await create_suggestion(self.conn, user_id=other, activity_id=UUID(plan.id), payload=_place())
+        self.assertEqual(self._one(placed, "location").proposedLocationName, "Fluntern Tennis Courts")
 
     async def test_ordinary_member_cannot_decide(self) -> None:
         plan = await self._plan()
@@ -332,6 +351,8 @@ class ActivitySuggestionTests(unittest.IsolatedAsyncioTestCase):
         suggested = await create_suggestion(self.conn, user_id=other, activity_id=UUID(plan.id), payload=_time())
         item_id = UUID(self._one(suggested, "time").id)
         self.assertFalse(self._one(suggested, "time").canDecide)
+        seen = await get_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
+        self.assertTrue(self._one(seen, "time").canDecide)
         with self.assertRaises(HTTPException) as accepted:
             await accept_suggestion(self.conn, user_id=other, suggestion_id=item_id)
         self.assertEqual(accepted.exception.status_code, 403)
@@ -344,9 +365,13 @@ class ActivitySuggestionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_decline_changes_only_the_suggestion(self) -> None:
         plan = await self._plan(locationName="Park courts")
+        peer = await self._other()
         suggested = await create_suggestion(self.conn, user_id=self.member_id, activity_id=UUID(plan.id), payload=_place())
+        with self.assertRaises(HTTPException) as own:
+            await decline_suggestion(self.conn, user_id=self.member_id, suggestion_id=UUID(self._one(suggested, "location").id))
+        self.assertEqual(own.exception.status_code, 403)
         declined = await decline_suggestion(
-            self.conn, user_id=self.member_id, suggestion_id=UUID(self._one(suggested, "location").id)
+            self.conn, user_id=peer, suggestion_id=UUID(self._one(suggested, "location").id)
         )
         self.assertEqual(self._one(declined, "location", status="declined").status, "declined")
         self.assertEqual(declined.locationName, "Park courts")
@@ -357,19 +382,51 @@ class ActivitySuggestionTests(unittest.IsolatedAsyncioTestCase):
         plan = await self._plan()
         await join_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
         await confirm_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
+        peer = await self._other()
         suggested = await create_suggestion(self.conn, user_id=self.member_id, activity_id=UUID(plan.id), payload=_time())
-        accepted = await accept_suggestion(
-            self.conn, user_id=self.member_id, suggestion_id=UUID(self._one(suggested, "time").id)
-        )
-        self.assertEqual(accepted.status, "open")
+        with self.assertRaises(HTTPException) as own:
+            await accept_suggestion(self.conn, user_id=self.member_id, suggestion_id=UUID(self._one(suggested, "time").id))
+        self.assertEqual(own.exception.status_code, 403)
+        await accept_suggestion(self.conn, user_id=peer, suggestion_id=UUID(self._one(suggested, "time").id))
+        accepted = await get_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
+        self.assertEqual(accepted.status, "confirmed")
+        self.assertFalse(accepted.actions.canConfirm)
         self.assertEqual(accepted.startAt, LATER)
         self.assertIsNotNone(accepted.participation)
         self.assertEqual(accepted.participation.goingCount, 1)
         self.assertEqual(accepted.participation.currentUserStatus, "going")
         self.assertTrue(accepted.participation.confirmationRequired)
+        await self.conn.execute("UPDATE activities SET status = 'open' WHERE id = $1", UUID(plan.id))
+        restored = await get_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
+        self.assertEqual(restored.status, "confirmed")
+        self.assertFalse(restored.actions.canConfirm)
         cleared = await reconfirm_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
         self.assertFalse(cleared.participation.confirmationRequired)
         self.assertEqual(cleared.participation.currentUserStatus, "going")
+
+    async def test_accepter_who_is_going_is_not_asked_again(self) -> None:
+        plan = await self._plan()
+        await join_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
+        await confirm_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
+        peer = await self._other()
+        await join_activity(self.conn, user_id=peer, activity_id=UUID(plan.id))
+        suggested = await create_suggestion(self.conn, user_id=self.member_id, activity_id=UUID(plan.id), payload=_time())
+        accepted = await accept_suggestion(self.conn, user_id=peer, suggestion_id=UUID(self._one(suggested, "time").id))
+        self.assertEqual(accepted.participation.currentUserStatus, "going")
+        self.assertFalse(accepted.participation.confirmationRequired)
+        suggester = await get_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
+        self.assertTrue(suggester.participation.confirmationRequired)
+        await self.conn.execute(
+            """
+            UPDATE activity_participants
+            SET confirmation_required = TRUE
+            WHERE activity_id = $1 AND user_id = $2
+            """,
+            UUID(plan.id),
+            peer,
+        )
+        again = await get_activity(self.conn, user_id=peer, activity_id=UUID(plan.id))
+        self.assertFalse(again.participation.confirmationRequired)
 
     async def test_confirmed_date_reopens_only_that_date(self) -> None:
         weekly = await self._weekly()
@@ -385,12 +442,15 @@ class ActivitySuggestionTests(unittest.IsolatedAsyncioTestCase):
             occurrence_id=UUID(first.id),
             payload=_place(),
         )
-        accepted = await accept_suggestion(
-            self.conn, user_id=self.member_id, suggestion_id=UUID(self._one(suggested, "location", first.id).id)
+        peer = await self._other()
+        await accept_suggestion(
+            self.conn, user_id=peer, suggestion_id=UUID(self._one(suggested, "location", first.id).id)
         )
+        accepted = await get_activity(self.conn, user_id=self.member_id, activity_id=UUID(weekly.id))
         changed = next(item for item in accepted.occurrences if item.id == first.id)
         untouched = next(item for item in accepted.occurrences if item.id == second.id)
-        self.assertEqual(changed.status, "open")
+        self.assertEqual(changed.status, "confirmed")
+        self.assertFalse(changed.actions.canConfirm)
         self.assertTrue(changed.participation.confirmationRequired)
         self.assertEqual(changed.participation.currentUserStatus, "going")
         self.assertEqual(untouched.status, "confirmed")
@@ -454,6 +514,7 @@ class ActivitySuggestionTests(unittest.IsolatedAsyncioTestCase):
         url = os.environ["DATABASE_URL"]
         outside = await asyncpg.connect(url)
         activity_id: UUID | None = None
+        peer: UUID | None = None
         try:
             created = await create_activity(
                 outside, user_id=self.member_id, circle_id=self.circle_id, payload=_create_payload(title="Race plan")
@@ -462,11 +523,27 @@ class ActivitySuggestionTests(unittest.IsolatedAsyncioTestCase):
             await publish_activity(outside, user_id=self.member_id, activity_id=activity_id)
             suggested = await create_suggestion(outside, user_id=self.member_id, activity_id=activity_id, payload=_time())
             suggestion_id = UUID(suggested.suggestions[0].id)
+            peer = await outside.fetchval(
+                """
+                SELECT id FROM users
+                WHERE id <> $1
+                  AND NOT EXISTS (
+                    SELECT 1 FROM circle_members
+                    WHERE circle_id = $2 AND user_id = users.id
+                  )
+                LIMIT 1
+                """,
+                self.member_id,
+                self.circle_id,
+            )
+            if peer is None:
+                self.skipTest("needs another user")
+            await activate_member(outside, user_id=peer, circle_id=self.circle_id)
 
             async def attempt() -> int | None:
                 conn = await asyncpg.connect(url)
                 try:
-                    await accept_suggestion(conn, user_id=self.member_id, suggestion_id=suggestion_id)
+                    await accept_suggestion(conn, user_id=peer, suggestion_id=suggestion_id)
                     return None
                 except HTTPException as exc:
                     return exc.status_code
@@ -489,6 +566,12 @@ class ActivitySuggestionTests(unittest.IsolatedAsyncioTestCase):
         finally:
             if activity_id is not None:
                 await outside.execute("DELETE FROM activities WHERE id = $1", activity_id)
+            if peer is not None:
+                await outside.execute(
+                    "DELETE FROM circle_members WHERE circle_id = $1 AND user_id = $2",
+                    self.circle_id,
+                    peer,
+                )
             await outside.close()
 
     async def test_suggestions_do_not_touch_legacy_rows(self) -> None:
@@ -496,12 +579,13 @@ class ActivitySuggestionTests(unittest.IsolatedAsyncioTestCase):
         plan = await self._plan()
         suggested = await create_suggestion(self.conn, user_id=self.member_id, activity_id=UUID(plan.id), payload=_time())
         item_id = UUID(self._one(suggested, "time").id)
-        await support_suggestion(self.conn, user_id=self.member_id, suggestion_id=item_id)
-        await remove_support(self.conn, user_id=self.member_id, suggestion_id=item_id)
-        await support_suggestion(self.conn, user_id=self.member_id, suggestion_id=item_id)
-        await decline_suggestion(self.conn, user_id=self.member_id, suggestion_id=item_id)
+        peer = await self._other()
+        await support_suggestion(self.conn, user_id=peer, suggestion_id=item_id)
+        await remove_support(self.conn, user_id=peer, suggestion_id=item_id)
+        await support_suggestion(self.conn, user_id=peer, suggestion_id=item_id)
+        await decline_suggestion(self.conn, user_id=peer, suggestion_id=item_id)
         again = await create_suggestion(self.conn, user_id=self.member_id, activity_id=UUID(plan.id), payload=_place())
-        await accept_suggestion(self.conn, user_id=self.member_id, suggestion_id=UUID(self._one(again, "location").id))
+        await accept_suggestion(self.conn, user_id=peer, suggestion_id=UUID(self._one(again, "location").id))
         self.assertEqual(await self._counts(), before)
 
     async def test_support_does_not_change_the_plan(self) -> None:
@@ -510,10 +594,12 @@ class ActivitySuggestionTests(unittest.IsolatedAsyncioTestCase):
         suggested = await create_suggestion(self.conn, user_id=self.member_id, activity_id=UUID(plan.id), payload=_time())
         item_id = UUID(self._one(suggested, "time").id)
         await support_suggestion(self.conn, user_id=other, suggestion_id=item_id)
-        await support_suggestion(self.conn, user_id=self.member_id, suggestion_id=item_id)
+        with self.assertRaises(HTTPException) as own:
+            await support_suggestion(self.conn, user_id=self.member_id, suggestion_id=item_id)
+        self.assertEqual(own.exception.status_code, 403)
         fresh = await get_activity(self.conn, user_id=self.member_id, activity_id=UUID(plan.id))
         self.assertEqual(fresh.startAt, plan.startAt)
         self.assertEqual(fresh.locationName, "Park courts")
         self.assertEqual(fresh.status, "open")
-        self.assertEqual(self._one(fresh, "time").supportCount, 2)
+        self.assertEqual(self._one(fresh, "time").supportCount, 1)
         self.assertEqual(self._one(fresh, "time").status, "open")

@@ -159,6 +159,7 @@ export type ActivityCreatePayload = {
   locationName?: string | null;
   locationAddress?: string | null;
   groupSize: number;
+  minParticipants: number;
   paymentType: "free" | "paid";
   priceAmount?: string | null;
   currency?: string | null;
@@ -234,6 +235,9 @@ export type ActivityGoingPerson = {
 export type ActivityParticipation = {
   goingCount: number;
   groupSize: number;
+  minParticipants: number;
+  remainingNeeded: number;
+  isReady: boolean;
   remainingPlaces: number;
   isFull: boolean;
   currentUserStatus?: "going" | "cancelled" | null;
@@ -253,6 +257,7 @@ export type Activity = {
   locationName?: string | null;
   locationAddress?: string | null;
   groupSize: number;
+  minParticipants: number;
   paymentType: "free" | "paid";
   priceAmount?: string | number | null;
   currency?: string | null;
@@ -564,7 +569,8 @@ export type ActivityNotificationType =
   | "reconfirmation_required"
   | "upcoming_activity"
   | "suggestion_accepted"
-  | "suggestion_declined";
+  | "suggestion_declined"
+  | "suggestion_created";
 
 /** In-app only. Identifiers and display basics; wording is localized on the client. */
 export type ActivityNotification = {
@@ -578,6 +584,7 @@ export type ActivityNotification = {
   recurring: boolean;
   startAt: string;
   suggestionType?: "time" | "location" | null;
+  suggestedByName?: string | null;
   cancellationNote?: string | null;
   resolved: boolean;
   createdAt: string;

@@ -10,6 +10,7 @@ from app.circle_identity import circle_identity
 from app.hoby_i18n import localized_display_name
 from app.schemas import ActivityParticipation, HomeActivityItem
 from app.services.activities_service import ensure_future_activity_occurrences
+from app.services.activity_participants import still_needs_confirmation
 
 HOME_ACTIVITY_LIMIT = 48
 
@@ -27,7 +28,7 @@ WHERE p.user_id = $1
 
 # Circle membership alone adds nothing: every row needs the user's own 'going' place.
 # Only circles the user can still open are shown (active member or creator).
-_UPCOMING_SQL = """
+_UPCOMING_SQL = f"""
 WITH entries AS (
   SELECT
     a.id AS activity_id,
@@ -37,7 +38,7 @@ WITH entries AS (
     a.location_name,
     a.location_address,
     a.status,
-    p.confirmation_required,
+    {still_needs_confirmation("p", occurrence=False)} AS confirmation_required,
     (
       SELECT COUNT(*)::int
       FROM activity_participants g
@@ -59,7 +60,7 @@ WITH entries AS (
     COALESCE(NULLIF(o.location_name_override, ''), a.location_name),
     COALESCE(NULLIF(o.location_address_override, ''), a.location_address),
     o.status,
-    p.confirmation_required,
+    {still_needs_confirmation("p", occurrence=True)} AS confirmation_required,
     (
       SELECT COUNT(*)::int
       FROM activity_occurrence_participants g
@@ -79,6 +80,7 @@ SELECT
   e.*,
   a.circle_id,
   a.title,
+  a.min_participants,
   a.group_size,
   a.recurrence_type,
   a.payment_type,
@@ -114,6 +116,7 @@ def _item(row: asyncpg.Record, lang: str) -> HomeActivityItem:
     hoby_name = _hoby_name(row, lang)
     _stored, circle_title, _has_name, _hobby = circle_identity(row["circle_name"], hoby_name, row["ritual_type"])
     size = int(row["group_size"])
+    minimum = int(row["min_participants"])
     going = int(row["going_count"] or 0)
     return HomeActivityItem(
         activityId=str(row["activity_id"]),
@@ -135,6 +138,9 @@ def _item(row: asyncpg.Record, lang: str) -> HomeActivityItem:
         status=row["status"],
         participation=ActivityParticipation(
             goingCount=going,
+            minParticipants=minimum,
+            remainingNeeded=max(minimum - going, 0),
+            isReady=going >= minimum,
             groupSize=size,
             remainingPlaces=max(size - going, 0),
             isFull=going >= size,

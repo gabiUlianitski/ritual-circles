@@ -73,16 +73,21 @@ export function CircleActivities(props: {
           <p className="muted">{props.canPlan ? t("circleActivities.emptyPlan") : t("circleActivities.emptyWait")}</p>
           {props.canPlan ? (
             <button type="button" className="circle-details-primary" onClick={props.onPlan}>
-              {t("circleActivities.planFirst")}
+              {t("activityPage.planActivity")}
             </button>
           ) : null}
         </div>
       ) : (
         <>
-          {upcoming.length === 0 ? <p className="muted circle-activities-note">{t("circleActivities.nothingUpcoming")}</p> : null}
+          {upcoming.length === 0 ? <p className="muted circle-activities-note">{t("circleActivities.emptyTitle")}</p> : null}
           <div className="circle-activities-list">
             {upcoming.map((activity) => (
-              <ActivityCard key={activity.id} activity={activity} onOpen={() => props.onOpen(activity.id)} />
+              <ActivityCard
+                key={activity.id}
+                activity={activity}
+                onOpen={() => props.onOpen(activity.id)}
+                onChanged={() => setRetry((n) => n + 1)}
+              />
             ))}
           </div>
           {past.length > 0 ? (
@@ -98,7 +103,12 @@ export function CircleActivities(props: {
               {pastOpen ? (
                 <div className="circle-activities-list">
                   {past.map((activity) => (
-                    <ActivityCard key={activity.id} activity={activity} onOpen={() => props.onOpen(activity.id)} />
+                    <ActivityCard
+                      key={activity.id}
+                      activity={activity}
+                      onOpen={() => props.onOpen(activity.id)}
+                      onChanged={() => setRetry((n) => n + 1)}
+                    />
                   ))}
                 </div>
               ) : null}

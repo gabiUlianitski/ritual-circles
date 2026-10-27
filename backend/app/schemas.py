@@ -774,11 +774,12 @@ ActivityNotificationType = Literal[
     "upcoming_activity",
     "suggestion_accepted",
     "suggestion_declined",
+    "suggestion_created",
 ]
 
 
 class ActivityNotification(BaseModel):
-    """One in-app Activity notification. No place, people, or suggestion note is included."""
+    """One in-app Activity notification. A new suggestion names who suggested it. No place or note is included."""
 
     id: str
     type: ActivityNotificationType
@@ -790,6 +791,7 @@ class ActivityNotification(BaseModel):
     recurring: bool = False
     startAt: datetime
     suggestionType: Literal["time", "location"] | None = None
+    suggestedByName: str | None = None
     cancellationNote: str | None = None
     """Reconfirmation only: the person has already answered (still going or left)."""
     resolved: bool = False
@@ -814,6 +816,7 @@ class ActivityCreateRequest(BaseModel):
     locationName: str | None = None
     locationAddress: str | None = None
     groupSize: int | None = None
+    minParticipants: int | None = None
     paymentType: ActivityPaymentName = "free"
     priceAmount: Decimal | None = None
     currency: str | None = None
@@ -834,6 +837,7 @@ class ActivityCreateRequest(BaseModel):
                 location_name=self.locationName,
                 location_address=self.locationAddress,
                 group_size=self.groupSize,
+                min_participants=self.minParticipants,
                 payment_type=self.paymentType,
                 price_amount=self.priceAmount,
                 currency=self.currency,
@@ -855,6 +859,7 @@ class ActivityUpdateRequest(BaseModel):
     locationName: str | None = None
     locationAddress: str | None = None
     groupSize: int | None = None
+    minParticipants: int | None = None
     paymentType: ActivityPaymentName | None = None
     priceAmount: Decimal | None = None
     currency: str | None = None
@@ -865,6 +870,13 @@ class ActivityUpdateRequest(BaseModel):
     def group_size_positive(cls, value: int | None) -> int | None:
         if value is not None and value <= 0:
             raise ValueError("Group size must be greater than zero")
+        return value
+
+    @field_validator("minParticipants")
+    @classmethod
+    def min_participants_positive(cls, value: int | None) -> int | None:
+        if value is not None and value <= 0:
+            raise ValueError("Minimum participants must be greater than zero")
         return value
 
 
@@ -940,6 +952,9 @@ class ActivityAttendanceRequest(BaseModel):
 class ActivityParticipation(BaseModel):
     goingCount: int
     groupSize: int
+    minParticipants: int
+    remainingNeeded: int
+    isReady: bool
     remainingPlaces: int
     isFull: bool
     currentUserStatus: ActivityParticipantStatusName | None = None
@@ -984,6 +999,7 @@ class ActivityResponse(BaseModel):
     locationName: str | None = None
     locationAddress: str | None = None
     groupSize: int
+    minParticipants: int
     paymentType: ActivityPaymentName
     priceAmount: Decimal | None = None
     currency: str | None = None

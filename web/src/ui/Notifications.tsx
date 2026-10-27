@@ -45,6 +45,8 @@ function activityTitleLine(item: StoredNotification, t: Translate): string {
       return t("activityNotifications.suggestionAcceptedTitle");
     case "suggestion_declined":
       return t("activityNotifications.suggestionDeclinedTitle");
+    case "suggestion_created":
+      return t("activityNotifications.suggestionCreatedTitle");
     default:
       return t("activityNotifications.title");
   }
@@ -68,6 +70,12 @@ function activityMessage(item: StoredNotification, t: Translate): string {
       return t("activityNotifications.suggestionAcceptedBody");
     case "suggestion_declined":
       return t("activityNotifications.suggestionDeclinedBody");
+    case "suggestion_created": {
+      const name = item.suggestedByName?.trim() || t("activityNotifications.someone");
+      return item.suggestionType === "location"
+        ? t("activityNotifications.suggestionCreatedPlaceBody", { name })
+        : t("activityNotifications.suggestionCreatedTimeBody", { name });
+    }
     default:
       return "";
   }

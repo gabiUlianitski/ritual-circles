@@ -42,6 +42,7 @@ export function CreateActivity(props: {
   const [locationName, setLocationName] = useState("");
   const [locationAddress, setLocationAddress] = useState("");
   const [groupSize, setGroupSize] = useState<number | null>(null);
+  const [minParticipants, setMinParticipants] = useState<number | null>(null);
   const [cost, setCost] = useState<ActivityDraft["cost"]>("free");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<string>(COST_CURRENCIES[0].code);
@@ -58,6 +59,7 @@ export function CreateActivity(props: {
         setLocationAddress(defaults.locationAddress?.trim() ?? "");
         const size = defaults.preferredGroupSize;
         setGroupSize(Number.isInteger(size) && size > 0 ? size : null);
+        setMinParticipants(Number.isInteger(size) && size > 0 ? size : null);
       })
       .catch(() => {
         if (!cancelled) setDefaultsFailed(true);
@@ -83,6 +85,7 @@ export function CreateActivity(props: {
     if (patch.locationName !== undefined) setLocationName(patch.locationName);
     if (patch.locationAddress !== undefined) setLocationAddress(patch.locationAddress);
     if (patch.groupSize !== undefined) setGroupSize(patch.groupSize);
+    if (patch.minParticipants !== undefined) setMinParticipants(patch.minParticipants);
     if (patch.cost !== undefined) setCost(patch.cost);
     if (patch.amount !== undefined) setAmount(patch.amount);
     if (patch.currency !== undefined) setCurrency(patch.currency);
@@ -100,6 +103,7 @@ export function CreateActivity(props: {
       locationName,
       locationAddress,
       groupSize,
+      minParticipants,
       cost,
       amount,
       currency,
@@ -116,7 +120,7 @@ export function CreateActivity(props: {
       const target =
         first === "title"
           ? titleId
-          : first === "groupSize"
+          : first === "groupSize" || first === "minParticipants"
             ? `${formId}-size`
             : first === "amount"
               ? `${formId}-amount`

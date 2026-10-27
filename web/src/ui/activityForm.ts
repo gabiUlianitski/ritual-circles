@@ -16,6 +16,7 @@ export type ActivityIssueCode =
   | "date"
   | "end"
   | "groupSize"
+  | "minParticipants"
   | "amount"
   | "currency";
 
@@ -30,6 +31,7 @@ export type ActivityDraft = {
   locationName: string;
   locationAddress: string;
   groupSize: number | null;
+  minParticipants: number | null;
   cost: "free" | "paid";
   amount: string;
   currency: string;
@@ -88,6 +90,14 @@ export function activityIssues(draft: ActivityDraft): ActivityIssueCode[] {
   }
   if (draft.groupSize == null || !Number.isInteger(draft.groupSize) || draft.groupSize <= 0) {
     issues.push("groupSize");
+  }
+  if (
+    draft.minParticipants == null ||
+    !Number.isInteger(draft.minParticipants) ||
+    draft.minParticipants <= 0 ||
+    (draft.groupSize != null && draft.minParticipants > draft.groupSize)
+  ) {
+    issues.push("minParticipants");
   }
   if (draft.cost === "paid") {
     if (parsePrice(draft.amount) == null) issues.push("amount");
@@ -150,6 +160,10 @@ export function draftFromActivity(activity: Activity): ActivityDraft {
     locationName: activity.locationName ?? "",
     locationAddress: activity.locationAddress ?? "",
     groupSize: Number.isInteger(activity.groupSize) && activity.groupSize > 0 ? activity.groupSize : null,
+    minParticipants:
+      Number.isInteger(activity.minParticipants) && activity.minParticipants > 0
+        ? activity.minParticipants
+        : activity.groupSize,
     cost: activity.paymentType === "paid" ? "paid" : "free",
     amount: activity.paymentType === "paid" ? amountInput(activity.priceAmount) : "",
     currency: /^[A-Z]{3}$/.test(currency) ? currency : COST_CURRENCIES[0].code,
@@ -162,6 +176,7 @@ export function activityPayload(
 ): ActivityCreatePayload | null {
   if (activityIssues(draft).length > 0) return null;
   const groupSize = draft.groupSize as number;
+  const minParticipants = draft.minParticipants as number;
   let startAt =
     draft.when === "recurring"
       ? nextWeeklyStartIso(draft.weekday, draft.startTime)
@@ -192,6 +207,7 @@ export function activityPayload(
     locationName: draft.locationName.trim() || null,
     locationAddress: draft.locationAddress.trim() || null,
     groupSize,
+    minParticipants,
     paymentType: draft.cost,
     priceAmount: price,
     currency: draft.cost === "paid" ? draft.currency.trim().toUpperCase() : null,

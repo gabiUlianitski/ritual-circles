@@ -11,7 +11,7 @@
 #                 Values are never printed. Use -EnvFile for a production env file.
 #   -Commit       Stage the release paths, show them, and commit locally after
 #                 you type COMMIT. Refuses if anything was already staged.
-#   -Migrate      Apply db/migrations/031-046 to the database in backend/.env
+#   -Migrate      Apply db/migrations/031-047 to the database in backend/.env
 #                 after you confirm a backup, then run the read-only schema check.
 #   -CheckSchema  Run only the read-only schema check.
 #   -Push         Re-run the schema check, then push main after you type PUSH.
@@ -66,6 +66,8 @@ $migrations = @(
     "044_activity_occurrence_slots.sql",
     "045_activity_notifications.sql",
     "046_activity_attendance_outcomes.sql"
+    "047_activity_min_participants.sql",
+    "048_suggestion_created_notification.sql"
 )
 
 $include = @(
@@ -162,7 +164,7 @@ if ($Prepare) {
             $missing | ForEach-Object { Write-Host "  $_" }
             $global:LASTEXITCODE = 1
         } else {
-            Write-Host "All $($migrations.Count) migration files (031-046) are present."
+            Write-Host "All $($migrations.Count) migration files (031-047) are present."
             $global:LASTEXITCODE = 0
         }
     }
@@ -230,12 +232,12 @@ if ($Commit) {
 if ($Migrate) {
     Write-Host ""
     Write-Host "This script cannot verify a backup. Take a Supabase backup first."
-    $answer = Read-Host "Type BACKUP-TAKEN to apply migrations 031-046 to the database in backend/.env"
+    $answer = Read-Host "Type BACKUP-TAKEN to apply migrations 031-047 to the database in backend/.env"
     if ($answer -ne "BACKUP-TAKEN") {
         Write-Host "Stopped. No migration was applied."
         exit 1
     }
-    Invoke-Step "Apply migrations 031-046 (statement by statement; stops at the first failure)" {
+    Invoke-Step "Apply migrations 031-047 (statement by statement; stops at the first failure)" {
         & $python (Join-Path $root "backend\scripts\apply_production_migrations.py")
     }
     Invoke-SchemaCheck

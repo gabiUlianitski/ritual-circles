@@ -16,6 +16,25 @@ GOING = "going"
 CANCELLED = "cancelled"
 
 
+def still_needs_confirmation(alias: str, *, occurrence: bool) -> str:
+    """A person who accepted the latest suggestion already agreed, so they are not asked again."""
+    if occurrence:
+        match = f"s.occurrence_id = {alias}.occurrence_id"
+    else:
+        match = f"s.activity_id = {alias}.activity_id AND s.occurrence_id IS NULL"
+    return f"""(
+      {alias}.confirmation_required
+      AND {alias}.user_id IS DISTINCT FROM (
+        SELECT s.decided_by
+        FROM activity_suggestions s
+        WHERE {match}
+          AND s.status = 'accepted'
+        ORDER BY s.decided_at DESC NULLS LAST, s.id DESC
+        LIMIT 1
+      )
+    )"""
+
+
 async def places_in_use(conn: asyncpg.Connection, activity_id: UUID) -> int:
     """Largest number of people going on the activity or on any one of its dates."""
     parent = await going_count(conn, activity_id)
@@ -58,11 +77,15 @@ def _summary(
     confirmation_required: bool = False,
 ) -> ActivityParticipation:
     size = int(row["group_size"])
+    minimum = int(row["min_participants"])
     remaining = max(size - going, 0)
     status = mine if mine in (GOING, CANCELLED) else None
     return ActivityParticipation(
         goingCount=going,
         groupSize=size,
+        minParticipants=minimum,
+        remainingNeeded=max(minimum - going, 0),
+        isReady=going >= minimum,
         remainingPlaces=remaining,
         isFull=going >= size,
         currentUserStatus=status,
@@ -106,8 +129,8 @@ async def summary_for(
     activity_id = row["id"]
     going = await going_count(conn, activity_id)
     mine = await conn.fetchrow(
-        """
-        SELECT status, confirmation_required
+        f"""
+        SELECT status, {still_needs_confirmation("activity_participants", occurrence=False)} AS confirmation_required
         FROM activity_participants
         WHERE activity_id = $1 AND user_id = $2
         """,
@@ -146,8 +169,9 @@ async def summaries_for(
         ):
             counts[item["activity_id"]] = int(item["n"])
         for item in await conn.fetch(
-            """
-            SELECT activity_id, status, confirmation_required
+            f"""
+            SELECT activity_id, status,
+                   {still_needs_confirmation("activity_participants", occurrence=False)} AS confirmation_required
             FROM activity_participants
             WHERE activity_id = ANY($1::uuid[]) AND user_id = $2
             """,
@@ -304,8 +328,9 @@ async def summaries_for_occurrences(
         ):
             counts[item["occurrence_id"]] = int(item["n"])
         for item in await conn.fetch(
-            """
-            SELECT occurrence_id, status, confirmation_required
+            f"""
+            SELECT occurrence_id, status,
+                   {still_needs_confirmation("activity_occurrence_participants", occurrence=True)} AS confirmation_required
             FROM activity_occurrence_participants
             WHERE occurrence_id = ANY($1::uuid[]) AND user_id = $2
             """,
@@ -362,8 +387,9 @@ async def summaries_for_occurrences_by_activity(
         ):
             counts[item["occurrence_id"]] = int(item["n"])
         for item in await conn.fetch(
-            """
-            SELECT occurrence_id, status, confirmation_required
+            f"""
+            SELECT occurrence_id, status,
+                   {still_needs_confirmation("activity_occurrence_participants", occurrence=True)} AS confirmation_required
             FROM activity_occurrence_participants
             WHERE occurrence_id = ANY($1::uuid[]) AND user_id = $2
             """,
