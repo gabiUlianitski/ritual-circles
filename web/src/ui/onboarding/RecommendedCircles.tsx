@@ -29,7 +29,7 @@ export function RecommendedCircles(props: {
       try {
         const [list, hobbyList] = await Promise.all([api.listCircles(), api.getHobies()]);
         if (!cancelled) {
-          setCatalog(Array.isArray(list) ? list.filter((c) => !c.isYours) : []);
+          setCatalog(Array.isArray(list) ? list.filter((c) => !c.isYours && !c.isCreator) : []);
           setHobies(Array.isArray(hobbyList) ? hobbyList : []);
         }
       } catch (e) {

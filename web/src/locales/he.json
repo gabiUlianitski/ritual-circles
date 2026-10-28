@@ -770,7 +770,11 @@
     "descriptionFriendly": "שמרו על זה קצר וידידותי.",
     "descriptionExample": "נפגשים כל יום ראשון בבוקר לרכיבות רגועות בציריך.",
     "previewNameFallback": "שם המעגל שלכם",
-    "previewDescriptionFallback": "הוסיפו תיאור קצר כדי שאנשים יבינו את המעגל."
+    "previewDescriptionFallback": "הוסיפו תיאור קצר כדי שאנשים יבינו את המעגל.",
+    "maxGroupTitle": "גודל קבוצה מרבי",
+    "maxGroupHelp": "מספר האנשים המרבי שנפגשים. כל אחד עדיין יכול להצטרף למעגל.",
+    "maxGroupPeople": "אנשים",
+    "maxGroupTip": "קבוצות קטנות (2–4 אנשים) נוחות יותר למפגשים הראשונים"
   },
   "createSuccess": {
     "kicker": "המעגל נוצר",
@@ -1037,8 +1041,8 @@
     "information": "מידע על המעגל",
     "rhythm": "תדירות",
     "format": "אופן המפגש",
-    "groupSize": "גודל קבוצה אופייני",
-    "typicalSizeValue": "גודל קבוצה אופייני: {{count}}",
+    "groupSize": "גודל קבוצה מרבי",
+    "typicalSizeValue": "גודל קבוצה מרבי: {{count}}",
     "cost": "עלות",
     "access": "הצטרפות",
     "upToPeople": "{{count}}",

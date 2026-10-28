@@ -115,6 +115,19 @@ export function formatGroupSizeSummary(
   }
 }
 
+/** The one number a circle keeps: the maximum. A hobby default of another kind becomes that maximum. */
+export function circleMaxCount(payload: GroupSizePayload | null | undefined, fallback = 6): number {
+  if (!payload) return fallback;
+  if (payload.type === "fixed") return payload.min ?? payload.max ?? fallback;
+  if (payload.type === "range") return payload.max ?? payload.min ?? fallback;
+  if (payload.type === "min") return payload.min ?? fallback;
+  return payload.max ?? fallback;
+}
+
+export function circleMaxGroupSizeState(payload: GroupSizePayload | null | undefined): GroupSizeState {
+  return { ...DEFAULT_GROUP_SIZE, type: "max", maxCount: circleMaxCount(payload) };
+}
+
 export function groupSizeStateFromPayload(payload: GroupSizePayload | null | undefined): GroupSizeState {
   if (!payload) return { ...DEFAULT_GROUP_SIZE };
   const base: GroupSizeState = { ...DEFAULT_GROUP_SIZE, type: payload.type };

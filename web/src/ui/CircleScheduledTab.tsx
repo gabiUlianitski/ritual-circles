@@ -35,14 +35,15 @@ import {
 } from "./groupSize";
 
 function groupSizeFromCircle(circle: CircleResponse | null): number {
-  if (circle?.groupSize?.type === "fixed") {
-    return circle.groupSize.min ?? circle.groupSize.max ?? circle.maxSize ?? 6;
-  }
+  const size = circle?.groupSize;
+  if (size?.type === "fixed") return size.min ?? size.max ?? circle?.maxSize ?? 6;
+  if (size?.type === "range") return size.max ?? size.min ?? circle?.maxSize ?? 6;
+  if (size?.type === "max") return size.max ?? circle?.maxSize ?? 6;
   return circle?.maxSize ?? 6;
 }
 
 function fixedGroupSizeState(n: number): GroupSizeState {
-  return { ...DEFAULT_GROUP_SIZE, type: "fixed", fixedCount: n };
+  return { ...DEFAULT_GROUP_SIZE, type: "max", maxCount: n };
 }
 
 function FieldLabel(props: { children: React.ReactNode }) {

@@ -7,14 +7,14 @@ import {
   formatCircleLocationShort,
   formatCircleScheduleChip,
 } from "./circleDetailsFormat";
-import { formatGroupSizeSummary } from "./groupSize";
+import { circleMaxCount } from "./groupSize";
 
 export function CircleDetailsInformation(props: { circle: CircleResponse }) {
   const { t } = useTranslation();
   const { circle } = props;
-  const capacity = circle.groupSize
-    ? formatGroupSizeSummary(circle.groupSize, t)
-    : t("circleDetails.upToPeople", { count: circle.maxSize });
+  const capacity = t("groupSize.upTo", {
+    count: circle.groupSize ? circleMaxCount(circle.groupSize, circle.maxSize) : circle.maxSize,
+  });
   const rows = [
     {
       icon: "↻",

@@ -33,7 +33,7 @@ import {
 import {
   DEFAULT_GROUP_SIZE,
   formatGroupSizeSummary,
-  groupSizeStateFromPayload,
+  circleMaxGroupSizeState,
   toGroupSizePayload,
   validateGroupSize,
   type GroupSizeState,
@@ -205,7 +205,7 @@ export function CreateCircleWizard(props: {
 
   useEffect(() => {
     if (!selectedHoby) return;
-    setGroupSize(groupSizeStateFromPayload(selectedHoby.groupSize));
+    setGroupSize(circleMaxGroupSizeState(selectedHoby.groupSize));
     setGroupSizeError(null);
   }, [selectedHoby?.slug, selectedHoby?.groupSize]);
   const types = useMemo(() => parseHobyTypesNested(selectedHoby?.types), [selectedHoby]);
@@ -239,7 +239,7 @@ export function CreateCircleWizard(props: {
   const step5Complete = validateCostPayment(costPayment) === null;
   const groupSizePayload = useMemo(() => toGroupSizePayload(groupSize), [groupSize]);
   const costPaymentPayload = useMemo(() => toCostPaymentPayload(costPayment), [costPayment]);
-  const groupSizeSummary = useMemo(() => formatGroupSizeSummary(groupSizePayload), [groupSizePayload]);
+  const groupSizeSummary = useMemo(() => formatGroupSizeSummary(groupSizePayload, t), [groupSizePayload, t]);
   const costPaymentSummary = useMemo(
     () => formatCostPaymentSummary(costPaymentPayload, groupSize),
     [costPaymentPayload, groupSize],
@@ -546,6 +546,7 @@ export function CreateCircleWizard(props: {
           }}
           disabled={props.working}
           fieldError={groupSizeError}
+          maxOnly
         />
       ) : null}
 

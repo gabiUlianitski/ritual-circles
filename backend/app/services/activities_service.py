@@ -110,7 +110,7 @@ def _flags(
         canLeave=joinable and live and going,
         canEdit=can_edit and status in ("draft", "open", "confirmed"),
         canPublish=is_editor and status == "draft",
-        canConfirm=is_editor and status == "open" and not series,
+        canConfirm=is_editor and not can_edit and status == "open" and not series,
         canComplete=is_editor and status == "confirmed" and has_ended and not series,
         canCancel=is_editor and status in ("draft", "open", "confirmed"),
         canSuggest=live and not has_ended and not series,

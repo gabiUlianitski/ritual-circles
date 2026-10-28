@@ -73,6 +73,7 @@ export function dailyMoment(input: {
   const sameHobbyNear = catalog.filter(
     (c) =>
       !c.isYours &&
+      !c.isCreator &&
       slugKey(c.ritualType) === slugKey(featured.ritualType) &&
       isCircleJoinable(c.memberCount, c.maxSize) &&
       circleNearUser(c, input.city),

@@ -66,7 +66,7 @@ export function buildHomeFeed(input: {
     input.onlyCompleteHobbies === false
       ? catalog
       : catalog.filter((c) => c.isYours || completeSlugs.has(slugKey(c.ritualType)));
-  const joinable = listed.filter((c) => !c.isYours && isCircleJoinable(c.memberCount, c.maxSize));
+  const joinable = listed.filter((c) => !c.isYours && !c.isCreator && isCircleJoinable(c.memberCount, c.maxSize));
 
   const countBySlug = new Map<string, number>();
   for (const c of catalog) {

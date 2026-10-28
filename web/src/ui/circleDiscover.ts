@@ -116,7 +116,7 @@ export function getRecommendedCircles(
   limit = 5,
 ): CircleListItem[] {
   const candidates = circles.filter(
-    (c) => !c.isYours && circleIsJoinable(c.memberCount, c.maxSize),
+    (c) => !c.isYours && !c.isCreator && circleIsJoinable(c.memberCount, c.maxSize),
   );
   if (!candidates.length) return [];
 
@@ -134,7 +134,7 @@ export function getRecommendedCircles(
 
 export function getActiveCircles(circles: CircleListItem[], limit = 5): CircleListItem[] {
   return [...circles]
-    .filter((c) => !c.isYours && (c.messagesLastWeek ?? 0) > 0)
+    .filter((c) => !c.isYours && !c.isCreator && (c.messagesLastWeek ?? 0) > 0)
     .sort((a, b) => {
       const msg = (b.messagesLastWeek ?? 0) - (a.messagesLastWeek ?? 0);
       if (msg !== 0) return msg;
@@ -145,7 +145,7 @@ export function getActiveCircles(circles: CircleListItem[], limit = 5): CircleLi
 
 export function getNeedsMembersCircles(circles: CircleListItem[], limit = 5): CircleListItem[] {
   return [...circles]
-    .filter((c) => !c.isYours && c.memberCount < 4)
+    .filter((c) => !c.isYours && !c.isCreator && c.memberCount < 4)
     .sort((a, b) => a.memberCount - b.memberCount)
     .slice(0, limit);
 }
@@ -155,7 +155,7 @@ export function isHighActivity(circle: CircleListItem): boolean {
 }
 
 export function circleNeedsMembers(circle: CircleListItem): boolean {
-  return !circle.isYours && circle.memberCount < 4;
+  return !circle.isYours && !circle.isCreator && circle.memberCount < 4;
 }
 
 export function discoverBadgeEmoji(
@@ -386,7 +386,7 @@ export function getNearYouCircles(
 ): CircleListItem[] {
   if (!userHasLocationData(userCity)) return [];
   return [...circles]
-    .filter((c) => !c.isYours && locationClose(c, userCity))
+    .filter((c) => !c.isYours && !c.isCreator && locationClose(c, userCity))
     .sort((a, b) => b.memberCount - a.memberCount || a.ritualType.localeCompare(b.ritualType))
     .slice(0, limit);
 }
@@ -413,7 +413,7 @@ export function getAllDiscoverCircles(
   hobies?: Hoby[] | HobyInterestLookup,
 ): CircleListItem[] {
   return [...circles]
-    .filter((c) => !c.isYours && circleMatchesInterestCategory(c, interestCategory, hobies))
+    .filter((c) => !c.isYours && !c.isCreator && circleMatchesInterestCategory(c, interestCategory, hobies))
     .sort((a, b) => {
       const ta = nextActivityTime(a);
       const tb = nextActivityTime(b);

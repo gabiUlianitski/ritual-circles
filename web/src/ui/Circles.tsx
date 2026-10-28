@@ -196,6 +196,7 @@ export function Circles(props: {
       catalogSorted.filter(
         (c) =>
           !c.isYours &&
+          !c.isCreator &&
           (!hobbyListReady || completeHobbySlugs.has(c.ritualType.trim().toLowerCase())),
       ),
     [catalogSorted, completeHobbySlugs, hobbyListReady],
@@ -326,7 +327,7 @@ export function Circles(props: {
   }
 
   function openDetails(c: CircleListItem) {
-    if (c.isYours) {
+    if (c.isYours || c.isCreator) {
       setCatalogDetail(null);
       setDetailsCircleId(c.id);
       setShowDetails(true);
@@ -338,7 +339,7 @@ export function Circles(props: {
   }
 
   function joinActionFor(c: CircleListItem) {
-    if (c.isYours) return null;
+    if (c.isYours || c.isCreator) return null;
 
     const busy = joinBusyId !== null;
     const joining = joinBusyId === c.id;
@@ -503,7 +504,7 @@ export function Circles(props: {
           hobiesCatalog={hobies}
           memberCount={c.memberCount}
         />
-        {!c.isYours && joinAction ? (
+        {!c.isYours && !c.isCreator && joinAction ? (
           <CircleDetailsPrimaryAction
             isMember={false}
             joinLabel={joinAction.label === t("discoverPage.join") ? t("discoverPage.joinThisCircle") : joinAction.label}
@@ -512,10 +513,10 @@ export function Circles(props: {
             onJoin={joinAction.onJoin}
           />
         ) : null}
-        {!c.isYours && !joinAction && c.inviteOnly ? (
+        {!c.isYours && !c.isCreator && !joinAction && c.inviteOnly ? (
           <p className="muted">{t("discoverPage.invitationOnlyHint")}</p>
         ) : null}
-        {!c.isYours ? <CircleDetailsWhyJoin circle={c} hobiesCatalog={hobies} /> : null}
+        {!c.isYours && !c.isCreator ? <CircleDetailsWhyJoin circle={c} hobiesCatalog={hobies} /> : null}
 
         {error ? <FormError>{error}</FormError> : null}
       </div>

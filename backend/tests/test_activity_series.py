@@ -347,7 +347,7 @@ class RecurringLifecycleTests(RecurringDbCase):
         )
         opened = await publish_activity(self.conn, user_id=self.member_id, activity_id=UUID(created.id))
         self.assertEqual(opened.status, "open")
-        self.assertTrue(opened.actions.canConfirm)
+        self.assertFalse(opened.actions.canConfirm)
         self.assertEqual(opened.occurrences, [])
         with self.assertRaises(HTTPException):
             await complete_activity(self.conn, user_id=self.member_id, activity_id=UUID(created.id))

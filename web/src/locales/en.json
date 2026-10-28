@@ -744,7 +744,11 @@
     "descriptionFriendly": "Keep it short and friendly.",
     "descriptionExample": "We meet every Sunday morning for relaxed rides around Zurich.",
     "previewNameFallback": "Your Circle Name",
-    "previewDescriptionFallback": "Add a short description to help people understand your circle."
+    "previewDescriptionFallback": "Add a short description to help people understand your circle.",
+    "maxGroupTitle": "Maximum group size",
+    "maxGroupHelp": "The most people who get together. Anyone can still join the circle.",
+    "maxGroupPeople": "people",
+    "maxGroupTip": "Smaller groups (2–4 people) are easier for first meetings"
   },
   "createSuccess": {
     "kicker": "Circle Created",
@@ -1008,8 +1012,8 @@
     "information": "Circle information",
     "rhythm": "Rhythm",
     "format": "Format",
-    "groupSize": "Typical group size",
-    "typicalSizeValue": "Typical group size: {{count}}",
+    "groupSize": "Maximum group size",
+    "typicalSizeValue": "Maximum group size: {{count}}",
     "cost": "Cost",
     "access": "Access",
     "upToPeople": "{{count}}",

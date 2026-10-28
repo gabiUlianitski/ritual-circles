@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import type { GroupSizeState, GroupSizeType } from "./groupSize";
 
 type OptionProps = {
@@ -63,8 +64,42 @@ export function CreateCircleGroupSizeStep(props: {
   title?: string;
   helper?: string;
   showTip?: boolean;
+  /** Circle setup asks only for a maximum. Hobby setup can still describe a preferred size. */
+  maxOnly?: boolean;
 }) {
+  const { t } = useTranslation();
   const { value, onChange, disabled, fieldError } = props;
+  if (props.maxOnly) {
+    const title = props.title ?? t("createCircle.maxGroupTitle");
+    const helper = props.helper ?? t("createCircle.maxGroupHelp");
+    return (
+      <section className="create-circle-step stack" aria-labelledby="create-step-group-size">
+        <h2 id="create-step-group-size" className="create-circle-step-title">
+          {title}
+        </h2>
+        <p className="create-circle-helper muted">{helper}</p>
+        <div className="create-circle-group-size-option create-circle-group-size-option--selected">
+          <p className="create-circle-group-size-inline row">
+            <NumberField
+              value={value.maxCount}
+              disabled={disabled}
+              ariaLabel={t("createCircle.maxGroupTitle")}
+              onChange={(n) => onChange({ ...value, type: "max", maxCount: n })}
+            />
+            <span>{t("createCircle.maxGroupPeople")}</span>
+          </p>
+        </div>
+        {fieldError ? (
+          <p className="error" role="alert">
+            {fieldError}
+          </p>
+        ) : null}
+        {props.showTip !== false ? (
+          <p className="create-circle-helper muted create-circle-group-size-tip">{t("createCircle.maxGroupTip")}</p>
+        ) : null}
+      </section>
+    );
+  }
   const title = props.title ?? "Typical group size";
   const helper =
     props.helper ?? "A usual number of people for getting together. Anyone can still join the circle.";

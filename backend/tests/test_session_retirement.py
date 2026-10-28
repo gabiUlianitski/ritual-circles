@@ -114,6 +114,28 @@ class SessionRetirementTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(await self._is_member(self.joiner_id, circle.id))
         self.assertEqual(await self._legacy_counts(), before)
 
+    async def test_creator_cannot_join_own_circle(self) -> None:
+        circle = await self._create()
+        before = await self.conn.fetchval(
+            "SELECT COUNT(*)::int FROM circle_members WHERE circle_id = $1 AND status = 'active'",
+            UUID(circle.id),
+        )
+        with self.assertRaises(HTTPException) as by_invite:
+            await join_circle(self.conn, user_id=self.creator_id, invite_code=circle.inviteCode)
+        self.assertEqual(by_invite.exception.status_code, 403)
+        with self.assertRaises(HTTPException) as by_search:
+            await join_circle_open(self.conn, user_id=self.creator_id, circle_id=UUID(circle.id))
+        self.assertEqual(by_search.exception.status_code, 403)
+        after = await self.conn.fetchval(
+            "SELECT COUNT(*)::int FROM circle_members WHERE circle_id = $1 AND status = 'active'",
+            UUID(circle.id),
+        )
+        self.assertEqual(after, before)
+        listed = await list_circles_catalog(self.conn, user_id=self.creator_id)
+        own = next(item for item in listed if item["id"] == circle.id)
+        self.assertTrue(own["isCreator"])
+        self.assertTrue(own["isYours"])
+
     async def test_b_open_join_without_any_session(self) -> None:
         circle = await self._create()
         before = await self._legacy_counts()

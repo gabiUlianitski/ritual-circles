@@ -367,6 +367,8 @@ async def join_circle(conn: asyncpg.Connection, *, user_id: UUID, invite_code: s
         )
         if not circle:
             raise HTTPException(status_code=404, detail="circle not found")
+        if circle["created_by"] == user_id:
+            raise HTTPException(status_code=403, detail="You created this circle")
 
         await _complete_join_transaction(conn, user_id=user_id, circle=circle)
 
@@ -391,6 +393,8 @@ async def join_circle_open(conn: asyncpg.Connection, *, user_id: UUID, circle_id
                 status_code=403,
                 detail="This circle is invite-only. Ask the organizer to invite you.",
             )
+        if circle["created_by"] == user_id:
+            raise HTTPException(status_code=403, detail="You created this circle")
 
         await _complete_join_transaction(conn, user_id=user_id, circle=circle)
 

@@ -83,6 +83,7 @@ export function discoverNewInterests(input: {
       const available = input.circles.filter(
         (circle) =>
           !circle.isYours &&
+          !circle.isCreator &&
           key(circle.ritualType) === slug &&
           isCircleJoinable(circle.memberCount, circle.maxSize),
       );
