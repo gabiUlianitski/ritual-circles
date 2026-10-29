@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any
 
 from app.services.google_places import geocode_address, place_to_candidate, places_text_search
@@ -15,7 +16,7 @@ from app.services.osm_venues import (
     overpass_venues_near,
     tennis_surface_request_bucket,
 )
-from app.services.venue_display import venue_card_fields
+from app.services.venue_display import place_category_from_label, place_category_from_tags, venue_card_fields
 from app.services.venue_hoby_blurb import google_hoby_relation, osm_hoby_relation
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,23 @@ _GEOCODE_TIMEOUT_S = 10.0
 _OSM_GATHER_TIMEOUT_S = 20.0
 _OSM_TOTAL_TIMEOUT_S = 28.0
 _NOMINATIM_ONLY_TIMEOUT_S = 12.0
+
+# Hobby venues in a city change slowly. Keep the normalized cards for 18 h.
+# Level is not part of the key: it only adds a beginner sentence to a tennis blurb,
+# and does not change which places are returned.
+_VENUE_CACHE_TTL_S = 18 * 3600.0
+_VENUE_CACHE: dict[tuple[str, str, str, str], tuple[float, tuple[list[dict[str, Any]], str | None, float | None, float | None]]] = {}
+
+
+def _venue_cache_key(
+    address: str,
+    ritual_type: str,
+    ritual_subtype: str | None,
+    country_code: str | None,
+) -> tuple[str, str, str, str]:
+    city = " ".join(address.strip().casefold().split())
+    subtype = " ".join((ritual_subtype or "").strip().casefold().split())
+    return ((country_code or "").strip().upper(), city, ritual_type.strip().casefold(), subtype)
 
 
 def _candidate_pos_key(c: dict[str, Any]) -> tuple:
@@ -583,6 +601,9 @@ async def _finalize_candidates(
                 "hobyRelation": hr,
                 "mapsUrl": c.get("mapsUrl"),
                 **card,
+                "placeCategory": place_category_from_tags(tags_fb)
+                if tags_fb
+                else place_category_from_label(card["category"]),
                 "lat": lat,
                 "lon": lon,
             }
@@ -817,11 +838,37 @@ async def suggest_venues_near_address(
     ritual_type: str,
     ritual_subtype: str | None = None,
     ritual_level: int | None = None,
+    country_code: str | None = None,
 ) -> tuple[list[dict[str, Any]], str | None, float | None, float | None]:
     """
     Returns venues, geocoded label, and optional map center (lat, lon).
     Uses Google Maps when configured; otherwise Nominatim + Overpass (OpenStreetMap).
+    Non-empty normalized cards are cached for 18 h by country, city, Hobby and Hobby Type.
+    Empty results and provider errors are not cached.
     """
+    key = _venue_cache_key(address, ritual_type, ritual_subtype, country_code)
+    cached = _VENUE_CACHE.get(key)
+    if cached and cached[0] > time.monotonic():
+        venues, near, lat, lon = cached[1]
+        return [dict(v) for v in venues], near, lat, lon
+    result = await _suggest_venues_uncached(
+        address=address,
+        ritual_type=ritual_type,
+        ritual_subtype=ritual_subtype,
+        ritual_level=ritual_level,
+    )
+    if result[0]:
+        _VENUE_CACHE[key] = (time.monotonic() + _VENUE_CACHE_TTL_S, result)
+    return result
+
+
+async def _suggest_venues_uncached(
+    *,
+    address: str,
+    ritual_type: str,
+    ritual_subtype: str | None,
+    ritual_level: int | None,
+) -> tuple[list[dict[str, Any]], str | None, float | None, float | None]:
     cfg = load_google_maps_config()
     if cfg:
         try:

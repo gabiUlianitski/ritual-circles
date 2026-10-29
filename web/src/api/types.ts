@@ -147,6 +147,8 @@ export type ActivityDefaults = {
   locationName: string | null;
   locationAddress: string | null;
   preferredGroupSize: number;
+  /** Circle city used to scope a place search. Not a venue. */
+  cityName?: string | null;
 };
 
 export type ActivityCreatePayload = {
@@ -347,6 +349,7 @@ export type VenueSuggestionItem = {
   distanceLabel?: string | null;
   distanceKm?: number | null;
   hint?: string | null;
+  placeCategory?: PlaceCategory;
   lat?: number | null;
   lon?: number | null;
 };
@@ -365,6 +368,23 @@ export type CitySuggestItem = {
   lat?: number | null;
   lon?: number | null;
   countryCode?: string | null;
+};
+
+/** Categories are assigned by the backend; unknown values render as a generic pin. */
+export type PlaceCategory = "sports" | "park" | "cafe" | "community" | "transit" | "generic";
+
+/** GET /geo/place-suggest — one normalized place inside the selected city. */
+export type PlaceSuggestion = {
+  kind: "place";
+  category: PlaceCategory;
+  name: string;
+  cityName?: string | null;
+  countryCode?: string | null;
+  countryName?: string | null;
+  shortAddress?: string | null;
+  fullAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 /** GET /geo/reverse-locate — browser coords → country + locality hints (Nominatim). */

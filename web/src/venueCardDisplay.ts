@@ -1,5 +1,36 @@
-import type { VenueSuggestionItem } from "./api/types";
+import type { PlaceCategory, PlaceSuggestion, VenueSuggestionItem } from "./api/types";
 import { isGenericPlaceName, placeNameFromMapsUrl } from "./parseCustomPlaceInput";
+
+/** One preferred place, whether it came from search or from the hobby suggestions. */
+export type SelectedPlace = {
+  name: string;
+  address: string;
+  category: PlaceCategory;
+  cityName: string;
+};
+
+export function placeFromSuggestion(p: PlaceSuggestion): SelectedPlace {
+  return {
+    name: p.name.trim(),
+    address: (p.fullAddress || p.shortAddress || "").trim(),
+    category: p.category ?? "generic",
+    cityName: p.cityName?.trim() ?? "",
+  };
+}
+
+export function placeFromVenue(v: VenueSuggestionItem, cityName: string): SelectedPlace {
+  return {
+    name: (v.displayName || v.name).trim(),
+    address: v.address?.trim() ?? "",
+    category: v.placeCategory ?? "generic",
+    cityName,
+  };
+}
+
+/** Stored as `<place name> — <address>`, or only the name when there is no address. */
+export function meetingPlaceFromPlace(place: SelectedPlace): string {
+  return [place.name, place.address].filter(Boolean).join(" — ");
+}
 
 export type VenueCardView = {
   displayName: string;

@@ -344,6 +344,7 @@ async def get_activity_defaults(
         locationName=defaults.location_name,
         locationAddress=defaults.location_address,
         preferredGroupSize=defaults.group_size,
+        cityName=_text(circle["city_name"]) or _text(circle["city"]),
     )
 
 

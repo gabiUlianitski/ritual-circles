@@ -66,6 +66,8 @@ export function CircleDetails(props: {
   initialDraft?: string;
   /** Opens this Activity first; going back from it returns to the caller. */
   initialActivityId?: string;
+  /** The activity was opened from the activities list. Back returns there. */
+  returnToActivities?: boolean;
   /** With initialActivityId: the one date of a recurring Activity to bring into view. */
   initialOccurrenceId?: string | null;
   onLeftCircle?: () => void | Promise<void>;
@@ -223,6 +225,9 @@ export function CircleDetails(props: {
           myUserId={myUserId}
           ownerId={creatorUserId}
           focusOccurrenceId={activityId === props.initialActivityId ? props.initialOccurrenceId : null}
+          backToActivities={Boolean(
+            props.returnToActivities && props.initialActivityId && activityId === props.initialActivityId,
+          )}
           onBack={() => {
             if (props.initialActivityId && activityId === props.initialActivityId) {
               props.onBack();

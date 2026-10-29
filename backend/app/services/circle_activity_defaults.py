@@ -36,7 +36,11 @@ def activity_location_defaults(
     city: object,
     city_name: object,
 ) -> tuple[str | None, str | None]:
-    """Return (location_name, location_address). A city name is never the address."""
+    """Return (location_name, location_address).
+
+    A preferred meeting place becomes the Activity's own snapshot.
+    The Circle city is search context only, never a venue name or an address.
+    """
     stored = _text(meeting_place)
     place_name: str | None = None
     address: str | None = None
@@ -51,7 +55,7 @@ def activity_location_defaults(
             place_name = stored
     if place_name:
         return place_name, address
-    return _text(city_name) or _text(city), None
+    return None, None
 
 
 def get_preferred_activity_size(group_size_json: object, max_size: int | None) -> int:

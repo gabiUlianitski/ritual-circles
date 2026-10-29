@@ -89,6 +89,7 @@ export function ActivityPage(props: {
         circleId={detailsCircleId}
         initialTab={detailsInitialTab}
         initialActivityId={detailsActivityId ?? undefined}
+        returnToActivities
         onBack={closeDetails}
         onLeftCircle={async () => {
           await props.onRefresh();

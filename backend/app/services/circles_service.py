@@ -34,9 +34,10 @@ def _meeting_line_from_row(row: asyncpg.Record | dict[str, object]) -> str:
     mp = row.get("meeting_place") or row.get("meetingPlace")
     if mp is not None and str(mp).strip():
         return str(mp).strip()
-    c = row.get("city")
-    if c is not None and str(c).strip():
-        return str(c).strip()
+    for key in ("city", "city_name", "cityName"):
+        c = row.get(key)
+        if c is not None and str(c).strip():
+            return str(c).strip()
     return ""
 
 
@@ -248,21 +249,18 @@ async def _join_circle_response(conn: asyncpg.Connection, circle: asyncpg.Record
 async def create_circle(
     conn: asyncpg.Connection, *, user_id: UUID, payload: CircleCreateRequest, lang: str = "en"
 ) -> CircleResponse:
-    line = ""
-    if payload.meetingPlace and str(payload.meetingPlace).strip():
-        line = str(payload.meetingPlace).strip()
-    elif payload.city and str(payload.city).strip():
-        line = str(payload.city).strip()
+    offline = payload.modality == "offline"
+    cc = _norm_country_code(payload.countryCode) if offline else None
+    cn = _norm_label(payload.cityName) if offline else None
+    # The preferred meeting place is optional; older clients send only `city`, which stays the place line.
+    mp = (_optional_text(payload.meetingPlace) or (None if cn else _optional_text(payload.city))) if offline else None
 
-    if payload.modality == "offline" and not line:
+    if offline and not (mp or cn):
         raise HTTPException(
             status_code=400,
-            detail="meeting place required for offline circles (meetingPlace or city)",
+            detail="city required for offline circles (cityName, meetingPlace or city)",
         )
-
-    cc = _norm_country_code(payload.countryCode) if payload.modality == "offline" else None
-    cn = _norm_label(payload.cityName) if payload.modality == "offline" else None
-    mp = line if payload.modality == "offline" else None
+    line = mp or cn
 
     exists = await conn.fetchrow("SELECT 1 FROM users WHERE id = $1", user_id)
     if not exists:
@@ -335,7 +333,7 @@ async def create_circle(
         ritualType=payload.ritualType,
         modality=payload.modality,
         recurringTime=payload.recurringTime,
-        city=line if payload.modality == "offline" else None,
+        city=line if offline else None,
         countryCode=cc,
         cityName=cn,
         meetingPlace=mp,

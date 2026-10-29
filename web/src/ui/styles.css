@@ -7831,23 +7831,13 @@ button.create-review-edit:focus-visible {
   font-size: 0.92em;
 }
 
-.create-venue-guided {
-  overflow-x: clip;
-  gap: 18px;
-}
-
-.create-venue-guided-subtitle {
-  margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.45;
-}
-
 .create-venue-city-pill {
   display: flex;
   align-items: center;
   gap: 10px;
   min-height: 56px;
-  padding: 10px 12px 10px 16px;
+  padding-block: 10px;
+  padding-inline: 16px 12px;
   border-radius: 999px;
   border: 1px solid rgba(126, 182, 255, 0.55);
   background: rgba(91, 141, 239, 0.14);
@@ -7857,159 +7847,344 @@ button.create-review-edit:focus-visible {
   font-size: 1.05rem;
   font-weight: 700;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 button.create-venue-city-change {
   width: auto;
-  margin: 0 0 0 auto;
-  min-height: 40px;
+  margin: 0;
+  margin-inline-start: auto;
+  min-height: 44px;
   padding: 8px 14px;
   border-radius: 999px;
   box-shadow: none;
 }
 
-.create-venue-assist {
-  gap: 10px;
-}
-
-button.create-venue-assist-btn {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  width: 100%;
-  min-height: 56px;
-  margin: 0;
-  padding: 14px 16px;
-  border-radius: 16px;
-  text-align: start;
-  font-size: 1rem;
-  box-shadow: none;
-}
-
-button.create-venue-assist-btn:focus-visible,
-button.create-venue-guided-select:focus-visible,
-button.create-venue-city-change:focus-visible,
-a.create-venue-map-link:focus-visible {
+button.create-venue-city-change:focus-visible {
   outline: 2px solid rgba(126, 182, 255, 0.95);
   outline-offset: 3px;
 }
 
-.create-venue-guided-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
+/* —— Create Circle: location step (city + optional preferred place) —— */
+.create-location-step {
+  position: relative;
+  z-index: 5;
+  gap: 20px;
+  overflow: visible;
+}
+
+.create-location-block {
   gap: 10px;
 }
 
-.create-venue-guided-card {
+.create-location-helper {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.create-location-label {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.create-location-place-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.create-location-optional {
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 182, 255, 0.4);
+  background: rgba(91, 141, 239, 0.12);
+  color: #c7dbff;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.create-location-city-icon,
+.place-category-icon {
+  flex: 0 0 auto;
+  color: #9ec1ff;
+}
+
+.place-ac {
+  position: relative;
+  z-index: 6;
+}
+
+.place-ac-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.place-ac-search-icon {
+  position: absolute;
+  inset-inline-start: 14px;
+  color: var(--muted, #9aa8b8);
+  pointer-events: none;
+}
+
+input.place-ac-input {
+  width: 100%;
+  min-height: 52px;
+  margin: 0;
+  padding-block: 12px;
+  padding-inline: 42px 46px;
+  border-radius: 14px;
+  font-size: 1rem;
+}
+
+input.place-ac-input:focus-visible {
+  outline: 2px solid rgba(126, 182, 255, 0.95);
+  outline-offset: 2px;
+}
+
+button.place-ac-clear {
+  position: absolute;
+  inset-inline-end: 4px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted, #9aa8b8);
+  box-shadow: none;
+}
+
+button.place-ac-clear:focus-visible {
+  outline: 2px solid rgba(126, 182, 255, 0.95);
+  outline-offset: 0;
+}
+
+.place-ac-list {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  max-height: min(360px, 55vh);
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+  background: #142238;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
+}
+
+.place-ac-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.place-ac-option.is-active,
+.place-ac-option:hover {
+  background: rgba(91, 141, 239, 0.18);
+}
+
+.place-ac-option-icon,
+.create-location-top-icon,
+.create-location-selected-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(91, 141, 239, 0.14);
+}
+
+.place-ac-option-text,
+.create-location-top-text,
+.create-location-selected-text {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-  width: 100%;
-  padding: 6px 8px 10px;
-  border-radius: 16px;
-  border: 1px solid var(--card-border);
-  background: rgba(255, 255, 255, 0.03);
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
-.create-venue-guided-card.is-selected {
-  border-color: rgba(126, 182, 255, 0.9);
-  background: rgba(91, 141, 239, 0.16);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(126, 182, 255, 0.35);
+.place-ac-option-name,
+.create-location-top-name,
+.create-location-selected-name {
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
-button.create-venue-guided-select {
+.place-ac-option-city,
+.create-location-top-city,
+.create-location-selected-city {
+  font-size: 0.88rem;
+  color: var(--muted, #9aa8b8);
+  overflow-wrap: anywhere;
+}
+
+.place-ac-option-category,
+.create-location-top-chip {
+  flex: 0 0 auto;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #c7dbff;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.place-ac-hint {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  color: var(--muted, #9aa8b8);
+  font-size: 0.92rem;
+}
+
+.place-ac-hint-title {
+  color: inherit;
+  font-weight: 650;
+}
+
+.create-location-top {
+  gap: 8px;
+}
+
+.create-location-top-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.create-location-top-title {
+  font-weight: 700;
+}
+
+.create-location-top-count,
+.create-location-top-loading {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.create-location-top-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+button.create-location-top-card {
+  display: flex;
+  align-items: center;
   gap: 12px;
   width: 100%;
-  min-height: 76px;
+  min-height: 60px;
   margin: 0;
-  padding: 10px 8px;
-  border: 0;
-  border-radius: 12px;
-  background: transparent;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.03);
   color: inherit;
   text-align: start;
   box-shadow: none;
 }
 
-.create-venue-guided-check {
-  flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  font-size: 1rem;
+button.create-location-top-card:hover {
+  border-color: rgba(126, 182, 255, 0.6);
+  background: rgba(91, 141, 239, 0.1);
 }
 
-.create-venue-guided-card.is-selected .create-venue-guided-check {
-  background: #3b82f6;
-  color: #fff;
-  font-weight: 800;
+button.create-location-top-card:focus-visible,
+button.create-location-action:focus-visible {
+  outline: 2px solid rgba(126, 182, 255, 0.95);
+  outline-offset: 2px;
 }
 
-.create-venue-guided-body {
+.create-location-selected {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(126, 182, 255, 0.9);
+  background: rgba(91, 141, 239, 0.16);
+}
+
+.create-location-selected-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.create-location-details {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.create-venue-guided-name {
-  font-size: 1.02rem;
-  font-weight: 750;
-  line-height: 1.3;
-}
-
-.create-venue-guided-category,
-.create-venue-guided-area {
-  font-size: 0.9rem;
-  line-height: 1.35;
-  color: var(--muted, #9aa8b8);
-}
-
-.create-venue-guided-distance {
-  flex: 0 0 auto;
-  font-size: 0.85rem;
-  font-weight: 650;
-  color: #d5e4ff;
-}
-
-a.create-venue-map-link {
-  align-self: flex-start;
-  margin-inline-start: 48px;
-  color: #9ec1ff;
-  font-weight: 700;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.18);
   font-size: 0.92rem;
-  text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
-.create-venue-guided-empty {
+.create-location-details-name {
+  font-weight: 650;
+}
+
+.create-location-selected-actions {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.create-venue-guided-empty p {
+button.create-location-action {
+  width: auto;
+  min-height: 44px;
   margin: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+button.create-location-keep {
+  align-self: flex-start;
+  min-height: 44px;
+}
+
+.create-location-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(126, 182, 255, 0.28);
+  background: rgba(91, 141, 239, 0.08);
+  color: #d5e4ff;
+  font-size: 0.92rem;
   line-height: 1.45;
 }
 
-.create-venue-guided .create-venue-manual-row {
-  flex-wrap: wrap;
-}
-
-.create-venue-guided .create-venue-maps-open-btn {
-  width: 100%;
-  min-height: 48px;
+.create-location-note svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: #9ec1ff;
 }
 
 @keyframes create-venue-shimmer {
@@ -13344,6 +13519,31 @@ button.circle-details-person--invite:hover {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.activity-location-section {
+  position: relative;
+  z-index: 3;
+  overflow: visible;
+}
+
+.activity-location-city {
+  margin: 0;
+  font-weight: 700;
+}
+
+.activity-location-origin {
+  font-size: 0.85rem;
+}
+
+button.activity-location-manual-link {
+  align-self: flex-start;
+  width: auto;
+  min-height: 44px;
+  margin: 0;
+  padding-block: 10px;
+  padding-inline: 0;
+  box-shadow: none;
 }
 
 .activity-form-section legend,

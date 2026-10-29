@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
-import type { CircleResponse, CitySuggestItem, CountryItem, Hoby, VenueSuggestionItem } from "../api/types";
+import type { CircleResponse, CitySuggestItem, Hoby } from "../api/types";
 import {
   isSubcategoryAny,
   levelsForSelectedType,
@@ -11,7 +11,7 @@ import {
 } from "./hobyMetadata";
 import { parseHobyLevelKey } from "./hobyLevelKey";
 import { FormError } from "./FormError";
-import { CreateCircleVenuePicker } from "./CreateCircleVenuePicker";
+import { CreateCircleLocationStep } from "./CreateCircleLocationStep";
 import {
   defaultMeetDateIso,
   formatScheduleSummary,
@@ -21,7 +21,7 @@ import {
 } from "./createCircleSchedule";
 import { formatHourOnlyDisplay } from "./HourOnlyPicker";
 import { MeetDateTimePicker } from "./MeetDateTimePicker";
-import { meetingPlaceReviewParts, meetingPlaceValue } from "../venueCardDisplay";
+import { meetingPlaceFromPlace, type SelectedPlace } from "../venueCardDisplay";
 import { CreateCircleCostPaymentStep } from "./CreateCircleCostPaymentStep";
 import {
   DEFAULT_COST_PAYMENT,
@@ -39,7 +39,6 @@ import {
   type GroupSizeState,
 } from "./groupSize";
 import { CreateCircleGroupSizeStep } from "./CreateCircleGroupSizeStep";
-import { geolocationUserMessage } from "../geolocationMessage";
 import { CIRCLE_DESCRIPTION_MAX, CIRCLE_NAME_MAX, type CircleIdentityFields } from "./circleDisplay";
 import { circleNameIsValid, circleNamePayload } from "./CircleNameField";
 import { circleDescriptionIsValid, circleDescriptionPayload } from "./CircleDescriptionField";
@@ -154,11 +153,8 @@ export function CreateCircleWizard(props: {
   const [cityQuery, setCityQuery] = useState("");
   const [citySelected, setCitySelected] = useState("");
   const [countryCode, setCountryCode] = useState("");
-  const [countries, setCountries] = useState<CountryItem[]>([]);
-  const [meetingPlace, setMeetingPlace] = useState("");
-  const [selectedVenueKey, setSelectedVenueKey] = useState<string | null>(null);
-  const [locateBusy, setLocateBusy] = useState(false);
-  const [venueSearchNonce, setVenueSearchNonce] = useState(0);
+  const [cityCenter, setCityCenter] = useState<{ lat: number | null; lon: number | null }>({ lat: null, lon: null });
+  const [place, setPlace] = useState<SelectedPlace | null>(null);
   const [groupSize, setGroupSize] = useState<GroupSizeState>(DEFAULT_GROUP_SIZE);
   const [groupSizeError, setGroupSizeError] = useState<string | null>(null);
   const [costPayment, setCostPayment] = useState<CostPaymentState>(DEFAULT_COST_PAYMENT);
@@ -170,11 +166,6 @@ export function CreateCircleWizard(props: {
   const [createLocked, setCreateLocked] = useState(false);
   const creatingRef = useRef(false);
 
-  const clearMeetingPlace = useCallback(() => {
-    setMeetingPlace("");
-    setSelectedVenueKey(null);
-  }, []);
-
   useEffect(() => {
     void (async () => {
       try {
@@ -184,21 +175,6 @@ export function CreateCircleWizard(props: {
         /* allow free-text fallback if catalog missing */
       }
     })();
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const rows = await api.getCountries();
-        if (!cancelled) setCountries(Array.isArray(rows) ? rows : []);
-      } catch {
-        if (!cancelled) setCountries([]);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   const selectedHoby = useMemo(() => hobies.find((h) => h.slug === hobySlug) ?? null, [hobies, hobySlug]);
@@ -233,7 +209,8 @@ export function CreateCircleWizard(props: {
 
   const minMeetDate = useMemo(() => todayIsoLocal(), []);
 
-  const step2Complete = Boolean(citySelected.trim() && meetingPlace.trim());
+  // City is required; the preferred meeting place is optional.
+  const step2Complete = Boolean(citySelected.trim());
   const step3Complete = Boolean(meetDate && meetHour !== "" && isMeetDateOnOrAfterToday(meetDate));
   const step4Complete = validateGroupSize(groupSize) === null;
   const step5Complete = validateCostPayment(costPayment) === null;
@@ -244,11 +221,6 @@ export function CreateCircleWizard(props: {
     () => formatCostPaymentSummary(costPaymentPayload, groupSize),
     [costPaymentPayload, groupSize],
   );
-  const meetingPlaceReview = useMemo(
-    () => meetingPlaceReviewParts(meetingPlace),
-    [meetingPlace],
-  );
-
   const hobbySummaryName = selectedHoby?.displayName ?? hobySlug.trim();
   const typeSummaryName =
     hobySubtype && !isSubcategoryAny(hobySubtype) ? subtypeLabel : "";
@@ -265,64 +237,29 @@ export function CreateCircleWizard(props: {
     hobyDisplayName: selectedHoby?.displayName?.trim() || hobySlug.trim(),
     hobyIcon: selectedHoby?.icon ?? null,
   };
-  const placeLine = [citySummaryName, meetingPlaceReview.placeName].filter(Boolean).join(" · ");
+  const placeLine = [citySummaryName, place?.name ?? ""].filter(Boolean).join(" · ");
+  const suggestionLabel = typeSummaryName || hobbySummaryName;
 
   function onCityQueryChange(q: string) {
     setCityQuery(q);
     setCitySelected("");
-    clearMeetingPlace();
-  }
-
-  function bumpVenueSearch() {
-    setVenueSearchNonce((n) => n + 1);
+    setPlace(null);
   }
 
   function onCitySelect(item: CitySuggestItem) {
     const display = item.displayName.trim() || item.shortName.trim();
     setCityQuery(item.shortName.trim() || display);
     setCitySelected(display);
+    setCityCenter({ lat: item.lat ?? null, lon: item.lon ?? null });
     const cc = item.countryCode?.trim().toUpperCase();
     if (cc && cc.length === 2) setCountryCode(cc);
-    clearMeetingPlace();
+    setPlace(null);
     setError(null);
-    bumpVenueSearch();
   }
 
-  function onSelectVenue(venue: VenueSuggestionItem, key: string) {
-    setSelectedVenueKey(key);
-    setMeetingPlace(meetingPlaceValue(venue));
+  function onPlaceChange(next: SelectedPlace | null) {
+    setPlace(next);
     setError(null);
-    window.setTimeout(() => {
-      navRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }, 80);
-  }
-
-  async function fillFromBrowserLocation() {
-    if (!window.isSecureContext) {
-      throw new Error("Location only works on HTTPS or localhost. Pick a city from the list instead.");
-    }
-    if (!navigator.geolocation) {
-      throw new Error("Location not available in this browser. Pick a city from the list instead.");
-    }
-    const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: false,
-        maximumAge: 300_000,
-        timeout: 15_000,
-      });
-    });
-    const r = await api.reverseLocate({ lat: pos.coords.latitude, lon: pos.coords.longitude });
-    const cc =
-      countries.find((c) => c.code === r.countryCode)?.code ??
-      countries.find((c) => c.code.toLowerCase() === r.countryCode.toLowerCase())?.code ??
-      r.countryCode;
-    if (cc) setCountryCode(cc);
-    const display = (r.displayName ?? "").trim() || r.cityShortName;
-    setCityQuery(r.cityShortName);
-    setCitySelected(display);
-    clearMeetingPlace();
-    setError(null);
-    bumpVenueSearch();
   }
 
   function onActivityChange(slug: string) {
@@ -347,7 +284,7 @@ export function CreateCircleWizard(props: {
       return;
     }
     if (step === 2 && !step2Complete) {
-      setError("Pick a city and meeting place.");
+      setError(t("createCircle.cityRequired"));
       return;
     }
     if (step === 3 && !step3Complete) {
@@ -425,7 +362,7 @@ export function CreateCircleWizard(props: {
         isRecurring: repeatsWeekly,
         countryCode: countryCode.trim() || null,
         cityName: citySelected.trim() || null,
-        meetingPlace: meetingPlace.trim(),
+        meetingPlace: place ? meetingPlaceFromPlace(place) : null,
         name: circleNamePayload(circleName),
         description: circleDescriptionPayload(circleDescription),
         inviteOnly: !openCircle,
@@ -477,35 +414,22 @@ export function CreateCircleWizard(props: {
       ) : null}
 
       {step === 2 ? (
-        <CreateCircleVenuePicker
+        <CreateCircleLocationStep
           cityQuery={cityQuery}
           citySelected={citySelected}
+          cityShortName={citySummaryName}
+          countryCode={countryCode}
+          cityLat={cityCenter.lat}
+          cityLon={cityCenter.lon}
           onCityQueryChange={onCityQueryChange}
           onCitySelect={onCitySelect}
+          place={place}
+          onPlaceChange={onPlaceChange}
           ritualType={hobySlug}
           ritualSubtype={isSubcategoryAny(hobySubtype) ? "" : hobySubtype}
           ritualLevel={parseHobyLevelKey(hobyLevel)}
-          venueSearchNonce={venueSearchNonce}
-          locateBusy={locateBusy}
-          onUseLocation={async () => {
-            setLocateBusy(true);
-            setError(null);
-            try {
-              await fillFromBrowserLocation();
-            } catch (e) {
-              const message = geolocationUserMessage(e);
-              setError(message);
-              throw new Error(message);
-            } finally {
-              setLocateBusy(false);
-            }
-          }}
-          meetingPlace={meetingPlace}
-          selectedKey={selectedVenueKey}
-          onSelectVenue={onSelectVenue}
-          onClearMeetingPlace={clearMeetingPlace}
+          suggestionLabel={suggestionLabel}
           disabled={props.working}
-          guided
         />
       ) : null}
 

@@ -9,6 +9,7 @@ import { circleDisplayTitle, discoverSubtitleParts } from "./circleDisplay";
 import { defaultMeetDateIso } from "./calendarMonth";
 import { FormError } from "./FormError";
 import {
+  initialActivityLocation,
   activityPayload,
   activityIssues,
   weekdayCodeFromDate,
@@ -41,6 +42,9 @@ export function CreateActivity(props: {
   const [weekday, setWeekday] = useState<WeekdayCode>(() => weekdayCodeFromDate(defaultMeetDateIso()));
   const [locationName, setLocationName] = useState("");
   const [locationAddress, setLocationAddress] = useState("");
+  const [circleCity, setCircleCity] = useState("");
+  const [countryCode, setCountryCode] = useState("");
+  const [locationFromCircle, setLocationFromCircle] = useState(false);
   const [groupSize, setGroupSize] = useState<number | null>(null);
   const [minParticipants, setMinParticipants] = useState<number | null>(null);
   const [cost, setCost] = useState<ActivityDraft["cost"]>("free");
@@ -55,14 +59,33 @@ export function CreateActivity(props: {
       .getActivityDefaults(props.circleId)
       .then((defaults) => {
         if (cancelled) return;
-        setLocationName(defaults.locationName?.trim() ?? "");
-        setLocationAddress(defaults.locationAddress?.trim() ?? "");
+        const place = initialActivityLocation({
+          locationName: defaults.locationName,
+          locationAddress: defaults.locationAddress,
+          cityName: defaults.cityName || props.circle.cityName,
+          meetingPlace: props.circle.meetingPlace,
+        });
+        setLocationName(place.name);
+        setLocationAddress(place.address);
+        setLocationFromCircle(place.inherited);
+        setCircleCity((defaults.cityName || props.circle.cityName || "").split(",")[0]?.trim() ?? "");
+        setCountryCode(props.circle.countryCode?.trim() ?? "");
         const size = defaults.preferredGroupSize;
         setGroupSize(Number.isInteger(size) && size > 0 ? size : null);
         setMinParticipants(Number.isInteger(size) && size > 0 ? size : null);
       })
       .catch(() => {
-        if (!cancelled) setDefaultsFailed(true);
+        if (cancelled) return;
+        setDefaultsFailed(true);
+        const place = initialActivityLocation({
+          cityName: props.circle.cityName,
+          meetingPlace: props.circle.meetingPlace,
+        });
+        setLocationName(place.name);
+        setLocationAddress(place.address);
+        setLocationFromCircle(place.inherited);
+        setCircleCity(props.circle.cityName?.split(",")[0]?.trim() ?? "");
+        setCountryCode(props.circle.countryCode?.trim() ?? "");
       })
       .finally(() => {
         if (!cancelled) setLoadingDefaults(false);
@@ -189,6 +212,9 @@ export function CreateActivity(props: {
             submitting={submitting}
             submitLabel={t("activityDetails.publish")}
             submittingLabel={t("activityDetails.publishing")}
+            circleCity={circleCity}
+            countryCode={countryCode}
+            locationFromCircle={locationFromCircle}
             secondaryLabel={t("activityDetails.saveDraft")}
             onSecondary={() => void save(false)}
           />

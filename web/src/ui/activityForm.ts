@@ -1,4 +1,5 @@
 import type { Activity, ActivityCreatePayload } from "../api/types";
+import { splitMeetingPlace } from "../venueCardDisplay";
 import { COST_CURRENCIES, type CostCurrency } from "./circlePayment";
 import { snapTimeValue } from "./quarterHourTime";
 
@@ -75,6 +76,26 @@ export function parsePrice(raw: string): string | null {
   const text = raw.trim().replace(",", ".");
   if (!/^\d+(\.\d{1,2})?$/.test(text)) return null;
   return Number(text).toFixed(2);
+}
+
+/** Starting place for a new Activity. The Circle city is search context, never the venue. */
+export function initialActivityLocation(source: {
+  locationName?: string | null;
+  locationAddress?: string | null;
+  cityName?: string | null;
+  meetingPlace?: string | null;
+}): { name: string; address: string; inherited: boolean } {
+  const city = (source.cityName ?? "").split(",")[0]?.trim() ?? "";
+  const stored = splitMeetingPlace(source.meetingPlace ?? "");
+  let name = source.locationName?.trim() ?? "";
+  let address = source.locationAddress?.trim() ?? "";
+  if (!name && stored.name) {
+    name = stored.name;
+    address = stored.address;
+  }
+  const onlyTheCity = Boolean(name) && !address && !stored.name && city && name.toLowerCase() === city.toLowerCase();
+  if (onlyTheCity) return { name: "", address: "", inherited: false };
+  return { name, address, inherited: Boolean(name) };
 }
 
 export function activityIssues(draft: ActivityDraft): ActivityIssueCode[] {

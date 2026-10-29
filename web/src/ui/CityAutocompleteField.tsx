@@ -13,6 +13,8 @@ export function CityAutocompleteField(props: {
   label?: string;
   /** Parent already shows the label. */
   hideLabel?: boolean;
+  /** A real <label htmlFor> is already on the page, so this input does not set its own name. */
+  hasVisibleLabel?: boolean;
   id?: string;
   /** Hide helper lines under the field (e.g. create-circle step). */
   compact?: boolean;
@@ -114,7 +116,9 @@ export function CityAutocompleteField(props: {
             showList && activeIndex >= 0 ? `${inputId}-opt-${activeIndex}` : undefined
           }
           autoComplete="off"
-          aria-label={props.hideLabel ? (props.placeholder ?? props.label ?? "City") : undefined}
+          aria-label={
+            props.hasVisibleLabel || !props.hideLabel ? undefined : (props.placeholder ?? props.label ?? "City")
+          }
           placeholder={props.placeholder ?? "Start typing — pick from the list"}
           value={props.value}
           disabled={props.disabled}

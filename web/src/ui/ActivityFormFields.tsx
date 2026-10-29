@@ -1,5 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { ActivityLocationField } from "./ActivityLocationField";
 import { DatePickerField } from "./DatePickerField";
 import { FormError } from "./FormError";
 import { QuarterHourTimePicker } from "./QuarterHourTimePicker";
@@ -33,6 +34,11 @@ export function ActivityFormFields(props: {
   submittingLabel: string;
   secondaryLabel?: string;
   onSecondary?: () => void;
+  /** Circle city, used only to scope place search. */
+  circleCity?: string;
+  countryCode?: string;
+  /** The current place was the Circle default when this new Activity opened. */
+  locationFromCircle?: boolean;
 }) {
   const { t } = useTranslation();
   const draft = props.draft;
@@ -157,27 +163,25 @@ export function ActivityFormFields(props: {
         </p>
       ) : null}
 
-      <fieldset className="activity-form-section">
+      <fieldset className="activity-form-section activity-location-section">
         <legend>{t("activityForm.where")}</legend>
-        <label className="activity-form-field" htmlFor={`${props.formId}-place`}>
-          <span>{t("activityForm.locationName")}</span>
-          <input
-            id={`${props.formId}-place`}
-            className="create-circle-input"
-            value={draft.locationName}
-            onChange={(event) => props.onChange({ locationName: event.target.value })}
-          />
-        </label>
-        <label className="activity-form-field" htmlFor={`${props.formId}-address`}>
-          <span>{t("activityForm.locationAddress")}</span>
-          <input
-            id={`${props.formId}-address`}
-            className="create-circle-input"
-            value={draft.locationAddress}
-            placeholder={t("activityForm.addressPlaceholder")}
-            onChange={(event) => props.onChange({ locationAddress: event.target.value })}
-          />
-        </label>
+        <p className="muted activity-form-help">{t("activityForm.locationHelp")}</p>
+        {props.circleCity?.trim() ? (
+          <p className="activity-location-city">
+            {t("activityForm.locationCityContext", { city: props.circleCity.trim() })}
+          </p>
+        ) : null}
+        <ActivityLocationField
+          id={`${props.formId}-place`}
+          city={props.circleCity ?? ""}
+          countryCode={props.countryCode}
+          name={draft.locationName}
+          address={draft.locationAddress}
+          inherited={Boolean(props.locationFromCircle)}
+          disabled={props.submitting}
+          onChange={props.onChange}
+        />
+        {!draft.locationName.trim() ? <p className="muted activity-form-help">{t("activityForm.locationLater")}</p> : null}
       </fieldset>
 
       <fieldset className="activity-form-section">

@@ -6,10 +6,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pycountry import countries
 
 from app.deps import CurrentUser, get_current_user
-from app.schemas import CitySuggestItem, CountryItem, LanguageItem, MapsLinkResolveResponse, ReverseLocateResponse
+from app.schemas import (
+    CitySuggestItem,
+    CountryItem,
+    LanguageItem,
+    MapsLinkResolveResponse,
+    PlaceSuggestion,
+    ReverseLocateResponse,
+)
 from app.services.google_maps_link import resolve_google_maps_link
 from app.services.language_suggest import language_suggest as search_languages
 from app.services.osm_venues import nominatim_city_suggest, reverse_place_hints_with_fallback
+from app.services.place_suggest import PLACE_SUGGEST_MAX_LIMIT, PlaceSearchUnavailable, place_suggest
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +57,28 @@ async def city_suggest(
             raise HTTPException(status_code=400, detail="country must be a 2-letter ISO code")
     raw = await nominatim_city_suggest(query=q.strip(), country_code=cc, limit=10)
     return [CitySuggestItem(**x) for x in raw]
+
+
+@router.get("/place-suggest", response_model=list[PlaceSuggestion])
+async def place_suggest_route(
+    q: str = Query(..., min_length=2, max_length=120),
+    city: str = Query(..., min_length=1, max_length=200),
+    country: str | None = Query(None, min_length=2, max_length=2),
+    limit: int = Query(PLACE_SUGGEST_MAX_LIMIT, ge=1, le=PLACE_SUGGEST_MAX_LIMIT),
+    lat: float | None = Query(None, ge=-90, le=90),
+    lon: float | None = Query(None, ge=-180, le=180),
+    _: CurrentUser = Depends(get_current_user),
+) -> list[PlaceSuggestion]:
+    cc: str | None = None
+    if country is not None and country.strip():
+        cc = country.strip().upper()
+        if not cc.isalpha():
+            raise HTTPException(status_code=400, detail="country must be a 2-letter ISO code")
+    try:
+        raw = await place_suggest(query=q, city=city, country_code=cc, limit=limit, lat=lat, lon=lon)
+    except PlaceSearchUnavailable:
+        raise HTTPException(status_code=503, detail="Place search is unavailable right now.") from None
+    return [PlaceSuggestion(**x) for x in raw]
 
 
 @router.get("/reverse-locate", response_model=ReverseLocateResponse)

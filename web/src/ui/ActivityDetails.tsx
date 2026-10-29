@@ -21,6 +21,8 @@ export function ActivityDetails(props: {
   focusOccurrenceId?: string | null;
   onBack: () => void;
   onChanged: () => void;
+  /** Opened from the activities list, so Back returns there. */
+  backToActivities?: boolean;
 }) {
   const { t } = useTranslation();
   const [activity, setActivity] = useState<Activity | null>(null);
@@ -395,7 +397,7 @@ export function ActivityDetails(props: {
   return (
     <div className={`activity-details stack${activity?.status === "cancelled" ? " is-cancelled" : ""}`}>
       <button type="button" className="circle-details-back" onClick={props.onBack}>
-        {t("activityDetails.back")}
+        {t(props.backToActivities ? "activityDetails.backToActivities" : "activityDetails.back")}
       </button>
 
       {loading ? (

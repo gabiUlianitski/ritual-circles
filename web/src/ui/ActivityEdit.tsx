@@ -88,6 +88,9 @@ export function ActivityEdit(props: {
         submitting={submitting}
         submitLabel={t("activityDetails.save")}
         submittingLabel={t("activityForm.submitting")}
+        circleCity={props.circle.cityName?.split(",")[0]?.trim() ?? ""}
+        countryCode={props.circle.countryCode?.trim() ?? ""}
+        locationFromCircle={false}
       />
     </form>
   );

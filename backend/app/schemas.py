@@ -432,6 +432,7 @@ class VenueSuggestionItem(BaseModel):
     distanceLabel: str | None = None
     distanceKm: float | None = None
     hint: str | None = None
+    placeCategory: Literal["sports", "park", "cafe", "community", "transit", "generic"] = "generic"
     lat: float | None = None
     lon: float | None = None
 
@@ -448,6 +449,8 @@ class VenueSuggestionsRequest(BaseModel):
     ritualType: str
     ritualSubtype: str | None = None
     ritualLevel: str | int | None = None
+    """ISO country, used only to keep the suggestion cache specific. Search still uses `address`."""
+    countryCode: str | None = None
 
 
 class VenueSuggestionsResponse(BaseModel):
@@ -474,6 +477,21 @@ class CitySuggestItem(BaseModel):
     lat: float | None = None
     lon: float | None = None
     countryCode: str | None = None
+
+
+class PlaceSuggestion(BaseModel):
+    """One normalized place inside the selected city (never a raw provider payload)."""
+
+    kind: Literal["place"] = "place"
+    category: Literal["sports", "park", "cafe", "community", "transit", "generic"] = "generic"
+    name: str
+    cityName: str | None = None
+    countryCode: str | None = None
+    countryName: str | None = None
+    shortAddress: str | None = None
+    fullAddress: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class ReverseLocateResponse(BaseModel):
@@ -804,6 +822,8 @@ class ActivityDefaultsResponse(BaseModel):
     locationName: str | None = None
     locationAddress: str | None = None
     preferredGroupSize: int
+    # Circle city for place search. Not a venue, and not copied into locationName.
+    cityName: str | None = None
 
 
 class ActivityCreateRequest(BaseModel):

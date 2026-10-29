@@ -166,7 +166,7 @@ class ActivityDefaultRuleTests(unittest.TestCase):
             city="Zurich",
             city_name=None,
         )
-        self.assertEqual(name, "Zurich")
+        self.assertIsNone(name)
         self.assertIsNone(address)
 
     def test_specific_place_keeps_the_city_out_of_the_address(self) -> None:
@@ -323,8 +323,9 @@ class ActivityDatabaseTests(unittest.IsolatedAsyncioTestCase):
             '{"type":"fixed","min":6,"max":6}',
         )
         defaults = await get_activity_defaults(self.conn, user_id=self.member_id, circle_id=self.circle_id)
-        self.assertEqual(defaults.locationName, "Zurich")
+        self.assertIsNone(defaults.locationName)
         self.assertIsNone(defaults.locationAddress)
+        self.assertEqual(defaults.cityName, "Zurich")
         self.assertEqual(defaults.preferredGroupSize, 6)
         before = await self._counts()
         first = await create_activity(
@@ -333,7 +334,7 @@ class ActivityDatabaseTests(unittest.IsolatedAsyncioTestCase):
             circle_id=self.circle_id,
             payload=_create_payload(title="Activity A", groupSize=None, locationName=None, locationAddress=None),
         )
-        self.assertEqual(first.locationName, "Zurich")
+        self.assertIsNone(first.locationName)
         self.assertIsNone(first.locationAddress)
         self.assertEqual(first.groupSize, 6)
         await self.conn.execute(
@@ -348,7 +349,7 @@ class ActivityDatabaseTests(unittest.IsolatedAsyncioTestCase):
         )
         listed = await list_activities_for_circle(self.conn, user_id=self.member_id, circle_id=self.circle_id)
         saved = next(item for item in listed if item.id == first.id)
-        self.assertEqual(saved.locationName, "Zurich")
+        self.assertIsNone(saved.locationName)
         self.assertEqual(saved.groupSize, 6)
         second = await create_activity(
             self.conn,
@@ -356,7 +357,7 @@ class ActivityDatabaseTests(unittest.IsolatedAsyncioTestCase):
             circle_id=self.circle_id,
             payload=_create_payload(title="Activity B", groupSize=None, locationName=None, locationAddress=None),
         )
-        self.assertEqual(second.locationName, "Bern")
+        self.assertIsNone(second.locationName)
         self.assertIsNone(second.locationAddress)
         self.assertEqual(second.groupSize, 8)
         self.assertEqual(await self._counts(), before)

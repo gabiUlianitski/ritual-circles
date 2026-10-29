@@ -67,6 +67,7 @@ async def venue_suggestions(
                 ritual_type=payload.ritualType.strip(),
                 ritual_subtype=payload.ritualSubtype.strip() if payload.ritualSubtype else None,
                 ritual_level=payload.ritualLevel,
+                country_code=payload.countryCode,
             )
     except TimeoutError as e:
         logger.warning("venue_suggestions_router_timeout", extra={"address": payload.address[:80]})

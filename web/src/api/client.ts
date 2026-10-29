@@ -21,6 +21,7 @@ import type {
   CircleResponse,
   CountryItem,
   CitySuggestItem,
+  PlaceSuggestion,
   LanguageItem,
   Hoby,
   HobyBulkResponse,
@@ -159,6 +160,7 @@ export const api = {
       ritualType: string;
       ritualSubtype?: string | null;
       ritualLevel?: string | number | null;
+      countryCode?: string | null;
     },
     fetchOptions?: { signal?: AbortSignal },
   ) => request<VenueSuggestionsResponse>("POST", "/circles/venue-suggestions", payload, fetchOptions),
@@ -353,6 +355,19 @@ export const api = {
     const sp = new URLSearchParams({ q: params.q });
     if (params.country?.trim()) sp.set("country", params.country.trim());
     return request<CitySuggestItem[]>("GET", `/geo/city-suggest?${sp.toString()}`, undefined, fetchOptions);
+  },
+  placeSuggest: (
+    params: { q: string; city: string; country?: string; limit?: number; lat?: number | null; lon?: number | null },
+    fetchOptions?: { signal?: AbortSignal },
+  ) => {
+    const sp = new URLSearchParams({ q: params.q, city: params.city });
+    if (params.country?.trim()) sp.set("country", params.country.trim());
+    if (params.limit) sp.set("limit", String(params.limit));
+    if (params.lat != null && params.lon != null) {
+      sp.set("lat", String(params.lat));
+      sp.set("lon", String(params.lon));
+    }
+    return request<PlaceSuggestion[]>("GET", `/geo/place-suggest?${sp.toString()}`, undefined, fetchOptions);
   },
   languageSuggest: (params: { q: string }) =>
     request<LanguageItem[]>("GET", `/geo/language-suggest?q=${encodeURIComponent(params.q)}`),

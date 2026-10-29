@@ -89,7 +89,11 @@ Fields:
 - `modality` `online` | `offline`
 - `recurringTime` (text schedule)
 - `is_recurring` (019)
-- `city`, `country_code`, `city_name`, `meeting_place` (007)
+- `city`, `country_code`, `city_name`, `meeting_place` (007). `meeting_place` is one text line: `<place name> — <address>`, or only the name. The city is where the Circle is based. It is not a venue, and a new Activity does not copy it into `location_name` when no preferred place is set.
+
+  Future structured place fields (not built; no migration): preferred place name, address, latitude, longitude, and a provider id. Those would support distance-based discovery, nearby Activities, deduplication, and a map, without geocoding the text again.
+
+  Changing the city while a preferred place is selected still uses the browser confirm dialog. There is no shared confirmation component to replace it.
 - `"maxSize"` integer 1–6, kept in step with `group_size_json`; a fallback for the default Activity size. Not a membership cap.
 - `group_size_json` fixed / max / min / range policy (022): the Circle's typical group size. Descriptive only; it pre-fills a new Activity's maximum `group_size`. A new Activity's `min_participants` starts equal to that maximum.
 - `cost_payment_json` (023)

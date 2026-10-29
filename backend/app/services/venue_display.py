@@ -173,6 +173,98 @@ def guess_category_from_name(name: str) -> str | None:
     return None
 
 
+PLACE_CATEGORIES = ("sports", "park", "cafe", "community", "transit", "generic")
+
+_PLACE_CATEGORY_BY_TAG: dict[tuple[str, str], str] = {
+    ("amenity", "cafe"): "cafe",
+    ("amenity", "coffee_shop"): "cafe",
+    ("shop", "coffee"): "cafe",
+    ("leisure", "park"): "park",
+    ("leisure", "garden"): "park",
+    ("leisure", "nature_reserve"): "park",
+    ("leisure", "playground"): "park",
+    ("leisure", "common"): "park",
+    ("leisure", "dog_park"): "park",
+    ("landuse", "recreation_ground"): "park",
+    ("landuse", "forest"): "park",
+    ("natural", "wood"): "park",
+    ("boundary", "national_park"): "park",
+    ("highway", "cycleway"): "park",
+    ("highway", "path"): "park",
+    ("highway", "track"): "park",
+    ("leisure", "sports_centre"): "sports",
+    ("leisure", "pitch"): "sports",
+    ("leisure", "stadium"): "sports",
+    ("leisure", "track"): "sports",
+    ("leisure", "fitness_centre"): "sports",
+    ("leisure", "fitness_station"): "sports",
+    ("leisure", "sports_hall"): "sports",
+    ("leisure", "swimming_pool"): "sports",
+    ("leisure", "ice_rink"): "sports",
+    ("leisure", "golf_course"): "sports",
+    ("leisure", "horse_riding"): "sports",
+    ("club", "sport"): "sports",
+    ("amenity", "community_centre"): "community",
+    ("amenity", "library"): "community",
+    ("amenity", "arts_centre"): "community",
+    ("amenity", "social_centre"): "community",
+    ("amenity", "theatre"): "community",
+    ("amenity", "townhall"): "community",
+    ("amenity", "events_venue"): "community",
+    ("amenity", "cultural_centre"): "community",
+    ("railway", "station"): "transit",
+    ("railway", "halt"): "transit",
+    ("railway", "tram_stop"): "transit",
+    ("railway", "subway_entrance"): "transit",
+    ("public_transport", "station"): "transit",
+    ("public_transport", "stop_position"): "transit",
+    ("public_transport", "platform"): "transit",
+    ("highway", "bus_stop"): "transit",
+    ("amenity", "bus_station"): "transit",
+    ("amenity", "ferry_terminal"): "transit",
+}
+
+_PLACE_CATEGORY_BY_LABEL: dict[str, str] = {
+    "cafe": "cafe",
+    "park": "park",
+    "bike path": "park",
+    "path": "park",
+    "landmark": "generic",
+    "sports center": "sports",
+    "sports pitch": "sports",
+    "track": "sports",
+    "tennis court": "sports",
+    "gym": "sports",
+    "stadium": "sports",
+    "cycling": "sports",
+    "library": "community",
+    "community center": "community",
+}
+
+
+def place_category_from_osm(key: str | None, value: str | None) -> str:
+    k = str(key or "").strip().lower()
+    v = str(value or "").strip().lower()
+    if (k, v) in _PLACE_CATEGORY_BY_TAG:
+        return _PLACE_CATEGORY_BY_TAG[(k, v)]
+    if k == "sport" and v:
+        return "sports"
+    return "generic"
+
+
+def place_category_from_tags(tags: dict[str, Any] | None) -> str:
+    tag_map = {str(k).lower(): str(v).lower() for k, v in (tags or {}).items()}
+    for key in ("amenity", "shop", "leisure", "club", "railway", "public_transport", "highway", "landuse", "natural", "boundary"):
+        category = place_category_from_osm(key, tag_map.get(key))
+        if category != "generic":
+            return category
+    return "sports" if tag_map.get("sport") else "generic"
+
+
+def place_category_from_label(label: str | None) -> str:
+    return _PLACE_CATEGORY_BY_LABEL.get(str(label or "").strip().lower(), "generic")
+
+
 def venue_card_fields(
     *,
     name: str,

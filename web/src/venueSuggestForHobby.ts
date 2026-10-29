@@ -25,6 +25,7 @@ export async function findVenueSuggestionsForHobby(
     ritualType: string;
     ritualSubtype?: string | null;
     ritualLevel?: string | number | null;
+    countryCode?: string | null;
   },
   options?: { signal?: AbortSignal },
 ): Promise<VenueSuggestionsResponse> {
@@ -34,6 +35,7 @@ export async function findVenueSuggestionsForHobby(
       ritualType: params.ritualType.trim(),
       ritualSubtype: params.ritualSubtype?.trim() || null,
       ritualLevel: params.ritualLevel ?? null,
+      countryCode: params.countryCode?.trim() || null,
     },
     options,
   );
